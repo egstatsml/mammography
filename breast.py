@@ -35,8 +35,8 @@ class breast(object):
 
 
         self.data = []                          #the mammogram
-        self.pectoral = []                      #binary map ofpectoral muscle
-        self.background = []                    #binary map of background
+        self.pectoral_mask = []                  #binary map ofpectoral muscle
+        self.breast_mask = []                    #binary map of breast
         self.pectoral_present = False
         self.pectoral_muscle_removed = False
         self.label_removed = False
@@ -311,9 +311,9 @@ class breast(object):
         temp = filters.gaussian_filter(temp,0.5) 
         #do some contrast enhancement
         enhance = np.log10( 1 + temp)
-        enhance[enhance > 0] = 1.0
+        enhance[enhance > 0.1] = 1.0
         label_mask, num_labels = measurements.label(enhance)
-        breast_mask = np.zeros(np.shape(self.data))
+        self.breast_mask = np.zeros(np.shape(self.data))
 
         #now will see how many labels there are
         #in an ideal scenario, there should only be two, the breast being scanned,
@@ -350,7 +350,6 @@ class breast(object):
                 elif(np.sum(component[:,0:np.round( self.im_width / 4)]) == 0):
                     #then this is a stray artifact, and should get rid of it in the label
                     #mask and the original image
-                    print('here')
                     label_mask[component == 1] = 0
                     self.data[component == 1] = 0
 
@@ -359,54 +358,40 @@ class breast(object):
                 #or below the breast
                 elif(np.sum(component) < 80000):
                     #then we should get rid of it
-                    print('here')
                     label_mask[component == 1] = 0
                     self.data[component == 1] = 0
 
-
-                #will check if any other small bits of skin above or below the breast made it through
-                #elif( (np.sum(component[0:np.round(np.shape(component)[0]/3), :]) == 0) | (np.sum(component[np.round(2 * np.shape(component)[0]/3):np.shape(component)[0], :])  == 0)):
-                #  label_mask[component == 1] = 0
-                # im[component == 1] = 0
-
-                
                 #if we have passed all the other tests, then we have found the breast
                 else:
                     print('found the breast')
-                    breast_mask = component
+                    self.breast_mask = component
+                    
 
+        #lets use this breast mask to set all the background elements to zero
+        #MAY WANT TO SET THEM TO NAN AT A LATER STAGE, WILL SEE HOW THAT WOULD WORK
+        self.data[ self.breast_mask == 0 ] = 0
+        
         print('finding the edges')
-        edges = feature.canny(breast_mask)
-
-        plt.figure()
-        plt.imshow(breast_mask)
-        plt.show()
+        edges = feature.canny(self.breast_mask)
         
         #get just a graph of the boundary
         #y is the y position of the image, and will use as independant variable here
         y,boundary = self.thin_boundary(edges)
 
+        print(boundary)
+        #remove any extra skin bits that have made it this far
+        boundary,y = self.remove_skin(boundary, y)
         #now will check to see if we have a point of inflection, caused by some skin included in the scan
+        print(boundary)
         #finding stationary points in the boundary
         stationary_y, stationary_x =  self.stationary_points(boundary)
 
         #stationary point in the where the boundary is maximum will likely be the nipple
         self.nipple_x = np.max(stationary_x)
-        self.nipple_y = stationary_y[stationary_x == self.nipple_x]
-
-        plt.figure()
-        plt.subplot(111)
-        plt.plot(y,boundary)
-        plt.title('Breast boundary')
-        plt.scatter(self.nipple_y,self.nipple_x)#, '+r', markersize=10)
-        plt.show()
-
+        self.nipple_y = stationary_y[stationary_x == self.nipple_x] + y[0]
         
-        plt.figure()
-        plt.imshow(edges)
-        plt.show()
+        self.boundary = boundary.astype('uint8')
 
-        self.boundary = edges.astype('uint8')
         return edges
 
 
@@ -450,24 +435,18 @@ class breast(object):
 
     """
 
-
-    def stationary_points(self, boundary, sigma = 10):
+    def stationary_points(self, boundary, sigma = 20):
 
         stationary_y = []
         stationary_x = []
         #now lets first apply a low pass filter/Gaussian blur to remove any high frequency
         #noise that would mess with the derivative
         #default high standard deviation (sigma = 10) on blur so it gets rid of high frequencies better
-        
-        print('sigma = %f' %(sigma))
-        temp = filters.gaussian_filter1d(np.asarray(boundary).astype(float) , sigma)
-        dx = np.diff(temp)
 
-        print(dx)
-        
-        plt.figure()
-        plt.plot(dx)
-        plt.show()
+        print('here')
+        temp = filters.gaussian_filter1d(np.asarray(boundary).astype(float) , sigma)
+        dx = np.gradient(temp)
+
         #now will find the stationary points. A stationary point will occur when the derivative changes from pos to negative
         for ii in range(0,np.shape(dx)[0] - 1):
             if( np.sign(dx[ii]) != np.sign(dx[ii+1]) ):
@@ -475,3 +454,110 @@ class breast(object):
                 stationary_x.append(boundary[ii])
         return np.asarray(stationary_y), np.asarray(stationary_x) 
 
+
+
+
+
+
+    """
+
+
+    TODO
+
+    USE Y ORIG VALUE BEFORE CHANGING BOUNDARIES
+
+
+
+
+
+
+
+
+
+    remove_skin()
+
+    Description:
+    Will remove any extra bits of skin at the bottom or top of the scan
+
+    Will breast boundary to do this, by finding points that are near stationary near the
+    top or bottom of the scan
+
+    @param boundary = array containing the breast boundary locations
+    
+    """
+    
+    def remove_skin(self, boundary, y):
+
+        
+        y_orig = y[0]
+        
+        temp = filters.gaussian_filter1d(np.asarray(boundary).astype(float) , 5)
+
+        
+        plt.figure()
+        plt.subplot(311)
+        plt.title('boundary')
+        plt.plot(boundary)
+
+        dx = np.gradient(temp)
+        temp = filters.gaussian_filter1d(dx , 20)
+        d2x = np.gradient(temp)
+        temp = filters.gaussian_filter1d(d2x , 10)
+        
+        test = signal.find_peaks_cwt(temp, np.arange(100,500))
+        print(test)
+        plt.subplot(312)
+        plt.title('first derivative')
+        plt.plot(dx)
+
+        plt.subplot(313)
+        plt.plot(d2x)
+        plt.title('second derivative')
+        plt.show()
+
+
+        #find the stationary points
+        stationary_y, stationary_x =  self.stationary_points(boundary)
+        #now will see where the stationary points are
+        #if they are near the end then probably where we go from skin to
+        #breast
+
+
+        #check near top of image
+        if( (stationary_y[0] < self.im_height /4.0 ) ):
+            #then it is skin and we should get rid of it
+            print('upper')
+            boundary = boundary[y > stationary_y[0]]
+            y = y[y > stationary_y[0]]
+            self.data[0:y[0],:] = 0
+            
+
+        if( np.max(np.abs(d2x[0:self.im_height/4])) > (np.max(np.abs(d2x)) * 0.6) ):
+            lim_pos =  np.where( np.abs(d2x) == np.max(np.abs(d2x[0:self.im_height/4])))[0]
+            print lim_pos
+            print np.shape(lim_pos)
+            boundary = boundary[lim_pos::]
+            y = y[lim_pos::]
+            self.data[0:lim_pos,:] = 0
+
+            
+        
+        if(stationary_y[-1] > self.im_height * (3.0/4.0) ):
+            print('lower')
+            boundary = boundary[y < stationary_y[-1]]
+            y = y[y < stationary_y[-1]]
+            self.data[y[-1]::,:] = 0
+
+
+        if( np.max(np.abs(d2x[self.im_height * (3/4)::])) > (np.max(np.abs(d2x)) * 0.6) ):
+            lim_pos = np.where( np.abs(d2x) == np.max(np.abs(d2x[self.im_height *(3/4)::])))[0]
+
+            boundary = boundary[0:lim_pos+y[0]]
+            y = y[0:lim_pos+y[0]]
+            print(np.shape(lim_pos))
+            print('pleeease')
+            
+            self.data[lim_pos + y_orig::,:] = 0
+
+
+        return boundary, y
