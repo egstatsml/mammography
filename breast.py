@@ -34,7 +34,7 @@ class breast(object):
     def __init__(self, file_path = False):
 
 
-        self.data = []                          #the mammogram
+        self.data = []                           #the mammogram
         self.pectoral_mask = []                  #binary map ofpectoral muscle
         self.breast_mask = []                    #binary map of breast
         self.pectoral_present = False
@@ -69,11 +69,14 @@ class breast(object):
     def initialise(self, file_path):
         file = dicom.read_file(file_path)
         self.data = np.fromstring(file.PixelData,dtype=np.int16).reshape((file.Rows,file.Columns))
+        #convert the data to floating point now
+        self.data = self.data.astype(float)
         self.im_width = np.shape(self.data)[1]
         self.im_height = np.shape(self.data)[0]
         #check correct orientation of the image
         self.check_orientation()
-        
+        self.remove_artifacts()
+        self.breast_boundary()
 
 
 
@@ -364,25 +367,24 @@ class breast(object):
                 #if we have passed all the other tests, then we have found the breast
                 else:
                     print('found the breast')
-                    self.breast_mask = component
-                    
+                    self.breast_mask = np.copy(component.astype('uint8'))
+
 
         #lets use this breast mask to set all the background elements to zero
         #MAY WANT TO SET THEM TO NAN AT A LATER STAGE, WILL SEE HOW THAT WOULD WORK
-        self.data[ self.breast_mask == 0 ] = 0
+        self.data[ self.breast_mask == 0 ] = np.nan
         
         print('finding the edges')
-        edges = feature.canny(self.breast_mask)
+        edges = feature.canny(self.breast_mask.astype(float))
+
         
         #get just a graph of the boundary
         #y is the y position of the image, and will use as independant variable here
         y,boundary = self.thin_boundary(edges)
 
-        print(boundary)
         #remove any extra skin bits that have made it this far
         boundary,y = self.remove_skin(boundary, y)
         #now will check to see if we have a point of inflection, caused by some skin included in the scan
-        print(boundary)
         #finding stationary points in the boundary
         stationary_y, stationary_x =  self.stationary_points(boundary)
 
@@ -392,7 +394,6 @@ class breast(object):
         
         self.boundary = boundary.astype('uint8')
 
-        return edges
 
 
 
@@ -443,7 +444,7 @@ class breast(object):
         #noise that would mess with the derivative
         #default high standard deviation (sigma = 10) on blur so it gets rid of high frequencies better
 
-        print('here')
+
         temp = filters.gaussian_filter1d(np.asarray(boundary).astype(float) , sigma)
         dx = np.gradient(temp)
 
@@ -493,11 +494,6 @@ class breast(object):
         
         temp = filters.gaussian_filter1d(np.asarray(boundary).astype(float) , 5)
 
-        
-        plt.figure()
-        plt.subplot(311)
-        plt.title('boundary')
-        plt.plot(boundary)
 
         dx = np.gradient(temp)
         temp = filters.gaussian_filter1d(dx , 20)
@@ -505,16 +501,6 @@ class breast(object):
         temp = filters.gaussian_filter1d(d2x , 10)
         
         test = signal.find_peaks_cwt(temp, np.arange(100,500))
-        print(test)
-        plt.subplot(312)
-        plt.title('first derivative')
-        plt.plot(dx)
-
-        plt.subplot(313)
-        plt.plot(d2x)
-        plt.title('second derivative')
-        plt.show()
-
 
         #find the stationary points
         stationary_y, stationary_x =  self.stationary_points(boundary)
@@ -529,16 +515,15 @@ class breast(object):
             print('upper')
             boundary = boundary[y > stationary_y[0]]
             y = y[y > stationary_y[0]]
-            self.data[0:y[0],:] = 0
+            self.data[0:y[0],:] = np.nan
             
 
         if( np.max(np.abs(d2x[0:self.im_height/4])) > (np.max(np.abs(d2x)) * 0.6) ):
             lim_pos =  np.where( np.abs(d2x) == np.max(np.abs(d2x[0:self.im_height/4])))[0]
-            print lim_pos
-            print np.shape(lim_pos)
+
             boundary = boundary[lim_pos::]
             y = y[lim_pos::]
-            self.data[0:lim_pos,:] = 0
+            self.data[0:lim_pos,:] = np.nan
 
             
         
@@ -546,7 +531,7 @@ class breast(object):
             print('lower')
             boundary = boundary[y < stationary_y[-1]]
             y = y[y < stationary_y[-1]]
-            self.data[y[-1]::,:] = 0
+            self.data[y[-1]::,:] = np.nan
 
 
         if( np.max(np.abs(d2x[self.im_height * (3/4)::])) > (np.max(np.abs(d2x)) * 0.6) ):
@@ -554,10 +539,8 @@ class breast(object):
 
             boundary = boundary[0:lim_pos+y[0]]
             y = y[0:lim_pos+y[0]]
-            print(np.shape(lim_pos))
-            print('pleeease')
             
-            self.data[lim_pos + y_orig::,:] = 0
+            self.data[lim_pos + y_orig::,:] = np.nan
 
 
         return boundary, y

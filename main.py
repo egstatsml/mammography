@@ -16,22 +16,23 @@ from skimage.feature import corner_harris, corner_subpix, corner_peaks
 from scipy import ndimage as ndi
 #import the breast class
 from breast import breast
+from feature_extract import feature
 import pywt
-
+from sklearn.cluster import KMeans
 from skimage import measure
 
+from scipy.cluster import vq as vq
+import skfuzzy as fuzz
 
+
+
+a = spreadsheet()
 
 #load in a file
 #file_path = '/home/ethan/DREAM/pilot_images/111359.dcm' #image without pectoral muscle
 file_path = '/home/ethan/DREAM/pilot_images/134060.dcm' #image with pectoral muscle
 #file_path = '/home/ethan/DREAM/pilot_images/502860.dcm' #malignant case
-current_scan = breast(file_path)
-current_scan.remove_artifacts()
-
-boundary = current_scan.breast_boundary()
-
-
+current_scan = feature(file_path)
 
 
 titles = ['Horizontal', 'Vertical', 'Diagonal']
@@ -62,17 +63,13 @@ plt.title('Current Scan')
 plt.colorbar()
 plt.show()
 
-
-
-pdf = np.histogram( enhanced[current_scan.breast_mask == 1], bins=np.arange(0,1000), density=True)
+plt.figure()
+plt.imshow(current_scan.breast_mask)
+plt.show()
+pdf = np.histogram( current_scan.data[current_scan.breast_mask == 1], bins=np.arange(0,500), density=True)
 cdf = np.cumsum(pdf[0])
 
 
-
-print(pdf)
-print(np.shape(pdf[0]))
-print(np.shape(pdf[1]))
-print(pdf[0])
 plt.figure()
 plt.subplot(211)
 plt.plot(np.arange(0, pdf[1][-1]),pdf[0])
@@ -82,9 +79,17 @@ plt.plot(np.arange(0, pdf[1][-1]), cdf)
 plt.title('CDF of log Enhanced scan')
 plt.show()
 
+current_scan.get_features()
 
 
 
+
+
+
+
+
+
+"""
 enhanced = np.copy(current_scan.data)
 enhanced[enhanced > np.mean(enhanced)] = enhanced[enhanced > np.mean(enhanced)]*10
 enhanced = filters.gaussian_filter((enhanced),30) 
@@ -108,34 +113,30 @@ ax.set_yticks([])
 plt.show()
 
 
+"""
+"""
+#lets do some clustering
+centre,dist = vq.kmeans(current_scan.data, 3)
+code, distance = vq.vq(current_scan.data, centre)
+res = centre[code]
+res2 = res.reshape(np.shape(current_scan.data))
+plt.figure()
+plt.imshow(res2)
+plt.show()
+"""
+"""
 
-decomp = pywt.wavedec2( np.log(1 + current_scan.data), 'db2')
-wav_i = []
+im_size = np.shape(current_scan.data)
 
-for ii in range(6, len(decomp)):
-    filter_bank = decomp[ii]
-    
-    plt.imshow( np.multiply(filter_bank[0], filter_bank[1]))
-    plt.title('Multiplication of Horizontal and Vertical')
-    plt.colorbar()
-    plt.show()
-    plt.clf()
-    #try element wise multiplication of horizontal and vertical
-    
-    for jj in range(0, 3):
-        print(jj)
-        filter_temp = filter_bank[jj]
-        print((filter_temp))
+test = np.copy(filters.gaussian_filter(current_scan.data,10)).reshape(im_size[0] * im_size[1],1)
+print(np.shape(test))
+kmeans = KMeans(3,init='k-means++')
+z = kmeans.fit_predict(test)
+print(np.shape(z))
+z = z.reshape(im_size)
 
-        plt.imshow(filter_temp)
-        plt.title(titles[jj])
-        plt.colorbar()
-        plt.show()
-        plt.clf()
-            
-    
+plt.figure()
+plt.imshow(z)
+plt.show()
+"""
 
-        
-    
-
-        
