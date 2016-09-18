@@ -116,8 +116,6 @@ class feature(breast):
             temp = [self.packets.node.path for self.packets.node in self.packets.get_level(ii)]
             temp = np.asarray(temp)
             self.indicies.append( temp.reshape( [np.sqrt(np.shape(temp)), np.sqrt(np.shape(temp))] ))
-            print('indicies')
-            print(np.asarray(temp))
             
             
         
@@ -176,8 +174,6 @@ class feature(breast):
 
         #features above will be an array according to the level of decomp from
         #wavelet packet level we are at
-
-        print(self.indicies[level])
         
         for ii in range(0, np.shape(self.indicies[level])[0]):
             for jj in range(0, np.shape(self.indicies[level])[1]):

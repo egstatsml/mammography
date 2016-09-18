@@ -241,11 +241,11 @@ class breast(object):
         thresh = np.copy(self.data)
         #will crop the image first, as the pectoral muscle will never be in the right hand side of the image
         #after the orientation has been corrected
-        thresh = thresh[:,0:self.im_width/2]
+        thresh = thresh[:,0:self.im_width/4]
 
         #now finding the mean value for all pixels that arent the background
         mean_val = np.mean(thresh[thresh > 0])
-        thresh[thresh > mean_val] = 0
+        thresh[thresh < mean_val] = 0
         #now apply a blur before edge detection
         thresh = filters.gaussian_filter(thresh,30) 
 
@@ -311,7 +311,7 @@ class breast(object):
 
         temp = np.copy(self.data)
 
-        temp = filters.gaussian_filter(temp,0.5) 
+        temp = filters.gaussian_filter(temp,5) 
         #do some contrast enhancement
         enhance = np.log10( 1 + temp)
         enhance[enhance > 0.1] = 1.0
@@ -328,7 +328,9 @@ class breast(object):
 
         #if the number of labels is greater than two, will get rid of the ones not needed
 
-        
+        #plt.figure()
+        #plt.imshow(label_mask)
+        #plt.show()
         if(num_labels >=  1):
 
             for ii in range(0, num_labels+1):
@@ -375,7 +377,7 @@ class breast(object):
         self.data[ self.breast_mask == 0 ] = np.nan
         
         print('finding the edges')
-        edges = feature.canny(self.breast_mask.astype(float))
+        edges = sobel(self.breast_mask.astype(float))
 
         
         #get just a graph of the boundary
@@ -389,8 +391,9 @@ class breast(object):
         stationary_y, stationary_x =  self.stationary_points(boundary)
 
         #stationary point in the where the boundary is maximum will likely be the nipple
-        self.nipple_x = np.max(stationary_x)
-        self.nipple_y = stationary_y[stationary_x == self.nipple_x] + y[0]
+        if(len(stationary_y) > 0):
+            self.nipple_x = np.max(stationary_x)
+            self.nipple_y = stationary_y[stationary_x == self.nipple_x] + y[0]
         
         self.boundary = boundary.astype('uint8')
 
@@ -404,10 +407,11 @@ class breast(object):
 
 
     def thin_boundary(self, edges):
-        y_temp, boundary_temp = np.where(edges == 1)
-
+        y_temp, boundary_temp = np.where(edges > 0.01)
+        
         #now will loop through to make sure there is only one boundary location for each boundary position
         #if there are multiple boundary points at the same location, will just take the outermost position
+        print y_temp
         #finding the range of our loop
         y_min = np.min(y_temp)
         y_max = np.max(y_temp)
