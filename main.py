@@ -1,6 +1,8 @@
 import dicom
 import os
 import numpy as np
+import pandas as pd
+import sys
 from matplotlib import pyplot as plt
 from matplotlib import cm
 import scipy
@@ -29,18 +31,37 @@ import skfuzzy as fuzz
 
 descriptor = spreadsheet()
 
+#creating a list that will store the scan filename if any of them create an error
+#will then save this list and have a look to see where they failed
+error_files = []
+
 while(descriptor.patient_pos < descriptor.no_patients):
     #load in a file
     #file_path = '/home/ethan/DREAM/pilot_images/111359.dcm' #image without pectoral muscle
     #file_path = '/home/ethan/DREAM/pilot_images/134060.dcm' #image with pectoral muscle
     #file_path = '/home/ethan/DREAM/pilot_images/502860.dcm' #malignant case
+    #file_path = '/home/ethan/DREAM/pilot_images/151849.dcm' #malignant case with pectoral muscle
     #file_path = '/home/ethan/DREAM/pilot_images/485343.dcm' #scan that broke my initial boundary scan
-
+    
+    
     file_path = descriptor.next_scan()
 
     print(file_path)
-    current_scan = feature(file_path)
-    
-    current_scan.get_features()
 
+    try:
+        current_scan = feature(file_path)
+        current_scan.get_features()
+    except:
+        error_files.append(file_path)
+
+
+
+
+#will be here after have run through everything
+#lets save the features we found, and the file ID's of any that
+#created any errors so I can have a look later
+#will just convert the list of error files to a pandas database to look at later
+error_database = pd.DataFrame(error_files)
+
+    
 

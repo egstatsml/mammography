@@ -64,11 +64,7 @@ class spreadsheet(object):
         self.filename_l = []  #list containing the filenames of the left and right breast scans
         self.filename_r = []
 
-
-        #if(benign_files):
-        #   self.get_benign()
-
-
+        
 
     """
     next_scan()

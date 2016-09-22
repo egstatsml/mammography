@@ -38,7 +38,7 @@ from scipy.ndimage import filters as filters
 from scipy.ndimage import measurements as measurements
 from skimage.transform import (hough_line, hough_line_peaks,
                                probabilistic_hough_line)
-
+from skimage.feature import local_binary_pattern
 
 from skimage import feature
 from skimage.filters import roberts, sobel, scharr, prewitt
@@ -174,15 +174,27 @@ class feature(breast):
 
         #features above will be an array according to the level of decomp from
         #wavelet packet level we are at
-        
+
         for ii in range(0, np.shape(self.indicies[level])[0]):
             for jj in range(0, np.shape(self.indicies[level])[1]):
 
+                lbp = local_binary_pattern(self.packets[self.indicies[level][ii,jj]].data, 8, 3, 'uniform')
+                if(self.indicies[level][ii,jj][0] == 'a'):
+                    """
+                    plt.figure()
+                    plt.subplot(121)
+                    plt.imshow(self.packets[self.indicies[level][ii,jj]].data)
+                    plt.title(self.indicies[level][ii,jj])
+                    plt.subplot(122)
+                    plt.imshow(lbp)
+                    plt.show()
+                    """
                 #find co-occurance matrix and convert to uint8
                 temp = np.copy(self.packets[self.indicies[level][ii,jj]].data)
                 temp = temp.astype('uint8')
                 glcm = greycomatrix(temp, np.shape(temp), [0])
 
+                    
                 self.homogeneity[ii,jj] = greycoprops(glcm, prop='homogeneity')[0,0]
                 self.energy[ii,jj] = greycoprops(glcm, prop='energy')[0,0]
                 self.contrast[ii,jj] = greycoprops(glcm, prop='contrast')[0,0]

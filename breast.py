@@ -35,6 +35,7 @@ class breast(object):
 
 
         self.data = []                           #the mammogram
+        self.original_scan = []
         self.pectoral_mask = []                  #binary map ofpectoral muscle
         self.breast_mask = []                    #binary map of breast
         self.pectoral_present = False
@@ -69,6 +70,9 @@ class breast(object):
     def initialise(self, file_path):
         file = dicom.read_file(file_path)
         self.data = np.fromstring(file.PixelData,dtype=np.int16).reshape((file.Rows,file.Columns))
+
+        self.original_scan = np.copy(self.data)
+        
         #convert the data to floating point now
         self.data = self.data.astype(float)
         self.im_width = np.shape(self.data)[1]
@@ -129,7 +133,8 @@ class breast(object):
             self.remove_pectoral_muscle()
 
         
-
+        
+            
 
 
 
@@ -145,9 +150,9 @@ class breast(object):
     search 50 by 50 area and find local pdf
     if local pdf has very few elements below a threshold and more elements above a threshold, then is probably the label 
     will adaptaviely set threshold based on image parameters
-
     """
 
+    
     def remove_label(self):
 
         pdf_axis = np.arange(0, np.max(self.data))
@@ -241,7 +246,7 @@ class breast(object):
         thresh = np.copy(self.data)
         #will crop the image first, as the pectoral muscle will never be in the right hand side of the image
         #after the orientation has been corrected
-        thresh = thresh[:,0:self.im_width/4]
+        thresh = thresh[:,0:self.im_width]
 
         #now finding the mean value for all pixels that arent the background
         mean_val = np.mean(thresh[thresh > 0])
@@ -253,6 +258,8 @@ class breast(object):
         #apply sobel filter
         #replacing with canny filter might make it more suitable for Hough Transform
         edge = sobel(thresh)
+
+
         thresh_val = np.mean(edge[edge > 0]) * 1.5
         #now will remove the lower value components to focus on the
         #more prominent edges
@@ -263,7 +270,9 @@ class breast(object):
         #find the most prominent lines in the Hough Transform
         h, theta, d = hough_line_peaks(h, theta, d)
         #use the peak values to create polar form of line describing edge of pectoral muscle
-        pectoral_rho = np.max(d) #will need to account for rho being negative, but shouldnt happen for pectoral muscle case
+        valid_h = h[(theta < np.pi/8) & (theta > 0 )]
+        
+        pectoral_rho = d[h == max(valid_h.min(), valid_h.max(), key=abs)] #will need to account for rho being negative, but shouldnt happen for pectoral muscle case
         pectoral_theta = theta[d == pectoral_rho]
 
         #now lets get rid of all information to the left of this line
@@ -275,7 +284,9 @@ class breast(object):
                 self.data[0:np.floor(y).astype(int), x] = 0
                 #set these locations in the pectoral muscle binary map to true
                 self.pectoral[0:np.floor(y).astype(int), x] = True
-                
+
+
+
         self.pectoral_removed = True
         
 
@@ -328,9 +339,6 @@ class breast(object):
 
         #if the number of labels is greater than two, will get rid of the ones not needed
 
-        #plt.figure()
-        #plt.imshow(label_mask)
-        #plt.show()
         if(num_labels >=  1):
 
             for ii in range(0, num_labels+1):
@@ -372,20 +380,21 @@ class breast(object):
                     self.breast_mask = np.copy(component.astype('uint8'))
 
 
+
         #lets use this breast mask to set all the background elements to zero
         #MAY WANT TO SET THEM TO NAN AT A LATER STAGE, WILL SEE HOW THAT WOULD WORK
         self.data[ self.breast_mask == 0 ] = np.nan
+
         
         print('finding the edges')
         edges = sobel(self.breast_mask.astype(float))
-
         
         #get just a graph of the boundary
         #y is the y position of the image, and will use as independant variable here
         y,boundary = self.thin_boundary(edges)
 
         #remove any extra skin bits that have made it this far
-        boundary,y = self.remove_skin(boundary, y)
+        y, boundary = self.remove_skin(boundary, y)
         #now will check to see if we have a point of inflection, caused by some skin included in the scan
         #finding stationary points in the boundary
         stationary_y, stationary_x =  self.stationary_points(boundary)
@@ -394,7 +403,10 @@ class breast(object):
         if(len(stationary_y) > 0):
             self.nipple_x = np.max(stationary_x)
             self.nipple_y = stationary_y[stationary_x == self.nipple_x] + y[0]
+
+
         
+            
         self.boundary = boundary.astype('uint8')
 
 
@@ -422,6 +434,8 @@ class breast(object):
         for ii in range(0, np.shape(y)[0]):
             boundary[ii] = np.max(boundary_temp[y_temp == ii+y_min])
 
+            #boundary[boundary > 0] = 1
+        #boundary = boundary.astype('uint8')
         return y, boundary
 
                                  
@@ -447,8 +461,8 @@ class breast(object):
         #now lets first apply a low pass filter/Gaussian blur to remove any high frequency
         #noise that would mess with the derivative
         #default high standard deviation (sigma = 10) on blur so it gets rid of high frequencies better
-
-
+        
+        
         temp = filters.gaussian_filter1d(np.asarray(boundary).astype(float) , sigma)
         dx = np.gradient(temp)
 
@@ -503,9 +517,20 @@ class breast(object):
         temp = filters.gaussian_filter1d(dx , 20)
         d2x = np.gradient(temp)
         temp = filters.gaussian_filter1d(d2x , 10)
-        
-        test = signal.find_peaks_cwt(temp, np.arange(100,500))
 
+        """
+        plt.figure()
+        plt.subplot(311)
+        plt.plot(boundary)
+
+        plt.subplot(312)
+        plt.plot(dx)
+
+        plt.subplot(313)
+        plt.plot(d2x)
+        plt.show()
+        """
+        
         #find the stationary points
         stationary_y, stationary_x =  self.stationary_points(boundary)
         #now will see where the stationary points are
@@ -522,13 +547,22 @@ class breast(object):
             self.data[0:y[0],:] = np.nan
             
 
-        if( np.max(np.abs(d2x[0:self.im_height/4])) > (np.max(np.abs(d2x)) * 0.6) ):
-            lim_pos =  np.where( np.abs(d2x) == np.max(np.abs(d2x[0:self.im_height/4])))[0]
 
+        elif( np.max(np.abs(d2x[0:self.im_height/4])) > (np.max(np.abs(d2x)) * 0.6) ):
+            lim_pos =  np.where( np.abs(d2x) == np.max(np.abs(d2x[0:self.im_height/4])))[0]
+            print('first')
             boundary = boundary[lim_pos::]
             y = y[lim_pos::]
-            self.data[0:lim_pos,:] = np.nan
-
+            print(lim_pos)
+            """
+            plt.figure()
+            plt.plot(boundary)
+            plt.show()
+            self.data[0:(lim_pos + y_orig),:] = np.nan
+            plt.figure()
+            plt.imshow(self.data)
+            plt.show()
+            """
             
         
         if(stationary_y[-1] > self.im_height * (3.0/4.0) ):
@@ -538,8 +572,10 @@ class breast(object):
             self.data[y[-1]::,:] = np.nan
 
 
-        if( np.max(np.abs(d2x[self.im_height * (3/4)::])) > (np.max(np.abs(d2x)) * 0.6) ):
-            lim_pos = np.where( np.abs(d2x) == np.max(np.abs(d2x[self.im_height *(3/4)::])))[0]
+        print(np.max(np.abs(d2x[np.round(self.im_height * (3.0/4.0)):-1])))
+        
+        if( np.max(np.abs(d2x[np.round(self.im_height * (3.0/4.0))::])) > (np.max(np.abs(d2x)) * 0.6) ):
+            lim_pos = np.where( np.abs(d2x) == np.max(np.abs(d2x[np.round(self.im_height * (3.0/4.0))::])))[0]
 
             boundary = boundary[0:lim_pos+y[0]]
             y = y[0:lim_pos+y[0]]
@@ -547,4 +583,4 @@ class breast(object):
             self.data[lim_pos + y_orig::,:] = np.nan
 
 
-        return boundary, y
+            return y, boundary
