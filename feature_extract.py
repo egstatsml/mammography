@@ -67,7 +67,7 @@ class feature(breast):
         
         self.packets = pywt.WaveletPacket2D(data=self.data, wavelet=wavelet_type, mode='sym')
         self.indicies = []            #way to index each decomposition level
-
+        
         #check that the number of levels isnt to high
         #if it is, lets print something to let them know
         if(levels <= self.packets.maxlevel):
@@ -77,7 +77,9 @@ class feature(breast):
             print('Maximum level of %d, level decomp given is %d' %(self.packets.maxlevel, levels))
             print('Set to max level and will continue')
             self.levels = self.packets.maxlevel
-
+            
+        #a helper function that will initialise a multidimensional array for the amount of levels of decomp we are doing
+        #self.__initialise_feature_lists()
         #now lets put the indicies for each level in a nice format that is pleseant to index
         #indicies will be a list of numpy arrays for each level
         self.find_indicies()
@@ -105,7 +107,7 @@ class feature(breast):
     Description:
     Function that will create the strings used to index the wavelet packets
     will implement algorithm to find these for arbitrary number of wavelet decomps
-0
+
     """
 
 
@@ -156,7 +158,8 @@ class feature(breast):
 
     Description:
     Will use the co-occurance matrix of the wavelet decomp level to find texture features
-
+    
+    features will be saved per decomposition level, so will ha
     @param level = level of decomp we are finding the features for
 
     """
@@ -189,6 +192,7 @@ class feature(breast):
                     plt.imshow(lbp)
                     plt.show()
                     """
+                
                 #find co-occurance matrix and convert to uint8
                 temp = np.copy(self.packets[self.indicies[level][ii,jj]].data)
                 temp = temp.astype('uint8')
@@ -202,3 +206,39 @@ class feature(breast):
                 self.correlation[ii,jj] = greycoprops(glcm, prop='correlation')[0,0]
                 self.entropy[ii,jj] = entropy.shannon_entropy(temp)
         
+
+
+
+
+
+
+
+
+    """
+    __initialise_feature_lists()
+
+    Description:
+    Is a helper function called by the __init__ function to create a multidimensional
+    list to store the features from the breast scan.
+    This function is called only after the max level of decomposition has been set, and should not be called from anywhere other than __init__
+    There will be a list for each level of wavelet decomposition that we do.
+    
+    Eg. if we want 3 levels of decomp, will be 
+    [ [ [] ], [ [] ], [ []]  ]
+
+    This allows us to have a list of features for each image we scan, with detail features from
+    wavelet decomp from each level
+
+    Features will look like
+    self.homogeneity[file_number][level_wavelet_decomposition][single_wavelet_decomposition]
+    
+    Isnt that nice :)
+
+
+    """
+
+    """
+    def __initialise_feature_lists(self):
+
+        for ii in range(0, ):
+    """

@@ -51,9 +51,10 @@ while(descriptor.patient_pos < descriptor.no_patients):
     try:
         current_scan = feature(file_path)
         current_scan.get_features()
-    except:
-        error_files.append(file_path)
 
+    except:
+        print('Error with current file %s' %(file_path))
+        error_files.append(file_path)
 
 
 
@@ -62,6 +63,12 @@ while(descriptor.patient_pos < descriptor.no_patients):
 #created any errors so I can have a look later
 #will just convert the list of error files to a pandas database to look at later
 error_database = pd.DataFrame(error_files)
+#will save the erroneous files as csv
+error_database.to_scv('error_files.csv')
 
-    
+#now lets train our classifier
+
+
+
+
 

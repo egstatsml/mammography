@@ -52,6 +52,7 @@ class breast(object):
         
         if(file_path != False):
             self.initialise(file_path)
+
         
 
 
@@ -376,11 +377,11 @@ class breast(object):
 
                 #if we have passed all the other tests, then we have found the breast
                 else:
-                    print('found the breast')
                     self.breast_mask = np.copy(component.astype('uint8'))
 
-
-
+        
+        #if we have gone through all of this and still havent found the breast, we should throw an error
+        
         #lets use this breast mask to set all the background elements to zero
         #MAY WANT TO SET THEM TO NAN AT A LATER STAGE, WILL SEE HOW THAT WOULD WORK
         self.data[ self.breast_mask == 0 ] = np.nan
@@ -541,7 +542,6 @@ class breast(object):
         #check near top of image
         if( (stationary_y[0] < self.im_height /4.0 ) ):
             #then it is skin and we should get rid of it
-            print('upper')
             boundary = boundary[y > stationary_y[0]]
             y = y[y > stationary_y[0]]
             self.data[0:y[0],:] = np.nan
@@ -550,32 +550,19 @@ class breast(object):
 
         elif( np.max(np.abs(d2x[0:self.im_height/4])) > (np.max(np.abs(d2x)) * 0.6) ):
             lim_pos =  np.where( np.abs(d2x) == np.max(np.abs(d2x[0:self.im_height/4])))[0]
-            print('first')
             boundary = boundary[lim_pos::]
             y = y[lim_pos::]
             print(lim_pos)
-            """
-            plt.figure()
-            plt.plot(boundary)
-            plt.show()
-            self.data[0:(lim_pos + y_orig),:] = np.nan
-            plt.figure()
-            plt.imshow(self.data)
-            plt.show()
-            """
+
             
         
         if(stationary_y[-1] > self.im_height * (3.0/4.0) ):
-            print('lower')
             boundary = boundary[y < stationary_y[-1]]
             y = y[y < stationary_y[-1]]
             self.data[y[-1]::,:] = np.nan
-
-
-        print(np.max(np.abs(d2x[np.round(self.im_height * (3.0/4.0)):-1])))
-        
-        if( np.max(np.abs(d2x[np.round(self.im_height * (3.0/4.0))::])) > (np.max(np.abs(d2x)) * 0.6) ):
-            lim_pos = np.where( np.abs(d2x) == np.max(np.abs(d2x[np.round(self.im_height * (3.0/4.0))::])))[0]
+            
+        if( np.max(np.abs(d2x[np.round(self.im_height * (3/4))::])) > (np.max(np.abs(d2x)) * 0.6) ):
+            lim_pos = np.where( np.abs(d2x) == np.max(np.abs(d2x[np.round(self.im_height * (3/4))::])))[0]
 
             boundary = boundary[0:lim_pos+y[0]]
             y = y[0:lim_pos+y[0]]

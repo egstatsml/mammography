@@ -49,6 +49,8 @@ class spreadsheet(object):
         self.exam_index = 0
         self.benign_files = benign_files
         self.no_exams = 1
+        self.no_benign_scans = 0       #number of cancer free image scans we have in the sample
+        self.no_malignant_scans = 0    #number of cancerous image scans
         self.image_index = 0
         self.no_left_scans = 0 #number of scan for each breast
         self.no_right_scans = 0 #should be the same but I am double checking
@@ -64,7 +66,7 @@ class spreadsheet(object):
         self.filename_l = []  #list containing the filenames of the left and right breast scans
         self.filename_r = []
 
-        
+        self.count_files()   #function that will count the number of benign and cancerous files we have in the sample
 
     """
     next_scan()
@@ -158,6 +160,7 @@ class spreadsheet(object):
         #this will create a mask to help me access just the elements with the patient I am interested in
         print(self.patient_id)
         temp = self.crosswalk['patientId'] == self.patient_id
+        #the maximum value from the exam index will tell us how many exams were done per patient_id
         self.no_exams = np.max(self.crosswalk[temp])
 
 
@@ -203,15 +206,23 @@ class spreadsheet(object):
     Description:
     Will just read the spreadsheet to see if this current scan is a malignant case
 
+    @param patient_pos = location of patient position in the spreadsheet
+                         default to the current patient but may want to look at any patient_id
+
     @retval boolean value for left and right breast.
             True if malignant, False if benign
 
     """
     
-    def check_cancer(self):
+    def check_cancer(self, patient_pos = np.nan):
+
+        #if there wasnt a specific patient position input to check, just use the current one from the scanning procedure
+        if(np.isnan(patient_pos)):
+            print('overwritten')
+            patient_pos = self.patient_pos
 
         #get just the metadata of this current exam
-        scan_metadata = self.metadata.iloc[self.patient_pos,:]
+        scan_metadata = self.metadata.iloc[patient_pos,:]
         
         #the spreadsheet will read a one if there is cancer
         return (scan_metadata['cancerL'] == 1), (scan_metadata['cancerR'] == 1)
@@ -251,6 +262,56 @@ class spreadsheet(object):
 
 
 
+
+
+    """
+    count_files()
+
+    Description:
+    Function will go through the metadata spreadsheets and count the number of cancerous and malignant scans we have
+    
+
+
+    """
+
+    def count_files(self):
+
+        malignant_count = 0
+        benign_count = 0
+        
+        for n in range(1,self.no_exams):
+            #will go through and find all of the scans per examination
+            #first lets see which exam number we are looking at
+            patient_id = self.metadata[n,'patientId']
+            exam_index = self.metadata[n,'examIndex']
+            
+            #now will check cancer for this exam
+            left, right = self.check_cancer(n)
+
+            num_left = np.sum( (self.crosswalk['patientId'] == patient_id) & (self.crosswalk['examIndex'] == exam_index) & (self.crosswalk['imageView'].str.contains('L')) )
+            num_right = np.sum( (self.crosswalk['patientId'] == patient_id) & (self.crosswalk['examIndex'] == exam_index) & (self.crosswalk['imageView'].str.contains('R')) )
+
+            if(left == True):
+                malignant_count = malignant_count + num_left
+            else:
+                benign_count = benign_count + num_left
+            
+            if(right == True):
+                malignant_count = malignant_count + num_right
+            else:
+                benign_count = benign_count + num_right
+
+        print('benign_count = %d' %(benign_count))
+        print('malignant_count = %d' %(malignant_count))                
+            
+        temp = self.crosswalk['patientId'] == self.current_patient_id
+        #the maximum value from the exam index will tell us how many exams were done per patient_id
+        self.no_exams = np.max(self.crosswalk[temp])
+
+
+    
+    
+
     """
     return_filename()
 
@@ -271,4 +332,3 @@ class spreadsheet(object):
             return base_dir + str(self.filename_r[self.right_index][0:-3])
 
 
-        
