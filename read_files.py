@@ -40,15 +40,15 @@ class spreadsheet(object):
         self.metadata = pd.read_excel( directory + '/exams_metadata_pilot.xlsx')
         self.crosswalk = pd.read_excel( directory + '/images_crosswalk_pilot.xlsx')        
 
-        self.no_patients = self.metadata.shape[0] - 1
+        self.total_no_exams = self.metadata.shape[0] - 1
         self.no_images = self.crosswalk.shape[0] - 1
 
         
-        self.patient_pos = -1          #patient position in the metadata spreadsheet
+        self.exam_pos = -1          #patient position in the metadata spreadsheet
         self.current_patient_id = 0
         self.exam_index = 0
         self.benign_files = benign_files
-        self.no_exams = 1
+        self.no_exams_patient = 1
         self.no_benign_scans = 0       #number of cancer free image scans we have in the sample
         self.no_malignant_scans = 0    #number of cancerous image scans
         self.image_index = 0
@@ -66,7 +66,10 @@ class spreadsheet(object):
         self.filename_l = []  #list containing the filenames of the left and right breast scans
         self.filename_r = []
 
-        self.count_files()   #function that will count the number of benign and cancerous files we have in the sample
+
+        self.malignant_count = 0
+        self.benign_count = 0
+        self._count_files()   #function that will count the number of benign and cancerous files we have in the sample
 
     """
     next_scan()
@@ -83,7 +86,7 @@ class spreadsheet(object):
         #see if we have gone through all of the left images_in_exam
         #if yes, then we just need to get the next scan
         #subtracting 1 to make it zero based
-        print('here')
+
         if(self.left_index >= (self.no_scans_left - 1)) & ( self.right_index >= (self.no_scans_right -1)):
             #if we want the next benign file
 
@@ -93,10 +96,9 @@ class spreadsheet(object):
                 #meaning that both breasts arent cancerous
                 #basically a do while loop
                 while(True):
-                    print('here')
+
                     self.get_benign()
                     if( (self.cancer_l == False) |  (self.cancer_r == False)):
-                        print('breaking the loop')
                         #will break the loop
                         break
                     
@@ -108,17 +110,12 @@ class spreadsheet(object):
                         #will break the loop
                         break
 
-        print(self.left_index)
-        print(self.no_scans_left)
         
         if(self.left_index < (self.no_scans_left)):
-            print('left')
             file_name = self._return_filename('left')
             self.left_index = self.left_index + 1
             
         elif( self.right_index < (self.no_scans_right) ):
-            print self.right_index
-            print self.filename_r
             file_name = self._return_filename('right')
             self.right_index = self.right_index + 1
 
@@ -145,9 +142,9 @@ class spreadsheet(object):
     def get_benign(self):
 
         #lets increment our patient position counter
-        self.patient_pos = self.patient_pos +1
-        print('patient pos = %d' %(self.patient_pos))
-        self.patient_id = int(self.metadata.iloc[self.patient_pos,0])
+        self.exam_pos = self.exam_pos +1
+        print('patient pos = %d' %(self.exam_pos))
+        self.patient_id = int(self.metadata.iloc[self.exam_pos,0])
         self.filename_l = []
         self.filename_r = []
         self.left_index = 0
@@ -155,13 +152,17 @@ class spreadsheet(object):
         self.image_index = 1
         self.exam_index = 1
         self.breast = 'left'
-
+        
         #see how many exams there are
         #this will create a mask to help me access just the elements with the patient I am interested in
         print(self.patient_id)
+
+        ########################################
+        # Check this it might not be right     #
+        ########################################
         temp = self.crosswalk['patientId'] == self.patient_id
         #the maximum value from the exam index will tell us how many exams were done per patient_id
-        self.no_exams = np.max(self.crosswalk[temp])
+        self.no_exams_patient = np.max(self.crosswalk[temp])
 
 
         #now make sure this scan doesnt have cancer
@@ -170,6 +171,8 @@ class spreadsheet(object):
         print('cancer left = %r, cancer right = %r' %(self.cancer_l, self.cancer_right))
         #will also get number of scans etc. for current patient, current exam and each breast
         self.get_filenames()
+
+        
         
         #since in this instance we want benign scans only, if the scans are malignant, will just set the number of scans for that
         #breast to zero so we dont look at it
@@ -206,7 +209,7 @@ class spreadsheet(object):
     Description:
     Will just read the spreadsheet to see if this current scan is a malignant case
 
-    @param patient_pos = location of patient position in the spreadsheet
+    @param exam_pos = location of patient position in the spreadsheet
                          default to the current patient but may want to look at any patient_id
 
     @retval boolean value for left and right breast.
@@ -214,15 +217,14 @@ class spreadsheet(object):
 
     """
     
-    def check_cancer(self, patient_pos = np.nan):
+    def check_cancer(self, exam_pos = np.nan):
 
         #if there wasnt a specific patient position input to check, just use the current one from the scanning procedure
-        if(np.isnan(patient_pos)):
-            print('overwritten')
-            patient_pos = self.patient_pos
+        if(np.isnan(exam_pos)):
+            exam_pos = self.exam_pos
 
         #get just the metadata of this current exam
-        scan_metadata = self.metadata.iloc[patient_pos,:]
+        scan_metadata = self.metadata.iloc[exam_pos,:]
         
         #the spreadsheet will read a one if there is cancer
         return (scan_metadata['cancerL'] == 1), (scan_metadata['cancerR'] == 1)
@@ -240,7 +242,7 @@ class spreadsheet(object):
         left = (self.crosswalk['patientId'] == self.patient_id) & (self.crosswalk['examIndex'] == self.exam_index) & (self.crosswalk["imageView"].str.contains('L')) 
 
         left_filenames = (self.crosswalk.loc[left, 'filename'])
-        #print(left_filenames)
+
         self.no_scans_left = np.sum(left)
         for ii in range(0, np.sum(left)):
             left_name = left_filenames.iloc[ii]
@@ -252,7 +254,6 @@ class spreadsheet(object):
         right_filenames = (self.crosswalk.loc[right, 'filename'])
         self.no_scans_right = np.sum(right)
         for ii in range(0, np.sum(right)):
-            print(ii)
             right_name = right_filenames.iloc[ii]
             self.filename_r.append(right_name)
 
@@ -274,16 +275,13 @@ class spreadsheet(object):
 
     """
 
-    def count_files(self):
-
-        malignant_count = 0
-        benign_count = 0
+    def _count_files(self):
         
-        for n in range(1,self.no_exams):
+        for n in range(1,self.total_no_exams):
             #will go through and find all of the scans per examination
             #first lets see which exam number we are looking at
-            patient_id = self.metadata[n,'patientId']
-            exam_index = self.metadata[n,'examIndex']
+            patient_id = int(self.metadata.iloc[n, 0])
+            exam_index = int(self.metadata.iloc[n,1])
             
             #now will check cancer for this exam
             left, right = self.check_cancer(n)
@@ -292,24 +290,24 @@ class spreadsheet(object):
             num_right = np.sum( (self.crosswalk['patientId'] == patient_id) & (self.crosswalk['examIndex'] == exam_index) & (self.crosswalk['imageView'].str.contains('R')) )
 
             if(left == True):
-                malignant_count = malignant_count + num_left
+                self.malignant_count = self.malignant_count + num_left
             else:
-                benign_count = benign_count + num_left
+                self.benign_count = self.benign_count + num_left
             
             if(right == True):
-                malignant_count = malignant_count + num_right
+                self.malignant_count = self.malignant_count + num_right
             else:
-                benign_count = benign_count + num_right
+                self.benign_count = self.benign_count + num_right
 
-        print('benign_count = %d' %(benign_count))
-        print('malignant_count = %d' %(malignant_count))                
-            
-        temp = self.crosswalk['patientId'] == self.current_patient_id
-        #the maximum value from the exam index will tell us how many exams were done per patient_id
-        self.no_exams = np.max(self.crosswalk[temp])
+        print('benign_count = %d' %(self.benign_count))
+        print('malignant_count = %d' %(self.malignant_count))                
 
+        #find the number of unique patients as well
+        self.no_patients = self.metadata.patientId.nunique()
+        print('number of unique patients = %d' %(self.no_patients))
+        
 
-    
+        
     
 
     """

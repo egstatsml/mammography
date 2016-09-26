@@ -65,7 +65,7 @@ class feature(breast):
         breast.__init__(self, file_path)
 
         
-        self.packets = pywt.WaveletPacket2D(data=self.data, wavelet=wavelet_type, mode='sym')
+        self.packets = pywt.WaveletPacket2D(data=self.data.astype(float), wavelet=wavelet_type, mode='sym')
         self.indicies = []            #way to index each decomposition level
         
         #check that the number of levels isnt to high
@@ -207,10 +207,20 @@ class feature(breast):
                 self.entropy[ii,jj] = entropy.shannon_entropy(temp)
         
 
-
-
-
-
+        
+        
+        temp =  self.packets[self.indicies[0][0,1]].data * self.packets[self.indicies[0][1,0]].data# * self.packets[self.indicies[0][1,1]].data
+        
+        plt.figure()
+        plt.imshow( temp)
+        plt.colorbar()
+        plt.show()
+        
+        
+        plt.figure()
+        plt.imshow(self.packets[self.indicies[0][0,0]].data)
+        plt.show()
+        
 
 
 

@@ -163,6 +163,7 @@ class breast(object):
         threshold_val_high = 0.99
         #search from right to left, as that is where the label will be
 
+        
         x = 0
         while (x < (self.im_width - 200) ):
             y = 0
@@ -173,12 +174,12 @@ class breast(object):
                 cdf = np.cumsum(pdf[0])
                 #see if most of the pixels are background, and if there has been no change over mid part of cdf
                 if( (cdf[0] > threshold_val) &( np.abs(cdf[1000] - cdf[100]) < 0.001 )):
-                    #then this area contains text
+
                     self.data[y:y+200,x:x+200] = 0
+
 
                 y = y+200
             x = x+200
-
 
 
 
@@ -244,7 +245,7 @@ class breast(object):
     def remove_pectoral_muscle(self):
         self.pectoral = np.zeros(np.shape(self.data), dtype=bool)        #cpy the image and apply the first threshold
         #will remove the components of the pectoral muscle
-        thresh = np.copy(self.data)
+        thresh = np.copy(self.data[0:self.im_height/4, 0:self.im_width/2])
         #will crop the image first, as the pectoral muscle will never be in the right hand side of the image
         #after the orientation has been corrected
         thresh = thresh[:,0:self.im_width]
@@ -322,11 +323,12 @@ class breast(object):
     def breast_boundary(self):
 
         temp = np.copy(self.data)
-
+        
         temp = filters.gaussian_filter(temp,5) 
+        
         #do some contrast enhancement
-        enhance = np.log10( 1 + temp)
-        enhance[enhance > 0.1] = 1.0
+        enhance = temp
+        enhance[enhance > 1] = 1.0
         label_mask, num_labels = measurements.label(enhance)
         self.breast_mask = np.zeros(np.shape(self.data))
 
@@ -381,7 +383,6 @@ class breast(object):
 
         
         #if we have gone through all of this and still havent found the breast, we should throw an error
-        
         #lets use this breast mask to set all the background elements to zero
         #MAY WANT TO SET THEM TO NAN AT A LATER STAGE, WILL SEE HOW THAT WOULD WORK
         self.data[ self.breast_mask == 0 ] = np.nan

@@ -35,21 +35,15 @@ descriptor = spreadsheet()
 #will then save this list and have a look to see where they failed
 error_files = []
 
-while(descriptor.patient_pos < descriptor.no_patients):
+
+
+while(descriptor.exam_pos < descriptor.total_no_exams):
     #load in a file
-    #file_path = '/home/ethan/DREAM/pilot_images/111359.dcm' #image without pectoral muscle
-    #file_path = '/home/ethan/DREAM/pilot_images/134060.dcm' #image with pectoral muscle
-    #file_path = '/home/ethan/DREAM/pilot_images/502860.dcm' #malignant case
-    #file_path = '/home/ethan/DREAM/pilot_images/151849.dcm' #malignant case with pectoral muscle
-    #file_path = '/home/ethan/DREAM/pilot_images/485343.dcm' #scan that broke my initial boundary scan
-    
-    
+        
     file_path = descriptor.next_scan()
 
-    print(file_path)
-
     try:
-        current_scan = feature(file_path)
+        current_scan = feature(file_path, levels=1)
         current_scan.get_features()
 
     except:
@@ -72,3 +66,13 @@ error_database.to_scv('error_files.csv')
 
 
 
+
+
+
+
+## some old file paths that can be handy whilst testing
+#file_path = '/home/ethan/DREAM/pilot_images/111359.dcm' #image without pectoral muscle
+#file_path = '/home/ethan/DREAM/pilot_images/134060.dcm' #image with pectoral muscle
+#file_path = '/home/ethan/DREAM/pilot_images/502860.dcm' #malignant case
+#file_path = '/home/ethan/DREAM/pilot_images/151849.dcm' #malignant case with pectoral muscle
+#file_path = '/home/ethan/DREAM/pilot_images/485343.dcm' #scan that broke my initial boundary scan
