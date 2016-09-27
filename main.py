@@ -113,7 +113,7 @@ descriptor = spreadsheet(benign_files=True)
 #will then save this list and have a look to see where they failed
 error_files = []
 benign_scan = feature(levels = 3, wavelet_type = 'haar', no_images = descriptor.benign_count)
-descriptor.total_no_exams = 1
+
 
 
 while(descriptor.exam_pos < descriptor.total_no_exams):
@@ -128,10 +128,12 @@ while(descriptor.exam_pos < descriptor.total_no_exams):
         print('Error with current file %s' %(file_path))
         error_files.append(file_path)
 
+
+
 #load in the malignant scans
 descriptor = spreadsheet(benign_files=False)
 malignant_scan = feature(levels = 3, wavelet_type = 'haar', benign_scans = False, no_images = descriptor.malignant_count)
-descriptor.total_no_exams = 1
+
 
 while(descriptor.exam_pos < descriptor.total_no_exams):
     #load in a file
