@@ -2,18 +2,19 @@
 read_files.py
 
 Author: Ethan Goan
-QUT
+Queensland University of Technology
+DREAM Mammography Challenge
 2016
-
 
 Description:
 
-Declare object to handle reading all of the data files and the excel sheets
-
+spreadsheet object is defined to handle the reading of image file names
+and the associated metadata
+spreadsheet object is capable of reading malignant or benign scans individually
+for training purposes
 
 
 """
-
 
 import dicom
 import os
@@ -87,7 +88,7 @@ class spreadsheet(object):
         #if yes, then we just need to get the next scan
         #subtracting 1 to make it zero based
 
-        if(self.left_index >= (self.no_scans_left - 1)) & ( self.right_index >= (self.no_scans_right -1)):
+        if(self.left_index >= (self.no_scans_left)) & ( self.right_index >= (self.no_scans_right)):
             #if we want the next benign file
 
             if(self.benign_files):
@@ -106,7 +107,7 @@ class spreadsheet(object):
             else:
                 while(True):
                     self.get_malignant()
-                    if(self.cancer_l |  self.cancer_r):
+                    if( (self.cancer_l == True) |  (self.cancer_r == True) ):
                         #will break the loop
                         break
 
@@ -143,7 +144,6 @@ class spreadsheet(object):
 
         #lets increment our patient position counter
         self.exam_pos = self.exam_pos +1
-        print('patient pos = %d' %(self.exam_pos))
         self.patient_id = int(self.metadata.iloc[self.exam_pos,0])
         self.filename_l = []
         self.filename_r = []
@@ -168,9 +168,10 @@ class spreadsheet(object):
         #now make sure this scan doesnt have cancer
         self.cancer_l, self.cancer_right = self.check_cancer()
         #now lets load all of the file names for this examination
-        print('cancer left = %r, cancer right = %r' %(self.cancer_l, self.cancer_right))
         #will also get number of scans etc. for current patient, current exam and each breast
         self.get_filenames()
+        print(self.filename_l)
+        print(self.filename_r)
 
         
         
@@ -193,6 +194,51 @@ class spreadsheet(object):
 
     def get_malignant(self):
         print('getting malignant scan')
+        #will keep looping through and searching until we find a scan that contains cancerous cells
+        self.cancer_l = False
+        self.cancer_r = False
+        while( (self.cancer_l == False) & (self.cancer_r == False)):
+            
+            #lets increment our patient position counter
+            self.exam_pos = self.exam_pos +1
+            self.patient_id = int(self.metadata.iloc[self.exam_pos,0])
+            self.filename_l = []
+            self.filename_r = []
+            self.left_index = 0
+            self.right_index = 0
+            self.image_index = 1
+            self.exam_index = 1
+            self.breast = 'left'
+
+            #see how many exams there are
+            #this will create a mask to help me access just the elements with the patient I am interested in
+            print(self.patient_id)
+
+            ########################################
+            # Check this it might not be right     #
+            ########################################
+            temp = self.crosswalk['patientId'] == self.patient_id
+            #the maximum value from the exam index will tell us how many exams were done per patient_id
+            self.no_exams_patient = np.max(self.crosswalk[temp])
+
+
+            #now make sure this scan doesnt have cancer
+            self.cancer_l, self.cancer_right = self.check_cancer()
+        #now lets load all of the file names for this examination
+        #will also get number of scans etc. for current patient, current exam and each breast
+        self.get_filenames()
+        print(self.filename_l)
+        print(self.filename_r)
+
+        #since in this instance we want benign scans only, if the scans are malignant, will just set the number of scans for that
+        #breast to zero so we dont look at it
+        if(self.cancer_l == False):
+            self.no_scans_left = 0
+            #change to the right breast
+            self.breast = 'right'
+
+        if(self.cancer_r == False):
+            self.no_scans_right = 0
 
 
 
