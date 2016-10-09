@@ -15,7 +15,7 @@ for training purposes
 
 
 """
-
+import sys
 import dicom
 import os
 import numpy as np
@@ -34,13 +34,25 @@ class spreadsheet(object):
     
 
     @param benign_files = boolean to tell us if we want benign or malignant scans
+    @param run_synapse = boolean to let us know is we are running on synapse server or
+                         just testing on my computer. Will change the paths for accessing the data
+                         to suit synapse servers if we are
 
     """
-    def __init__(self, directory = './', benign_files = True):
-        
-        self.metadata = pd.read_excel( directory + '/exams_metadata_pilot.xlsx')
-        self.crosswalk = pd.read_excel( directory + '/images_crosswalk_pilot.xlsx')        
+    def __init__(self, directory = './', benign_files = True, run_synapse = False):
 
+        #if we are running on synapse, change the file paths a bit
+        if(run_synapse == True):
+            print(run_synapse)
+            self.metadata = pd.read_csv('/exams_metadata_pilot.tsv', sep='\t')
+            self.crosswalk = pd.read_csv('/images_crosswalk_pilot.tsv', sep='\t')        
+
+        #else everything is in the source directory so dont worry
+        else:
+            self.metadata = pd.read_excel( directory + 'exams_metadata_pilot.xlsx')
+            self.crosswalk = pd.read_excel( directory + 'images_crosswalk_pilot.xlsx')        
+
+        self.run_synapse = run_synapse
         self.total_no_exams = self.metadata.shape[0] - 1
         self.no_images = self.crosswalk.shape[0] - 1
 
@@ -91,7 +103,7 @@ class spreadsheet(object):
         if(self.left_index >= (self.no_scans_left)) & ( self.right_index >= (self.no_scans_right)):
             #if we want the next benign file
 
-            if(self.benign_files):
+            if(self.benign_files == True):
 
                 #just use a loop that will keep searching until it finds a benign scan
                 #meaning that both breasts arent cancerous
@@ -104,14 +116,20 @@ class spreadsheet(object):
                         break
                     
             #if we are getting the malignant scans
-            else:
+            elif(self.benign_scans == False):
                 while(True):
                     self.get_malignant()
                     if( (self.cancer_l == True) |  (self.cancer_r == True) ):
                         #will break the loop
                         break
-
-        
+                    
+            #otherwise we will be loading both in
+            else:
+                print('Error: If you want to load any scan in, use get_either function')
+                sys.exit()
+                
+                
+                
         if(self.left_index < (self.no_scans_left)):
             file_name = self._return_filename('left')
             self.left_index = self.left_index + 1
@@ -119,29 +137,29 @@ class spreadsheet(object):
         elif( self.right_index < (self.no_scans_right) ):
             file_name = self._return_filename('right')
             self.right_index = self.right_index + 1
-
+            
         return file_name
-
-
-
-
-
-
+    
+    
+    
+    
+    
+    
     """
     get_benign()
-
+    
     Description:
     function will load the next benign examination
     If have gone through all the scans in the exam
     
     """
-
-
-
+    
+    
+    
         
     
     def get_benign(self):
-
+        
         #lets increment our patient position counter
         self.exam_pos = self.exam_pos +1
         self.patient_id = int(self.metadata.iloc[self.exam_pos,0])
@@ -156,15 +174,15 @@ class spreadsheet(object):
         #see how many exams there are
         #this will create a mask to help me access just the elements with the patient I am interested in
         print(self.patient_id)
-
+        
         ########################################
         # Check this it might not be right     #
         ########################################
         temp = self.crosswalk['patientId'] == self.patient_id
         #the maximum value from the exam index will tell us how many exams were done per patient_id
         self.no_exams_patient = np.max(self.crosswalk[temp])
-
-
+        
+        
         #now make sure this scan doesnt have cancer
         self.cancer_l, self.cancer_right = self.check_cancer()
         #now lets load all of the file names for this examination
@@ -172,7 +190,7 @@ class spreadsheet(object):
         self.get_filenames()
         print(self.filename_l)
         print(self.filename_r)
-
+        
         
         
         #since in this instance we want benign scans only, if the scans are malignant, will just set the number of scans for that
@@ -181,17 +199,17 @@ class spreadsheet(object):
             self.no_scans_left = 0
             #change to the right breast
             self.breast = 'right'
-
+            
         if(self.cancer_r):
             self.no_scans_right = 0
-        
-        
-        
-
-
-
-
-
+            
+            
+            
+            
+            
+            
+            
+            
     def get_malignant(self):
         print('getting malignant scan')
         #will keep looping through and searching until we find a scan that contains cancerous cells
@@ -242,6 +260,46 @@ class spreadsheet(object):
 
 
 
+
+
+    """
+    get_either()
+
+    Description:
+    Function will just get the next available scan, doesn't matter what type it is
+    will just get the next scan
+    
+    """
+    def get_either(self):
+        #lets increment our patient position counter
+        self.exam_pos = self.exam_pos +1
+        self.patient_id = int(self.metadata.iloc[self.exam_pos,0])
+        self.filename_l = []
+        self.filename_r = []
+        self.left_index = 0
+        self.right_index = 0
+        self.image_index = 1
+        self.exam_index = 1
+        self.breast = 'left'
+            
+        #see how many exams there are
+        #this will create a mask to help me access just the elements with the patient I am interested in
+        print(self.patient_id)
+        
+        ########################################
+        # Check this it might not be right     #
+        ########################################
+        temp = self.crosswalk['patientId'] == self.patient_id
+        #the maximum value from the exam index will tell us how many exams were done per patient_id
+        self.no_exams_patient = np.max(self.crosswalk[temp])
+        
+        #now make sure this scan doesnt have cancer
+        self.cancer_l, self.cancer_right = self.check_cancer()
+        #now lets load all of the file names for this examination
+        #will also get number of scans etc. for current patient, current exam and each breast
+        self.get_filenames()
+        print(self.filename_l)
+        print(self.filename_r)
 
 
 
@@ -369,10 +427,45 @@ class spreadsheet(object):
 
     """
     def _return_filename(self, breast):
-        base_dir = './pilot_images/'
+
+        if(self.run_synapse == True):
+            base_dir = '/trainingData'
+        else:
+            base_dir = './pilot_images/'
+
         if(breast == 'left'):
             return base_dir + str(self.filename_l[self.left_index][0:-3])
         else:
             return base_dir + str(self.filename_r[self.right_index][0:-3])
 
 
+
+
+    def filenames(self):
+        base_dir = './pilot_images/'
+        return  base_dir + str(self.filename_l[self.left_index][0:-3]), base_dir + str(self.filename_r[self.left_index][0:-3])
+
+
+
+
+
+
+    """
+    get_most_recent()
+
+    Description:
+    Function will load in the most recent scan from a patient
+
+    @param patientId = patient number
+    
+    """
+    def get_most_recent(self, patientId):
+        #create a truncated database that just includes the information for the
+        #current patient
+        self.patient_id = patientId
+        mask = (self.metadata['patientId'] == patientId)
+        patient_data = self.metadata.loc[mask,:]
+        #now lets find the most recent exam and get those files
+        self.exam_index = np.max(patient_data['examIndex'])
+        #now get the filenames for this exam
+        self.get_filenames()

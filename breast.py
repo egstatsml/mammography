@@ -96,45 +96,62 @@ class breast(object):
     def initialise(self, file_path):
         file = dicom.read_file(file_path)
         self.data = np.fromstring(file.PixelData,dtype=np.int16).reshape((file.Rows,file.Columns))
-
-        self.original_scan = np.copy(self.data)
-        
         #convert the data to floating point now
         self.data = self.data.astype(float)
+        self.original_scan = np.copy(self.data)
+        self.check_orientation()
+        
+        
+    """
+    preprocessing()
+    
+    Description:
+    
+    Wrapper function to call methods to apply preprocessing to data
+    such as removing artifacts, aligning images and finding the brest boundaries
+    
+    This function should only be called after the breast.initialise() function has
+    been called
+    
+    
+    """
+        
+        
+    def preprocessing(self):
         self.im_width = np.shape(self.data)[1]
         self.im_height = np.shape(self.data)[0]
         #check correct orientation of the image
-        self.check_orientation()
         self.remove_artifacts()
         self.breast_boundary()
-
-
-
-
-
-
+        
+        
+        
             
     """
     check_orientation()
-
+    
     Description:
-
+    
     Will check if the image is the correct orientation,
     Eg. breast is on the left hand side of the image.
-
+    
     If it isn't, just fliplr
-
+    
     @param im = input image
-
     @retval image of correct orientation
-
     """
-
-
+    
+    
     def check_orientation(self):
-        if( sum(self.data[:,0]) < 100):
+        
+        #finding the sum of pixel intensities on the left column
+        left_edge = np.sum(self.data[:,0])
+        #finding the sum of pixel intensities on the right column
+        right_edge = np.sum(self.data[:,-1])
+        
+        if( right_edge > left_edge):
             self.data = np.fliplr(self.data)
-
+            self.original_scan = np.fliplr(self.original_scan)
 
 
 

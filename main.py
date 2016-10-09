@@ -105,9 +105,12 @@ def create_classifier_arrays(benign_scan, malignant_scan):
 
 
 
+RUN_SYNAPSE = False
 
 
-descriptor = spreadsheet(benign_files=True)
+
+
+descriptor = spreadsheet(benign_files=True, run_synapse = RUN_SYNAPSE)
 
 #creating a list that will store the scan filename if any of them create an error
 #will then save this list and have a look to see where they failed
@@ -122,6 +125,7 @@ while(descriptor.exam_pos < descriptor.total_no_exams):
     print(file_path)
     try:
         benign_scan.initialise(file_path)
+        benign_scan.preprocessing()
         benign_scan.get_features()
 
     except:
@@ -131,7 +135,7 @@ while(descriptor.exam_pos < descriptor.total_no_exams):
 
 
 #load in the malignant scans
-descriptor = spreadsheet(benign_files=False)
+descriptor = spreadsheet(benign_files=False, run_synapse = RUN_SYNAPSE)
 malignant_scan = feature(levels = 3, wavelet_type = 'haar', benign_scans = False, no_images = descriptor.malignant_count)
 
 
@@ -141,6 +145,7 @@ while(descriptor.exam_pos < descriptor.total_no_exams):
     print(file_path)
     try:
         malignant_scan.initialise(file_path)
+        malignant_scan.preprocessing()
         malignant_scan.get_features()
     except:
         print('Error with current file %s' %(file_path))
@@ -154,7 +159,6 @@ while(descriptor.exam_pos < descriptor.total_no_exams):
 error_database = pd.DataFrame(error_files)
 #will save the erroneous files as csv
 error_database.to_csv('error_files.csv')
-
 
 #now lets train our classifier
 #will just use the features from the approximation wavelet decomps

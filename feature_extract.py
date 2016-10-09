@@ -94,16 +94,15 @@ class feature(breast):
     to the maximum.
     The indicies (the labels for decomp eg. 'avd', 'hv' etc.) for the decomposition will also be found and saved as a list of arrays. 
     These will be used for to index the wavelet decomp levels.
-
-
+    
+    
     """
-
-
-            
+    
+    
+    
     def initialise(self, file_path):
         #call the breast initialise function first
         breast.initialise(self, file_path)
-
         #increment the image number
         self.current_image_no = self.current_image_no + 1
         #do the wavelet packet decomposition
@@ -132,12 +131,12 @@ class feature(breast):
     Description:
     Function that will create the strings used to index the wavelet packets
     will implement algorithm to find these for arbitrary number of wavelet decomps
-
+    
     """
-
-
+    
+    
     def find_indicies(self):
-
+        
         for ii in range(self.levels, 0, -1):
             #just getting the indecies and putting them in a square array
             temp = [self.packets.node.path for self.packets.node in self.packets.get_level(ii)]
@@ -195,7 +194,7 @@ class feature(breast):
     """
 
     def _get_features_level(self, level):
-
+        
         #initialise array for each decomp branch to hold the features
         image_no = self.current_image_no
         self.homogeneity[image_no][level] = np.zeros(np.shape(self.indicies[level]))
