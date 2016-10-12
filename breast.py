@@ -75,6 +75,7 @@ class breast(object):
         self.nipple_x = 0
         self.nipple_y = 0
         
+        
         if(file_path != None):
             self.initialise(file_path)
 

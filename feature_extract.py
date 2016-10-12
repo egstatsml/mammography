@@ -53,7 +53,7 @@ from breast import breast
 
 class feature(breast):
 
-    def __init__(self, file_path = None, wavelet_type = 'haar', levels = 3, benign_scans = True, no_images = np.nan):
+    def __init__(self, file_path = None, wavelet_type = 'haar', levels = 3, benign_scans = True, no_images = 1):
         breast.__init__(self, file_path)
 
         self.packets = []             #wavelet packets for each level of decomposition
