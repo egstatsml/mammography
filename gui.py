@@ -71,7 +71,9 @@ class view_scan(QtGui.QWidget):
         self.im_l = mammogram_view()
         self.im_r = mammogram_view()
 
-        self._initialised = 0
+        #boolean variables to say if we have initialised and displayed the image views yet
+        self._displayed_l = False
+        self._displayed_r = False
 
         #dictionary that is used to convert index in the breast dropdown menu to a string
         self._breast_dict = {0:'left', 1:'right'}
@@ -238,10 +240,12 @@ class view_scan(QtGui.QWidget):
     @param breast = string having left or right to say scans from which breast 
                     to view
 
-
     """
 
+
+    
     def load_scan(self, im_location = 'left', breast = 'left'):
+        
         self.showMaximized()
 
         #saving the files that we want to view into the filenames variable
@@ -255,26 +259,20 @@ class view_scan(QtGui.QWidget):
             sys.exit()
             
         #now we begin to load in the scan for either the left or right view
-        
         #initialise the _patient data class for each image
-        #if we arer setting up the left image view
-        print(im_location)
-        if( (im_location == 'left') & (self._initialised == 0)):
+        #if we arer setting up the left image view        
+        if(im_location == 'left'):
             print(filenames)
             self.im_l.initialise(filenames, im_location)
+            print(np.shape(self.im_l._features[0].original_scan))
             self.im_l._breast_loc = breast
             self.im_l.set_im()
-            #now will add the mammogram widget
-            self.add_mammogram(self.im_l)
-            self._initialised = 1
-            
-        elif(im_location == 'left'):
-            print('just update the figure')
-            self.im_l.initialise(filenames, im_location)
-            self.im_l._breast_loc = breast
-            self.im_l.set_im()
-            
-
+            self.im_buttons(self.im_l)
+            #now will add the mammogram widget if we need to
+            if(self._displayed_l == False):
+                self.add_mammogram(self.im_l)
+                self._displayed_l = True
+        
 
         #if we are setting the right image
         elif(im_location == 'right'):
@@ -282,11 +280,16 @@ class view_scan(QtGui.QWidget):
             self.im_r.initialise(filenames, im_location)
             self.im_l._breast_loc = breast
             self.im_r.set_im()
-            self.add_mammogram(self.im_r)
-        
+            self.im_buttons(self.im_r)
+            #now will add the mammogram widget if we need to
+            if(self._displayed_r == False):
+                self.add_mammogram(self.im_r)
+                self._displayed_r = True
+            
+            
         #if location doesn't equal left or right, will print a message and throw an error
         else:
-            print('Invalid location for mammogram view. Must be either left or right')
+            print('Error in Load Scan: Invalid location for mammogram view. Must be either left or right')
             sys.exit()
         
 
@@ -332,11 +335,31 @@ class view_scan(QtGui.QWidget):
         self.layout.addWidget(mammogram.breast_btn, b_y, b_x, b_h, b_w)
         self.layout.addWidget(mammogram.breast_disp, b_d_y, b_d_x, b_d_h, b_d_w)
 
+
+
+
+    """
+    im_buttons()
+
+    Description:
+    Function is called to set the data for all of the drop down menus and everything
+    Will first clear them to makse sure there isn't any old data in there
+
+    Then will find the number of exams and set the breast dropdown menu
+
+    Will also set the additional labels
+
+
+    @param mammogram = the mammogram_view object whose details we are setting
+
+    """
+    def im_buttons(self, mammogram):
         
         mammogram.index_disp.setText('%d' %(mammogram.currentIndex))
         mammogram.exam_index_disp.setText('Exam Number')
         mammogram.breast_disp.setText('Breast')
-
+        
+        
         #now make sure the drop boxes are cleared
         mammogram.exam_index_btn.clear()
         mammogram.breast_btn.clear()
@@ -345,15 +368,14 @@ class view_scan(QtGui.QWidget):
             mammogram.exam_index_btn.addItem( ('%d' %ii) )
         #adding the labels for the breast scan as well
         print('printing breast views')
-        #for ii,word in enumerate(['left', 'right']):
-        #   print(word)
-        #  mammogram.breast_btn.addItem(word)
         mammogram.breast_btn.addItems(['left', 'right'])
 
         self._breast_disp_layout = []
         self._breast_dropbox_layout = []
         
 
+
+        
 
 
         
@@ -372,17 +394,14 @@ class view_scan(QtGui.QWidget):
         #temporarily block signals
         self.block('right')
         
-        #if we are first opening up the right view
-        if( (self.im_r.breast_btn.currentIndex()) < 0):
-            #set the breast button to the same as the left view
-            print('here first time')
-            self.load_scan(im_location = 'right', breast=self.im_l._breast_loc)
-        
-        else:
-            self.im_r._breast_loc = self.im_l._breast_loc 
-            self.im_r.breast_btn.setCurrentIndex(self.im_l.breast_btn.currentIndex() )
-            self.im_r.exam_index_btn.setCurrentIndex(self.im_l.exam_index_btn.currentIndex() )
-            self.change_view_r()
+        #set the breast button to the same as the left view
+        self.im_r._breast_loc = self.im_l._breast_loc
+        self.load_scan(im_location = 'right', breast=self.im_l._breast_loc)
+
+        self.im_r.breast_btn.setCurrentIndex(self.im_l.breast_btn.currentIndex() )
+        self.im_r.exam_index_btn.setCurrentIndex(self.im_l.exam_index_btn.currentIndex() )
+
+
 
         #make sure we arent looking at the same frame twice
         #will only happen if the current index is zero
@@ -416,19 +435,17 @@ class view_scan(QtGui.QWidget):
 
     
     def clear_mammogram_l(self):
-        #self.clear_mammogram(self.im_l)
-        print('deleted everything')
-        self.im_l = mammogram_view()
-        print('reset everything')
+        
+        self.im_l._features[:] = []
+    
+
         
     def clear_mammogram_r(self):
         
-        self.clear_mammogram(self.im_r)
-        self.im_r = mammogram_view()
-
+        self.im_r._features[:] = []
         
 
-
+        
 
     def clear_mammogram(self, mamm):
 
@@ -453,7 +470,7 @@ class view_scan(QtGui.QWidget):
         sip.delete(mamm)
 
         
-        """
+        
         #set them all equal to non is the final step
         mamm.breast_btn = None
         mamm.rotate_btn = None
@@ -463,7 +480,7 @@ class view_scan(QtGui.QWidget):
         mamm.jump_left_btn = None
         mamm.jump_right_btn = None
         mamm = None
-        """
+        
         
     ################################################################
     #
@@ -490,37 +507,34 @@ class view_scan(QtGui.QWidget):
     
     def change_view_l(self):
 
-        #saving the exam index and the breast view index
+        self.block('left')
         exam_index = self.im_l.exam_index_btn.currentIndex()
         breast_index = self.im_l.breast_btn.currentIndex()
-        #will get the specific exams from this index
-        #the plus one is to accommodate for non zero based indexing used on the spreadsheet
         self._descriptor.get_exam(self._descriptor.current_patient_id, self.im_l.exam_index_btn.currentIndex() + 1)
         #now load in that scan
         self.im_l._breast_loc = self._breast_dict[self.im_l.breast_btn.currentIndex()]
 
-        
-        breast_view = self.im_l._breast_loc
         #Now we need to clear the current image features stored for this view,
         #so we dont append too many images
-        #easiest way to do this is to just reinitialise the mammography view
         self.clear_mammogram_l()
-        self._hide_imageview_extras()
-        self.load_scan(im_location = 'left', breast = breast_view)
+        self.load_scan(im_location = 'left', breast = self.im_l._breast_loc)
 
         #set the indicies to what the were
         self.im_l.exam_index_btn.setCurrentIndex(exam_index)
         self.im_l.breast_btn.setCurrentIndex(breast_index)
-        #now need to reconnect the signals for the changing the view again
-        self.setup_signals(self.im_l, 'left')
 
+        
+        self.unblock('left')
 
 
         ### Same as above function, just for right view
+
+
         
     def change_view_r(self):
 
         #saving the exam index and the breast view index
+        self.block('right')
         exam_index = self.im_r.exam_index_btn.currentIndex()
         breast_index = self.im_r.breast_btn.currentIndex()
 
@@ -529,19 +543,16 @@ class view_scan(QtGui.QWidget):
         #now load in that scan
         self.im_r._breast_loc = self._breast_dict[self.im_r.breast_btn.currentIndex()]
         
-        breast = self.im_r._breast_loc
         #Now we need to clear the current image features stored for this view,
         #so we dont append too many images
-        #easiest way to do this is to just reinitialise the mammography view
         self.clear_mammogram_r()
-        self._hide_imageview_extras()
-        self.load_scan(im_location = 'right', breast = breast)
+        self.load_scan(im_location = 'right', breast = self.im_r._breast_loc)
 
         #set the indicies to what the were
         self.im_r.exam_index_btn.setCurrentIndex(exam_index)
         self.im_r.breast_btn.setCurrentIndex(breast_index)
         #now connect the signals for the changing the view again
-        self.setup_signals(self.im_r, 'right')
+        self.unblock('right')
 
 
 
@@ -861,7 +872,6 @@ class mammogram_view(pg.ImageView):
 
         #align scan function is called to turn the data to the correct orientation for viewing
         self._im_data = self.align_scan(view)
-            
         self.setImage(self._im_data)
         
 
@@ -915,6 +925,8 @@ class mammogram_view(pg.ImageView):
         num_frames = len(self._features)
         print(num_frames)
         temp = np.zeros((num_frames, np.shape(self._features[0].original_scan)[0], np.shape(self._features[0].original_scan)[1]))
+        print('shape of temp')
+        print(np.shape(temp))
         #create array that has dimensions of [num_frames, width, height]
         #switch the width and height so image shows properly
         temp_flipped = np.zeros((num_frames, np.shape(self._features[0].original_scan)[1], np.shape(self._features[0].original_scan)[0]))
@@ -1040,9 +1052,7 @@ class window(view_scan):
 
 
 
-        
-        
-0        
+       
         
         
 """
