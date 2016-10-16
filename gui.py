@@ -1,13 +1,7 @@
 """
 widget class to handle the gui stuff
 
-
-
-
-
-
-
-
+ 
 TODO LIST:
 
 put left and right arrow figures on the buttons to jump left and right
@@ -18,13 +12,9 @@ show number of previous scans
 
 days since previous scans
 
-
-show which view we are looking at
+make all of the displed indecies start from 1, radiologists will like this more
 
 """
-
-
-
 import dicom
 import os
 import numpy as np
@@ -37,15 +27,16 @@ import time
 
 import pyqtgraph as pg
 from PyQt4 import QtGui, QtCore
-
 from PyQt4.QtCore import Qt, QTimer
 from PyQt4.QtGui import *
-
+import sip
 
 #import my classes
 from breast import breast
 from feature_extract import feature
 from read_files import spreadsheet
+
+
 
 
 
@@ -77,12 +68,17 @@ class view_scan(QtGui.QWidget):
         self.track_btn.clicked.connect(self.track_image)
         
         #image view widgets
-        self.im_l = mammogram_view()#pg.ImageView(view = pg.PlotItem()) #initiate with plot item to set axis ticks on
-        self.im_r = mammogram_view()#pg.ImageView(view = pg.PlotItem()) #initiate with plot item to set axis ticks on
+        self.im_l = mammogram_view()
+        self.im_r = mammogram_view()
+
+        self._initialised = 0
+
+        #dictionary that is used to convert index in the breast dropdown menu to a string
+        self._breast_dict = {0:'left', 1:'right'}
+        
         
         #overlay for the waiting indicator
-        self.loading = Overlay(self.im_l)
-        self.loading.hide()
+        #self.loading = QtGui.QProgressBar(self)
         
         #boolean variable that will say if the right image is being used or not
         #might change the way this is done later on though
@@ -90,13 +86,12 @@ class view_scan(QtGui.QWidget):
         #hiding the histogram and other stuff
         self._hide_imageview_extras()
         
-        
-        
+                
         #member variables
         self._data = []
         #create member variable that will hold the features of a patients scan
         self._patient_data_l = []#feature(levels = 3, wavelet_type = 'haar', no_images = 1) for ii in range(6)]
-        self._patient_data_r = [feature(levels = 3, wavelet_type = 'haar', no_images = 1) for ii in range(6)]
+        self._patient_data_r = []#feature(levels = 3, wavelet_type = 'haar', no_images = 1) for ii in range(6)]
         self._descriptor = spreadsheet(benign_files=None, run_synapse=False)
         #dictonary that will hold a descriptor and layout id number
         self._load_scan_dict = {'dimensions_btn' : 0, 'asymmetry_btn' : 1,
@@ -104,7 +99,6 @@ class view_scan(QtGui.QWidget):
                                 'im_l': 5, 'im_r': 6}
          
         
-                
 
 
 
@@ -118,8 +112,6 @@ class view_scan(QtGui.QWidget):
     #                        Button Functions
     #
     ######################################################################
-    
-
 
     """
     menu_buttons()
@@ -129,7 +121,6 @@ class view_scan(QtGui.QWidget):
 
 
     """
-
 
     def menu_buttons(self):
         print('here')
@@ -149,6 +140,84 @@ class view_scan(QtGui.QWidget):
 
         
 
+    """
+    begin_viewing()
+
+    Description:
+    Function first called when we start viewing
+
+    """
+
+    def begin_viewing(self):
+        
+        #will load in the most recent scan
+        self.load_most_recent_scan()
+
+        #now setup the signals for the mammogram_view objects to activate
+        #reloading when the image view is changed
+        self.setup_signals(self.im_l, 'left')
+        self.setup_signals(self.im_r, 'right')
+
+
+
+        
+    """
+    setup_signals()
+
+    Description:
+    Function will connect the signals for when a drop down menu changes to the functions'
+    to reload the image data
+
+    @param mammogram = the mammogram_view object we are connecting the signals from
+    @param location = string saying if it is the left or right hand view
+
+    """ 
+
+    def setup_signals(self, mammogram, location):
+        
+        if(location == 'left'):
+            mammogram.breast_btn.currentIndexChanged.connect(self.change_view_l)
+            mammogram.exam_index_btn.currentIndexChanged.connect(self.change_view_l)
+        elif(location == 'right'):
+            mammogram.breast_btn.currentIndexChanged.connect(self.change_view_r)
+            mammogram.exam_index_btn.currentIndexChanged.connect(self.change_view_r)
+        else:
+            print('Invalid location in setup_signals(). Must be either left or right')
+            sys.exit()
+            
+
+        
+
+    """
+    load_most_recent_scan()
+
+    Description:
+    Function will get the filenames of the most recent scan and send them to the load scan function to be
+    loaded in and displayed
+
+    Default Parameters
+
+    @param im_location = string saying whether or not is the right or left view
+    @param breast = string having left or right to say scans from which breast 
+                    to view
+    
+
+    """
+    def load_most_recent_scan(self, im_location = 'left', breast = 'left'):
+        self._descriptor.get_most_recent(self._descriptor.current_patient_id)
+        #now load the data in
+        self.load_scan(im_location, breast)
+        
+
+
+        #connecting signals of the drop down menus to functions
+        #not the most elegant way to do this, but seperates everything nicely
+        #and most of the functionality is handled by other functions like load_scan and
+        #from spreadsheet class
+        #Essentially just wrapper functions
+
+
+        
 
 
         
@@ -163,25 +232,17 @@ class view_scan(QtGui.QWidget):
     Patient ID has been saved in the member class _descriptor
 
 
+    Default parameters
 
     @param im_location = string saying whether or not is the right or left view
     @param breast = string having left or right to say scans from which breast 
                     to view
 
 
-
-
-
-
-    TODO:
-    add functionality to load in any examination
-
     """
 
     def load_scan(self, im_location = 'left', breast = 'left'):
         self.showMaximized()
-        #read in the data
-        self._descriptor.get_most_recent(self._descriptor.current_patient_id)
 
         #saving the files that we want to view into the filenames variable
         if(breast == 'left'):
@@ -198,19 +259,28 @@ class view_scan(QtGui.QWidget):
         #initialise the _patient data class for each image
         #if we arer setting up the left image view
         print(im_location)
-        if(im_location == 'left'):
+        if( (im_location == 'left') & (self._initialised == 0)):
             print(filenames)
             self.im_l.initialise(filenames, im_location)
+            self.im_l._breast_loc = breast
             self.im_l.set_im()
-            im_y, im_x, im_h, im_w = self.im_l.get_pos(self.im_l._im_layout)
             #now will add the mammogram widget
             self.add_mammogram(self.im_l)
+            self._initialised = 1
+            
+        elif(im_location == 'left'):
+            print('just update the figure')
+            self.im_l.initialise(filenames, im_location)
+            self.im_l._breast_loc = breast
+            self.im_l.set_im()
+            
 
 
         #if we are setting the right image
         elif(im_location == 'right'):
             print(filenames)
             self.im_r.initialise(filenames, im_location)
+            self.im_l._breast_loc = breast
             self.im_r.set_im()
             self.add_mammogram(self.im_r)
         
@@ -220,9 +290,9 @@ class view_scan(QtGui.QWidget):
             sys.exit()
         
 
+        
 
-
-
+            
 
 
     """
@@ -236,16 +306,54 @@ class view_scan(QtGui.QWidget):
     """
 
     def add_mammogram(self, mammogram):
+
+        #getting the y position, x pos, height and width of the widgets
+        
         im_y, im_x, im_h, im_w = mammogram.get_pos(mammogram._im_layout)
         l_y, l_x, l_h, l_w = mammogram.get_pos(mammogram._left_btn_layout)
         r_y, r_x, r_h, r_w = mammogram.get_pos(mammogram._right_btn_layout)
-        rot_y, rot_x, rot_h, rot_w = mammogram.get_pos(mammogram._rotate_btn_layout)
+        in_y, in_x, in_h, in_w = mammogram.get_pos(mammogram._index_disp_layout)
+        ex_d_y, ex_d_x, ex_d_h, ex_d_w = mammogram.get_pos(mammogram._exam_index_disp_layout)
+        ex_y, ex_x, ex_h, ex_w = mammogram.get_pos(mammogram._exam_index_layout)
+        b_y, b_x, b_h, b_w = mammogram.get_pos(mammogram._breast_dropbox_layout)
+        b_d_y, b_d_x, b_d_h, b_d_w =  mammogram.get_pos(mammogram._breast_disp_layout)
+        rot_y, rot_x, rot_h, rot_w = mammogram.get_pos(mammogram._rotate_btn_layout) 
+
         
         #now add all of these widgets
         self.layout.addWidget(mammogram, im_y, im_x, im_h, im_w)
         self.layout.addWidget(mammogram.jump_left_btn, l_y, l_x, l_h, l_w)
         self.layout.addWidget(mammogram.jump_right_btn, r_y, r_x, r_h, r_w)
+        self.layout.addWidget(mammogram.index_disp, in_y, in_x, in_h, in_w)
         self.layout.addWidget(mammogram.rotate_btn, rot_y, rot_x, rot_h, rot_w)
+        self.layout.addWidget(mammogram.exam_index_disp, ex_d_y, ex_d_x, ex_d_h, ex_d_w)
+        self.layout.addWidget(mammogram.exam_index_btn, ex_y, ex_x, ex_h, ex_w)
+        self.layout.addWidget(mammogram.exam_index_disp, ex_d_y, ex_d_x, ex_d_h, ex_d_w)
+        self.layout.addWidget(mammogram.breast_btn, b_y, b_x, b_h, b_w)
+        self.layout.addWidget(mammogram.breast_disp, b_d_y, b_d_x, b_d_h, b_d_w)
+
+        
+        mammogram.index_disp.setText('%d' %(mammogram.currentIndex))
+        mammogram.exam_index_disp.setText('Exam Number')
+        mammogram.breast_disp.setText('Breast')
+
+        #now make sure the drop boxes are cleared
+        mammogram.exam_index_btn.clear()
+        mammogram.breast_btn.clear()
+        #add all of the exam numbers        
+        for ii in range(1, self._descriptor.no_exams_patient +1):  
+            mammogram.exam_index_btn.addItem( ('%d' %ii) )
+        #adding the labels for the breast scan as well
+        print('printing breast views')
+        #for ii,word in enumerate(['left', 'right']):
+        #   print(word)
+        #  mammogram.breast_btn.addItem(word)
+        mammogram.breast_btn.addItems(['left', 'right'])
+
+        self._breast_disp_layout = []
+        self._breast_dropbox_layout = []
+        
+
 
 
         
@@ -256,38 +364,238 @@ class view_scan(QtGui.QWidget):
     Function will load in the data from the right image and place it next to the other scan of
     the breast
     
+    Will immediately jump to the next frame available
+
     """
     def load_asymmetry(self):
+
+        #temporarily block signals
+        self.block('right')
         
-        self.load_scan(im_location = 'right', breast='left')
+        #if we are first opening up the right view
+        if( (self.im_r.breast_btn.currentIndex()) < 0):
+            #set the breast button to the same as the left view
+            print('here first time')
+            self.load_scan(im_location = 'right', breast=self.im_l._breast_loc)
+        
+        else:
+            self.im_r._breast_loc = self.im_l._breast_loc 
+            self.im_r.breast_btn.setCurrentIndex(self.im_l.breast_btn.currentIndex() )
+            self.im_r.exam_index_btn.setCurrentIndex(self.im_l.exam_index_btn.currentIndex() )
+            self.change_view_r()
+
+        #make sure we arent looking at the same frame twice
+        #will only happen if the current index is zero
+        if(self.im_l.currentIndex == 0):
+            self.im_r.jump_right()
+        else:
+            self.im_r.jump_left()
+        #make sure the signals are unblocked again
+        self.unblock('right')
+
+
+        
+
+
+    """
+    clear_mammogram_x()
+
+    Description:
+
+    Wrapper function that will clear the mammography view, which is handy when we need to load in new mammograms
+    when the user selects a different view/scan/exam
+
+    Must remove all of the widgets to successfully clear everything
+    clear_mammogram function is called to handle this
+
+    @param mammogram = a mammogram_view object that we want to clear
+    @location = the location of the mammogram_view object, either left or right
+
+
+    """
+
+    
+    def clear_mammogram_l(self):
+        #self.clear_mammogram(self.im_l)
+        print('deleted everything')
+        self.im_l = mammogram_view()
+        print('reset everything')
+        
+    def clear_mammogram_r(self):
+        
+        self.clear_mammogram(self.im_r)
+        self.im_r = mammogram_view()
+
+        
+
+
+
+    def clear_mammogram(self, mamm):
+
+        #remove all of the widgets from the layout
+        self.layout.removeWidget(mamm)
+        self.layout.removeWidget(mamm.breast_btn)
+        self.layout.removeWidget(mamm.rotate_btn)
+        self.layout.removeWidget(mamm.exam_index_btn)
+        self.layout.removeWidget(mamm.exam_index_disp)
+        self.layout.removeWidget(mamm.breast_disp)
+        self.layout.removeWidget(mamm.jump_left_btn)
+        self.layout.removeWidget(mamm.jump_right_btn)        
+
+        #now delete them all
+        sip.delete(mamm.breast_btn)
+        sip.delete(mamm.rotate_btn)
+        sip.delete(mamm.exam_index_btn)
+        sip.delete(mamm.exam_index_disp)
+        sip.delete(mamm.breast_disp)
+        sip.delete(mamm.jump_left_btn)
+        sip.delete(mamm.jump_right_btn)   
+        sip.delete(mamm)
 
         
         """
-        for ii in range(0,self._descriptor.no_scans_left):
-            self._file_path = './pilot_images/' + str(self._descriptor.filename_l[ii])[:-3]
-            self._patient_data_r[ii].initialise(self._file_path)
-                    
-        
-        
-        self._im_r_data = self.align_scan(self._patient_data_r, self._descriptor.no_scans_right)
-        self.im_r.setImage(self._im_r_data)
-
-        
-        self.layout.addWidget(self.im_r, 1, 10,1,10)  # plot goes on right side, spanning 3 rows
-        self.layout.addWidget(self.rotate_r_btn, 10, 10,1,2)        
-        self.layout.addWidget(self.track_btn, 5,20,2,2)
-        #set the boolean variable for the right image being used to True
-        self._right_used = True
+        #set them all equal to non is the final step
+        mamm.breast_btn = None
+        mamm.rotate_btn = None
+        mamm.exam_index_btn = None
+        mamm.exam_index_disp = None
+        mamm.breast_disp = None
+        mamm.jump_left_btn = None
+        mamm.jump_right_btn = None
+        mamm = None
         """
-    
-    
         
+    ################################################################
+    #
+    #        Functions connected to PYQT signals
+    #
+    ################################################################        
 
 
+
+    """
+    change_view_x()
+
+    Description:
+    Function is connected to currentIndexChanged signal in the mammogram breast dropdown menu.
+    Also copnnected to view currentIndexChanged in the mammogram exam index dropdown menu.
+    When the breast view is changed, this function is called to load in the filenames for the new scans
+    and then load in the new scans
+    
+    The x above will be either l for left or r for right
+
+    There is one wrapper function for each scan in the view, ie. left and right view
+
+    """
+    
+    def change_view_l(self):
+
+        #saving the exam index and the breast view index
+        exam_index = self.im_l.exam_index_btn.currentIndex()
+        breast_index = self.im_l.breast_btn.currentIndex()
+        #will get the specific exams from this index
+        #the plus one is to accommodate for non zero based indexing used on the spreadsheet
+        self._descriptor.get_exam(self._descriptor.current_patient_id, self.im_l.exam_index_btn.currentIndex() + 1)
+        #now load in that scan
+        self.im_l._breast_loc = self._breast_dict[self.im_l.breast_btn.currentIndex()]
+
+        
+        breast_view = self.im_l._breast_loc
+        #Now we need to clear the current image features stored for this view,
+        #so we dont append too many images
+        #easiest way to do this is to just reinitialise the mammography view
+        self.clear_mammogram_l()
+        self._hide_imageview_extras()
+        self.load_scan(im_location = 'left', breast = breast_view)
+
+        #set the indicies to what the were
+        self.im_l.exam_index_btn.setCurrentIndex(exam_index)
+        self.im_l.breast_btn.setCurrentIndex(breast_index)
+        #now need to reconnect the signals for the changing the view again
+        self.setup_signals(self.im_l, 'left')
+
+
+
+        ### Same as above function, just for right view
+        
+    def change_view_r(self):
+
+        #saving the exam index and the breast view index
+        exam_index = self.im_r.exam_index_btn.currentIndex()
+        breast_index = self.im_r.breast_btn.currentIndex()
+
+        #will get the specific exams from this index
+        self._descriptor.get_exam(self._descriptor.current_patient_id, self.im_r.exam_index_btn.currentIndex() + 1)
+        #now load in that scan
+        self.im_r._breast_loc = self._breast_dict[self.im_r.breast_btn.currentIndex()]
+        
+        breast = self.im_r._breast_loc
+        #Now we need to clear the current image features stored for this view,
+        #so we dont append too many images
+        #easiest way to do this is to just reinitialise the mammography view
+        self.clear_mammogram_r()
+        self._hide_imageview_extras()
+        self.load_scan(im_location = 'right', breast = breast)
+
+        #set the indicies to what the were
+        self.im_r.exam_index_btn.setCurrentIndex(exam_index)
+        self.im_r.breast_btn.setCurrentIndex(breast_index)
+        #now connect the signals for the changing the view again
+        self.setup_signals(self.im_r, 'right')
+
+
+
+
+
+
+    """
+    block()
+
+    Description:
+    Function that will block an mammogram view from outputting any
+    event signals
+    
+    @param side = string saying left or right image
 
     
+    """
 
+    def block(self, side):
+        if(side == 'left'):
+            self.im_l.breast_btn.blockSignals(True)
+            self.im_l.exam_index_btn.blockSignals(True)        
+        #otherwise will be right side
+        else:
+            self.im_r.breast_btn.blockSignals(True)
+            self.im_r.exam_index_btn.blockSignals(True)        
+
+
+
+    """
+    unblock()
+
+    Description:
+    Function that will block an mammogram view from outputting any
+    event signals
     
+    @param side = string saying left or right image
+
+    """
+
+    def unblock(self, side):
+        if(side == 'left'):
+            self.im_l.breast_btn.blockSignals(False)
+            self.im_l.exam_index_btn.blockSignals(False)        
+        #otherwise will be right side
+        else:
+            self.im_r.breast_btn.blockSignals(False)
+            self.im_r.exam_index_btn.blockSignals(False)        
+
+
+
+
+
+            
     #######################################################################
     #
     #            Methods to called by pushing the buttons
@@ -323,8 +631,6 @@ class view_scan(QtGui.QWidget):
                 
             self.im_r.setImage(self._im_r_data)
             
-
-
 
 
 
@@ -391,13 +697,17 @@ mammogram_view
 will build on the ImageView class to add buttons for scanning and rotating and stuff
 
 
+Default Parameters for init
 
+@param filenames = None
+@param location = None
+@param breast = string to say if this is the left or right breast
 
 """
 
 class mammogram_view(pg.ImageView):
 
-    def __init__(self, filenames = None, location = None):
+    def __init__(self, filenames = None, location = None, breast = 'left'):
         pg.ImageView.__init__(self, view = pg.PlotItem())
         self.rotate_btn = QtGui.QPushButton('Rotate')
         self.rotate_btn.clicked.connect(self._rotate)
@@ -405,10 +715,16 @@ class mammogram_view(pg.ImageView):
         self.jump_left_btn.clicked.connect(self.jump_left)
         self.jump_right_btn = QtGui.QPushButton('Next')
         self.jump_right_btn.clicked.connect(self.jump_right)
+        self.index_disp = QtGui.QLabel()
+        self.exam_index_btn = QtGui.QComboBox(self)
+        self.exam_index_disp = QtGui.QLabel()
+        self.breast_btn = QtGui.QComboBox(self)
+        self.breast_disp = QtGui.QLabel()
+                
         self._im_data = []            #array that will have the image data stored in here
         self._features = []           #will be list of features class that will hold the features of individual scans
         self._filenames = []          #list of filenames for this breast on this scan
-        self._breast_loc = []         #location of the breast, if it is left or right
+        self._breast_loc = breast     #location of the breast, if it is left or right
         self._im_data = []            #array that will hold the data that is being displayed
         self._im_index = 1            #image view index 
 
@@ -424,14 +740,20 @@ class mammogram_view(pg.ImageView):
         self._left_btn_layout = []
         self._right_btn_layout = []
         self._rotate_layout = []
+        self._index_disp_layout = []
+        self._exam_index_layout = []
+        self._exam_index_disp_layout = []
+        self._breast_disp_layout = []
+        self._breast_dropbox_layout = []
         
         
         #if filenames and location have been supplied, will run the initialise function
         #to load in the data and set everything up
         if( (filenames != None) & (location != None) ):
             self.initialise(filenames, location)
-
+          
         #now just some error checking
+
         #if the only the filename or the location has been supplied, throw an error
         #to remind me to supply both
         elif(( (filenames == None) | (location == None) ) & ( (filenames != None) | (location != None) )):
@@ -439,11 +761,14 @@ class mammogram_view(pg.ImageView):
             print('Need to supply both filenames and location to the init function if you want to initialise from constructor')
             sys.exit()
 
-        
-    
 
 
 
+
+
+
+
+            
     """
     initialise()
 
@@ -467,6 +792,8 @@ class mammogram_view(pg.ImageView):
         #now will set all of the positions of the images and buttons in the frame
         self.set_location(self._location)
 
+
+        
 
         
 
@@ -495,15 +822,27 @@ class mammogram_view(pg.ImageView):
         #a small amount of hardcoding for the dimensions
         self._rotate_btn_layout = [self._im_layout[2] + self._im_layout[0] + 1, self._im_layout[1], 1,2]
         self._left_btn_layout = [self._im_layout[2] + self._im_layout[0] + 1, self._im_layout[1] + 2, 1,1]
-        self._right_btn_layout = [self._im_layout[2] + self._im_layout[0] + 1, self._im_layout[1] + 3, 1,1]
+        self._index_disp_layout = [self._im_layout[2] + self._im_layout[0] + 1, self._im_layout[1] + 3, 1,1]
+        self._right_btn_layout = [self._im_layout[2] + self._im_layout[0] + 1, self._im_layout[1] + 4, 1,1]
 
-    
+        self._exam_index_disp_layout = [self._im_layout[2] + self._im_layout[0] + 2, self._im_layout[1], 1,1]
+        self._exam_index_layout = [self._im_layout[2] + self._im_layout[0] + 2, self._im_layout[1]+1, 1,1]
+
+        self._breast_disp_layout = [self._im_layout[2] + self._im_layout[0] + 2, self._im_layout[1]+2, 1,1]
+        self._breast_dropbox_layout = [self._im_layout[2] + self._im_layout[0] + 2, self._im_layout[1]+3, 1,1]
         
 
+
+
+        
+        
 
     def get_pos(self, pos_data):
         return pos_data[0], pos_data[1], pos_data[2], pos_data[3]
 
+
+
+    
     """
     set_im()
 
@@ -574,11 +913,13 @@ class mammogram_view(pg.ImageView):
     def align_scan(self, view = 'orig'):    
 
         num_frames = len(self._features)
+        print(num_frames)
         temp = np.zeros((num_frames, np.shape(self._features[0].original_scan)[0], np.shape(self._features[0].original_scan)[1]))
         #create array that has dimensions of [num_frames, width, height]
         #switch the width and height so image shows properly
         temp_flipped = np.zeros((num_frames, np.shape(self._features[0].original_scan)[1], np.shape(self._features[0].original_scan)[0]))
         #now set each frame into the temp array
+
         for ii in range(0,num_frames):
 
             if(view == 'orig'):
@@ -602,20 +943,15 @@ class mammogram_view(pg.ImageView):
     """
     def jump_left(self):
         self.jumpFrames(-1)
-
+        self.index_disp.setText('%d' %(self.currentIndex))
         
     def jump_right(self):
         self.jumpFrames(1)
+        self.index_disp.setText('%d' %(self.currentIndex))
 
 
 
-
-
-
-
-
-
-
+        
 
 
 
@@ -694,7 +1030,7 @@ class window(view_scan):
         #save the current patient ID
         self._descriptor.current_patient_id = int(temp.read())
         #now we can load in the scan
-        self.load_scan()
+        self.begin_viewing()
         
         
         
@@ -706,7 +1042,7 @@ class window(view_scan):
 
         
         
-        
+0        
         
         
 """
@@ -719,66 +1055,18 @@ Just taken from the PyQt tutorial page
 
 https://wiki.python.org/moin/PyQt/A%20full%20widget%20waiting%20indicator
 
-"""
+"""           
 
+class loading_screen(QtGui.QWidget):
 
+    def __init__(self):
 
+        #initialise the GUI Widget
+        QtGui.QWidget.__init__(self)
+        self.loading_text = QLabel()
+        self.loading_text.setText('Loading...')
+        
+        self.layout = QtGui.QGridLayout()
+        self.setLayout(self.layout)
 
-class Overlay(QWidget):
-
-    def __init__(self, parent = None):
-    
-        QWidget.__init__(self, parent)
-        palette = QPalette(self.palette())
-        palette.setColor(palette.Background, Qt.transparent)
-        self.setPalette(palette)
-        
-        """
-        qr = self.frameGeometry()
-        cp = QtGui.QDesktopWidget().availableGeometry().center()
-        qr.moveCenter(cp)
-        self.move(qr.topLeft())
-        """
-        
-    def paintEvent(self, event):
-    
-        painter = QPainter()
-        painter.begin(self)
-        painter.setRenderHint(QPainter.Antialiasing)
-        painter.fillRect(event.rect(), QBrush(QColor(255, 255, 255, 127)))
-        painter.setPen(QPen(Qt.NoPen))
-        
-        for i in range(6):
-            if (self.counter / 5) % 6 == i:
-                painter.setBrush(QBrush(QColor(127 + (self.counter % 5)*32, 127, 127)))
-            else:
-                painter.setBrush(QBrush(QColor(127, 127, 127)))
-            painter.drawEllipse(
-                self.width()/2 + 30 * np.cos(2 * np.pi * i / 6.0) - 10,
-                self.height()/2 + 30 * np.sin(2 * np.pi * i / 6.0) - 10,
-                20, 20)
-        
-        painter.end()
-        
-        
-        
-    def showEvent(self, event):
-    
-        self.timer = self.startTimer(50)
-        self.counter = 0
-    
-    def timerEvent(self, event):
-    
-        self.counter += 1
-        self.update()
-        if self.counter == 60:
-            self.killTimer(self.timer)
-            self.hide()
-
-        
-        
-        
-        
-        
-        
-        
+        self.layout.addWidget(self.loading_text,0,0,10,10)

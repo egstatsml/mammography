@@ -78,8 +78,8 @@ class spreadsheet(object):
         self.no_scans_right = 0
         self.filename_l = []  #list containing the filenames of the left and right breast scans
         self.filename_r = []
-
-
+        
+        
         self.malignant_count = 0
         self.benign_count = 0
         self._count_files()   #function that will count the number of benign and cancerous files we have in the sample
@@ -338,23 +338,23 @@ class spreadsheet(object):
 
     #just creating a mask that will tell me which rows to look at in the crosswalk spreadsheet
     #to get the filenames of the scans
-
-
+    
+    
     
     def get_filenames(self):
-
+        
         left = (self.crosswalk['patientId'] == self.patient_id) & (self.crosswalk['examIndex'] == self.exam_index) & (self.crosswalk["imageView"].str.contains('L')) 
-
+        
         left_filenames = (self.crosswalk.loc[left, 'filename'])
-
+        
         self.no_scans_left = np.sum(left)
         for ii in range(0, np.sum(left)):
             left_name = left_filenames.iloc[ii]
             self.filename_l.append(left_name)
-
-
+            
+            
         right = (self.crosswalk['patientId'] == self.patient_id) & (self.crosswalk['examIndex'] == self.exam_index) & (self.crosswalk["imageView"].str.contains('R')) 
-
+        
         right_filenames = (self.crosswalk.loc[right, 'filename'])
         self.no_scans_right = np.sum(right)
         for ii in range(0, np.sum(right)):
@@ -444,28 +444,75 @@ class spreadsheet(object):
     def filenames(self):
         base_dir = './pilot_images/'
         return  base_dir + str(self.filename_l[self.left_index][0:-3]), base_dir + str(self.filename_r[self.left_index][0:-3])
-
-
-
-
-
-
+    
+    
+    
+    
+    
+    
+    
     """
     get_most_recent()
-
+    
     Description:
     Function will load in the most recent scan from a patient
-
+    
     @param patientId = patient number
     
     """
+    
     def get_most_recent(self, patientId):
         #create a truncated database that just includes the information for the
         #current patient
+        
+        #just clearing the filename variables in case they have something already in them
+        self.filename_l = []
+        self.filename_r = []
         self.patient_id = patientId
         mask = (self.metadata['patientId'] == patientId)
         patient_data = self.metadata.loc[mask,:]
         #now lets find the most recent exam and get those files
         self.exam_index = np.max(patient_data['examIndex'])
+        
+        #setting the number of exams
+        self.no_exams_patient = self.exam_index
+        
         #now get the filenames for this exam
         self.get_filenames()
+        
+        
+        
+        
+        
+        
+        
+    
+    """
+    get_exam()
+    
+    Description:
+    Function will load in the specific scans from a signle examination
+    
+    @param patientId = patient number
+    @param exam = exam index
+    
+    """
+    
+    def get_exam(self, patientId, exam):
+        #create a truncated database that just includes the information for the
+        #current patient
+        
+        #just clearing the filename variables in case they have something already in them
+        self.filename_l = []
+        self.filename_r = []
+        self.patient_id = patientId
+        mask = (self.metadata['patientId'] == patientId)
+        patient_data = self.metadata.loc[mask,:]
+        #now lets find the most recent exam and get those files
+        self.exam_index = exam
+        
+        #now get the filenames for this exam
+        self.get_filenames()
+
+        
+        
