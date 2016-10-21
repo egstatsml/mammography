@@ -80,7 +80,8 @@ class view_scan(QtGui.QWidget):
         
         
         #overlay for the waiting indicator
-        #self.loading = QtGui.QProgressBar(self)
+        self.loading = QtGui.QProgressBar(self)
+        self.loading.hide()
         
         #boolean variable that will say if the right image is being used or not
         #might change the way this is done later on though
@@ -130,15 +131,9 @@ class view_scan(QtGui.QWidget):
         self.layout.addWidget(self.asymmetry_btn, 0, 2,1,2)  
         self.layout.addWidget(self.previous_btn, 0, 4,1,2)   
         self.layout.addWidget(self.artifacts_btn, 0, 6,1,2)  
-        self.layout.addWidget(self.close_btn, 0, 8,1,2) 
-                
-        ## Add widgets to the layout in their proper positions
+        self.layout.addWidget(self.close_btn, 0, 8,1,2)
 
-        #self.layout.addWidget(self.text, 1, 0)   # text edit goes in middle-left
-        #self.layout.addWidget(self.listw, 0, 8,1,2)  # list widget goes in bottom-left
-        # plot goes on right side, spanning
-        #self.layout.addWidget(self.rotate_l_btn, 10, 0,1,2)  
-
+        
 
         
 
@@ -159,7 +154,6 @@ class view_scan(QtGui.QWidget):
         #reloading when the image view is changed
         self.setup_signals(self.im_l, 'left')
         self.setup_signals(self.im_r, 'right')
-
 
 
         
@@ -209,14 +203,6 @@ class view_scan(QtGui.QWidget):
         self._descriptor.get_most_recent(self._descriptor.current_patient_id)
         #now load the data in
         self.load_scan(im_location, breast)
-        
-
-
-        #connecting signals of the drop down menus to functions
-        #not the most elegant way to do this, but seperates everything nicely
-        #and most of the functionality is handled by other functions like load_scan and
-        #from spreadsheet class
-        #Essentially just wrapper functions
 
 
         
@@ -246,8 +232,11 @@ class view_scan(QtGui.QWidget):
     
     def load_scan(self, im_location = 'left', breast = 'left'):
         
+        #make sure the screen is maximised
         self.showMaximized()
-
+        self.begin_loading()
+        #want to begin showing the loading bar
+        #self.begin_loading()
         #saving the files that we want to view into the filenames variable
         if(breast == 'left'):
             filenames = self._descriptor.filename_l
@@ -293,6 +282,9 @@ class view_scan(QtGui.QWidget):
             sys.exit()
         
 
+        self.layout.setSpacing(10)
+        #now am done with the loading screen, so lets hide it
+        self.hide_loading()
         
 
             
@@ -375,10 +367,52 @@ class view_scan(QtGui.QWidget):
         
 
 
+
+    """
+    begin_loading()
+
+    Description:
+    Will show the loading screen bar in the correct position
+    on the current layout
+
+
+    """
+
+    def begin_loading(self):
+        #will want to add the loading bar to the correct position, which is the bottom left corner
+        #will get the dimensions of the grid layout to do this
+        n_cols = self.layout.columnCount()
+        n_rows = self.layout.rowCount()
+        print('n_cols = %d' %n_cols)
+        print('n_rows = %d' %n_rows)
+        self.layout.addWidget(self.loading,12,n_cols-3,1,2)
+        self.loading_widget_index = self.layout.count() #should be the last widget
+        
+        #now need to show it
+        self.loading.show()
+
+        
+    """
+    hide_loading()
+
+    Description:
+    Done loading whatever we were loading, so lets hide the loading bar
+
+    """
+
+
+    def hide_loading(self):
+        #first lets remove the loading bar from the layout
+        self.layout.removeWidget(self.loading)
+        #lets hide it as well
+        self.loading.hide()
+        #set it back to zero
+        self.loading.reset()
         
 
 
-        
+
+
     """
     load_asymmetry()
     
@@ -1045,38 +1079,6 @@ class window(view_scan):
         self.begin_viewing()
         
         
+
+
         
-        
-        
-        
-
-
-
-       
-        
-        
-"""
-busy indicator
-
-Will pop up whenever the gui does something that will take a little while,
-just to let the user know that the program is loading
-
-Just taken from the PyQt tutorial page
-
-https://wiki.python.org/moin/PyQt/A%20full%20widget%20waiting%20indicator
-
-"""           
-
-class loading_screen(QtGui.QWidget):
-
-    def __init__(self):
-
-        #initialise the GUI Widget
-        QtGui.QWidget.__init__(self)
-        self.loading_text = QLabel()
-        self.loading_text.setText('Loading...')
-        
-        self.layout = QtGui.QGridLayout()
-        self.setLayout(self.layout)
-
-        self.layout.addWidget(self.loading_text,0,0,10,10)
