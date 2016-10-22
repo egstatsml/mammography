@@ -53,7 +53,7 @@ from gui import view_scan, window
 
 #initialising everything            
 ## Always start by initializing Qt (only once per application)
-app = QtGui.QApplication([])
+app = QtGui.QApplication(['Mammograph-E'])
 w = window()
 descriptor = spreadsheet(benign_files=None)
 #creating a list that will store the scan filename if any of them create an error

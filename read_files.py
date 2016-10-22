@@ -513,6 +513,39 @@ class spreadsheet(object):
         
         #now get the filenames for this exam
         self.get_filenames()
-
         
+        
+        
+    """
+    get_patient_data()
+    
+    Description:
+    Function that will return a Pandas database of the current patients
+    information listed in the metadata spreadsheet
+    Will return all of the information form all examinations
+    
+    The current patient ID is read from the current_patient_id member variable
+    
+    Can be used then for viewing in the GUI
+    
+    @retval Pandas Database of the current patient we are interested in
+    
+    """
+    
+    def get_patient_info(self):
+        #creating a mask for crop the data to information for just our patient of interest
+        mask = (self.metadata['patientId'] == self.current_patient_id)
+        #get the header
+        header = self.metadata.columns.values
+        print(header)
+        patient_info = pd.DataFrame(header) 
+        patient_info = patient_info.T #transpose so it is row not a column
+        data = self.metadata.loc[mask,:]
+        data_values = pd.DataFrame(data.values)
+        print(data_values)
+        #patient_info.append(data_values, ignore_index=True)
+        patient_info = pd.concat([patient_info,data_values], ignore_index=True)
+        print(patient_info)
+        #now return the cropped database
+        return patient_info
         

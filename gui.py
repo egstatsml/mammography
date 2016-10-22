@@ -6,9 +6,6 @@ TODO LIST:
 
 put left and right arrow figures on the buttons to jump left and right
 
-implement viewing of previous scans
-
-show number of previous scans
 
 days since previous scans
 
@@ -35,7 +32,7 @@ import sip
 from breast import breast
 from feature_extract import feature
 from read_files import spreadsheet
-
+from information_window import *
 
 
 
@@ -50,12 +47,12 @@ class view_scan(QtGui.QWidget):
         QtGui.QWidget.__init__(self)
         #setting all the member variables
         #member buttons for the viewing screens
-        self.dimensions_btn = QtGui.QPushButton('dimensions')
-        self.dimensions_btn.clicked.connect(self.get_dimensions)
+        self.information_btn = QtGui.QPushButton('Information')
+        self.information_btn.clicked.connect(self.display_information)
         self.asymmetry_btn = QtGui.QPushButton('Asymmetry')
         self.asymmetry_btn.clicked.connect(self.load_asymmetry)
-        self.previous_btn = QtGui.QPushButton('Previous Scans')
-        self.previous_btn.clicked.connect(self.load_previous_scans)
+        self.features_btn = QtGui.QPushButton('Features')
+        self.features_btn.clicked.connect(self.show_features)
         self.close_btn = QtGui.QPushButton('Close')
         self.close_btn.clicked.connect(self.close_window)
         self.artifacts_btn = QtGui.QPushButton('Remove Artifacts')
@@ -66,6 +63,10 @@ class view_scan(QtGui.QWidget):
         self.listw = QtGui.QListWidget()
         self.track_btn =QtGui.QPushButton('Track')
         self.track_btn.clicked.connect(self.track_image)
+
+        #Window that will pop up and display information of the patient
+        #Have 
+        self.information_window = information()
         
         #image view widgets
         self.im_l = mammogram_view()
@@ -125,17 +126,17 @@ class view_scan(QtGui.QWidget):
 
     """
 
+    
     def menu_buttons(self):
-        print('here')
-        self.layout.addWidget(self.dimensions_btn, 0, 0,1,2) 
+        
+        self.layout.addWidget(self.information_btn, 0, 0,1,2) 
         self.layout.addWidget(self.asymmetry_btn, 0, 2,1,2)  
-        self.layout.addWidget(self.previous_btn, 0, 4,1,2)   
-        self.layout.addWidget(self.artifacts_btn, 0, 6,1,2)  
+        self.layout.addWidget(self.artifacts_btn, 0, 4,1,2) 
+        self.layout.addWidget(self.features_btn, 0, 6,1,2)    
         self.layout.addWidget(self.close_btn, 0, 8,1,2)
-
         
-
         
+    
 
     """
     begin_viewing()
@@ -150,6 +151,8 @@ class view_scan(QtGui.QWidget):
         #will load in the most recent scan
         self.load_most_recent_scan()
 
+        #make sure the screen is maximised
+        self.showMaximized()
         #now setup the signals for the mammogram_view objects to activate
         #reloading when the image view is changed
         self.setup_signals(self.im_l, 'left')
@@ -232,11 +235,8 @@ class view_scan(QtGui.QWidget):
     
     def load_scan(self, im_location = 'left', breast = 'left'):
         
-        #make sure the screen is maximised
-        self.showMaximized()
         self.begin_loading()
-        #want to begin showing the loading bar
-        #self.begin_loading()
+
         #saving the files that we want to view into the filenames variable
         if(breast == 'left'):
             filenames = self._descriptor.filename_l
@@ -280,12 +280,11 @@ class view_scan(QtGui.QWidget):
         else:
             print('Error in Load Scan: Invalid location for mammogram view. Must be either left or right')
             sys.exit()
-        
 
-        self.layout.setSpacing(10)
-        #now am done with the loading screen, so lets hide it
+        #now am done with the loading bar, so lets hide it
         self.hide_loading()
-        
+        #make sure all of the widgets are stretched evenly
+        self.set_stretch()
 
             
 
@@ -312,9 +311,9 @@ class view_scan(QtGui.QWidget):
         ex_y, ex_x, ex_h, ex_w = mammogram.get_pos(mammogram._exam_index_layout)
         b_y, b_x, b_h, b_w = mammogram.get_pos(mammogram._breast_dropbox_layout)
         b_d_y, b_d_x, b_d_h, b_d_w =  mammogram.get_pos(mammogram._breast_disp_layout)
-        rot_y, rot_x, rot_h, rot_w = mammogram.get_pos(mammogram._rotate_btn_layout) 
-
+        rot_y, rot_x, rot_h, rot_w = mammogram.get_pos(mammogram._rotate_btn_layout)
         
+
         #now add all of these widgets
         self.layout.addWidget(mammogram, im_y, im_x, im_h, im_w)
         self.layout.addWidget(mammogram.jump_left_btn, l_y, l_x, l_h, l_w)
@@ -343,7 +342,7 @@ class view_scan(QtGui.QWidget):
 
 
     @param mammogram = the mammogram_view object whose details we are setting
-
+    
     """
     def im_buttons(self, mammogram):
         
@@ -408,47 +407,12 @@ class view_scan(QtGui.QWidget):
         self.loading.hide()
         #set it back to zero
         self.loading.reset()
+            
+        
         
 
 
-
-
-    """
-    load_asymmetry()
-    
-    Description:
-    Function will load in the data from the right image and place it next to the other scan of
-    the breast
-    
-    Will immediately jump to the next frame available
-
-    """
-    def load_asymmetry(self):
-
-        #temporarily block signals
-        self.block('right')
         
-        #set the breast button to the same as the left view
-        self.im_r._breast_loc = self.im_l._breast_loc
-        self.load_scan(im_location = 'right', breast=self.im_l._breast_loc)
-
-        self.im_r.breast_btn.setCurrentIndex(self.im_l.breast_btn.currentIndex() )
-        self.im_r.exam_index_btn.setCurrentIndex(self.im_l.exam_index_btn.currentIndex() )
-
-
-
-        #make sure we arent looking at the same frame twice
-        #will only happen if the current index is zero
-        if(self.im_l.currentIndex == 0):
-            self.im_r.jump_right()
-        else:
-            self.im_r.jump_left()
-        #make sure the signals are unblocked again
-        self.unblock('right')
-
-
-        
-
 
     """
     clear_mammogram_x()
@@ -516,14 +480,10 @@ class view_scan(QtGui.QWidget):
         mamm = None
         
         
-    ################################################################
-    #
-    #        Functions connected to PYQT signals
-    #
-    ################################################################        
 
 
 
+    
     """
     change_view_x()
 
@@ -640,15 +600,113 @@ class view_scan(QtGui.QWidget):
 
 
 
-            
-    #######################################################################
+
+    """
+    my_maximise()
+
+    Description:
+
+
+    """
+    def set_stretch(self):
+        #the default stretch value
+        stretch = 0
+        #iterate over all columns
+        for ii in range(0, self.layout.columnCount()):
+            self.layout.setColumnStretch(ii, 0)
+    
+        for ii in range(0, self.layout.rowCount()):
+            self.layout.setRowStretch(ii, 0)
+
+
+
+    ################################################################
     #
-    #            Methods to called by pushing the buttons
+    #        Functions connected to PYQT signals
     #
+    ################################################################        
+
+    ##############
     #
+    # Menu Button Signal Functions
     #
-    #######################################################################
+    ##############
+
+
+
+    """
+    load_asymmetry()
+    
+    Description:
+    Function will load in the data from the right image and place it next to the other scan of
+    the breast
+    
+    Will immediately jump to the next frame available
+
+    """
+    def load_asymmetry(self):
+
+
+        #temporarily block signals
+        self.block('right')
+        #set the breast button to the same as the left view
+        self.im_r._breast_loc = self.im_l._breast_loc
+        self.load_scan(im_location = 'right', breast=self.im_l._breast_loc)
+
+        self.im_r.breast_btn.setCurrentIndex(self.im_l.breast_btn.currentIndex() )
+        self.im_r.exam_index_btn.setCurrentIndex(self.im_l.exam_index_btn.currentIndex() )
+
+        #make sure we arent looking at the same frame twice
+        #will only happen if the current index is zero
+        if(self.im_l.currentIndex == 0):
+            self.im_r.jump_right()
+        else:
+            self.im_r.jump_left()
+        #make sure the signals are unblocked again
+        self.unblock('right')
+
+
+
         
+
+
+
+    """
+    show_features()
+    
+    Description:
+    Connected to the clicked signal for the features button in the GUI
+    
+    Function will perform the feature enhancement done in the feature class
+    and will show the enhanced image on the image display
+
+    The features that will be shown will be a multiplication of the detail components in the
+    first level of wavelet decomposition.
+
+    This will enhance the visibility of microcalcifications
+
+    """
+    
+    def show_features(self):
+        
+        #first need to perform preprocessing to remove artifacts
+        self.im_l._features[0].preprocessing()
+        #now extract the features by performing the wavelet packet decomposition
+        self.im_l._features[0].get_features()
+        #now will create a variable that will hold the element wise multiplication of
+        #the detail coefficients in the first level of packet transform
+        print(self.im_l._features[0].indicies[2][0,0])
+        detail = np.zeros(np.shape(self.im_l._features[0].packets[self.im_l._features[0].indicies[2][0,0]].data))
+        detail = self.im_l._features[0].packets[self.im_l._features[0].indicies[2][0,1]].data * self.im_l._features[0].packets[self.im_l._features[0].indicies[2][1,0]].data * self.im_l._features[0].packets[self.im_l._features[0].indicies[2][1,1]].data
+        
+        #now want to copy this data to the image view data
+        
+
+
+
+
+        
+            
     """
     remove_artifacts()
     
@@ -679,32 +737,27 @@ class view_scan(QtGui.QWidget):
 
 
 
-
-
-
-
     def track_image(self):
         print('TODO: add functionality')
 
-        
-            
-    def load_other_view(self):
-        print('TODO: add functionality')
-        
-        
-    def load_previous_scans(self):
-        print('TODO: add functionality')
+
         
     def close_window(self):
         print('TODO: add functionality')
         self.im_l.setCurrentIndex()
         
         
-    def get_dimensions(self):
-        a = self.im.getView()
-        print(a.viewRange())
-        #self.layout.removeWidget(self.im)
-        #self.layout.addWidget(self.text, 1, 0)   # text edit goes in middle-left
+    def display_information(self):
+        #lets get the data of the patient we are looking for
+        patient_info = self._descriptor.get_patient_info()
+        self.information_window.table.set_data(patient_info)
+        self.information_window.view.setModel(self.information_window.table)
+        self.information_window.view.show()
+
+
+        #code to get the viewing area of an image
+        #a = self.im.getView()
+        #print(a.viewRange())
         
         
         
@@ -724,10 +777,8 @@ class view_scan(QtGui.QWidget):
         self.im_r.ui.menuBtn.hide()
         self.im_r.ui.histogram.hide()    
         
-        
-        
 
-
+        
     def clear_window(self):
         for i in reversed(range(self.layout.count())): 
             self.layout.itemAt(i).widget().setParent(None)
@@ -765,7 +816,10 @@ class mammogram_view(pg.ImageView):
         self.exam_index_disp = QtGui.QLabel()
         self.breast_btn = QtGui.QComboBox(self)
         self.breast_disp = QtGui.QLabel()
-                
+
+        #want to set the size policy to ignore the size hint, as it messes with my stuff a bit
+        self.setSizePolicy(QtGui.QSizePolicy.Ignored, QtGui.QSizePolicy.Ignored)
+        
         self._im_data = []            #array that will have the image data stored in here
         self._features = []           #will be list of features class that will hold the features of individual scans
         self._filenames = []          #list of filenames for this breast on this scan
@@ -1077,8 +1131,4 @@ class window(view_scan):
         self._descriptor.current_patient_id = int(temp.read())
         #now we can load in the scan
         self.begin_viewing()
-        
-        
-
-
-        
+                
