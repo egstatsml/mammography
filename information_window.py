@@ -50,11 +50,10 @@ class information(QtGui.QWidget):
         #make a table that will hold a table
         self.table = pandas_model()
         self.view = QtGui.QTableView()
-        
-        #now lets set any other member variables we might need
-        #probably some bottons or something
-        
-        
+
+
+
+
 
 
 
@@ -82,3 +81,52 @@ class pandas_model(QtCore.QAbstractTableModel):
                 return QtCore.QVariant(str(
                     self._data.values[index.row()][index.column()]))
         return QtCore.QVariant()
+
+
+
+
+
+
+
+
+
+
+
+"""
+notes
+
+
+defines window that will pop up to enter notes
+
+
+"""
+
+
+
+class notes(QtGui.QWidget):
+
+    def __init__(self):
+        QtGui.QWidget.__init__(self)
+        
+        self.text_box = QtGui.QLineEdit(self)
+        self.save_btn = QtGui.QPushButton('Save', self)
+        self.status_label = QtGui.QLabel(self)
+        self.save_btn.clicked.connect(self.update_label)
+        self.setWindowTitle('Mammograph-E - Notes')
+        
+        #lets size the window
+        #making it to the golden ratio
+        self.resize(1018,720)
+
+        self.text_box.move(10,10)
+        self.text_box.resize( 962, 680) #* (3/4), 320 * np.sqrt(2) * (3/4) )
+
+        self.save_btn.move( 10, 680 + 15)
+        self.save_btn.resize(100,20)
+        self.status_label.move( 110, 680 + 15)
+        self.status_label.resize(100,20)
+        
+        self.text_box.setText('Please enter patient notes')
+
+    def update_label(self):
+        self.status_label.setText('Saved')

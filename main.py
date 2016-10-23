@@ -127,7 +127,10 @@ while(descriptor.exam_pos < descriptor.total_no_exams):
         benign_scan.initialise(file_path)
         benign_scan.preprocessing()
         benign_scan.get_features()
-
+        plt.figure()
+        #plt.imshow(benign_scan.data)
+        plt.imshow(benign_scan.packets[benign_scan.indicies[2][0,0]].data)
+        plt.show()
     except:
         print('Error with current file %s' %(file_path))
         error_files.append(file_path)

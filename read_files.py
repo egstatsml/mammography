@@ -537,15 +537,12 @@ class spreadsheet(object):
         mask = (self.metadata['patientId'] == self.current_patient_id)
         #get the header
         header = self.metadata.columns.values
-        print(header)
         patient_info = pd.DataFrame(header) 
         patient_info = patient_info.T #transpose so it is row not a column
         data = self.metadata.loc[mask,:]
         data_values = pd.DataFrame(data.values)
-        print(data_values)
         #patient_info.append(data_values, ignore_index=True)
         patient_info = pd.concat([patient_info,data_values], ignore_index=True)
-        print(patient_info)
         #now return the cropped database
         return patient_info
         

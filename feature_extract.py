@@ -107,22 +107,6 @@ class feature(breast):
         self.current_image_no = self.current_image_no + 1
         #do the wavelet packet decomposition
         
-        self.packets = pywt.WaveletPacket2D(data=self.data.astype(float), wavelet=self.wavelet_type, mode='sym')
-
-        #check that the number of levels isnt to high
-        #if it is, lets print something to let them know
-        if(self.levels > self.packets.maxlevel):
-            print('number of levels given is too large')
-            print('Maximum level of %d, level decomp given is %d' %(self.packets.maxlevel, levels))
-            print('Set to max level and will continue')
-            self.levels = self.packets.maxlevel
-            #will have to reinitialise the feature lists
-            self.__initialise_feature_lists()
-
-        #now lets put the indicies for each level in a nice format that is pleseant to index
-        #indicies will be a list of numpy arrays for each level
-        self.find_indicies()
-        
 
         
     """
@@ -164,6 +148,25 @@ class feature(breast):
 
     def get_features(self, level = 'all'):
 
+        #perform the wavelet decomposition
+        self.packets = pywt.WaveletPacket2D(data=self.data.astype(float), wavelet=self.wavelet_type, mode='sym')
+
+        #check that the number of levels isnt to high
+        #if it is, lets print something to let them know
+        if(self.levels > self.packets.maxlevel):
+            print('number of levels given is too large')
+            print('Maximum level of %d, level decomp given is %d' %(self.packets.maxlevel, levels))
+            print('Set to max level and will continue')
+            self.levels = self.packets.maxlevel
+            #will have to reinitialise the feature lists
+            self.__initialise_feature_lists()
+
+        #now lets put the indicies for each level in a nice format that is pleseant to index
+        #indicies will be a list of numpy arrays for each level
+        self.find_indicies()
+        
+
+        
         if(level == 'all'):
             for ii in range(0, self.levels):
                 self._get_features_level(ii)

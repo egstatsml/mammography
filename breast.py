@@ -122,6 +122,7 @@ class breast(object):
         self.im_width = np.shape(self.data)[1]
         self.im_height = np.shape(self.data)[0]
         #check correct orientation of the image
+        self.remove_label()
         self.remove_artifacts()
         self.breast_boundary()
         

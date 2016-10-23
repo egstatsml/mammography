@@ -45,6 +45,7 @@ class view_scan(QtGui.QWidget):
 
         #initialise the GUI Widget
         QtGui.QWidget.__init__(self)
+
         #setting all the member variables
         #member buttons for the viewing screens
         self.information_btn = QtGui.QPushButton('Information')
@@ -53,10 +54,10 @@ class view_scan(QtGui.QWidget):
         self.asymmetry_btn.clicked.connect(self.load_asymmetry)
         self.features_btn = QtGui.QPushButton('Features')
         self.features_btn.clicked.connect(self.show_features)
-        self.close_btn = QtGui.QPushButton('Close')
-        self.close_btn.clicked.connect(self.close_window)
-        self.artifacts_btn = QtGui.QPushButton('Remove Artifacts')
-        self.artifacts_btn.clicked.connect(self.remove_artifacts)
+        self.notes_btn = QtGui.QPushButton('notes')
+        self.notes_btn.clicked.connect(self.display_notes)
+        self.adjacent_btn = QtGui.QPushButton('Adjacent')
+        self.adjacent_btn.clicked.connect(self.load_adjacent)
         #buttons that allow  rotating the scans
         #initialising text box and list Widgets
         self.text = QtGui.QLineEdit('enter text')
@@ -64,9 +65,10 @@ class view_scan(QtGui.QWidget):
         self.track_btn =QtGui.QPushButton('Track')
         self.track_btn.clicked.connect(self.track_image)
 
-        #Window that will pop up and display information of the patient
-        #Have 
+        #Window that will pop up and display information of the patient 
         self.information_window = information()
+        #window for saving notes 
+        self.notes_window = notes()
         
         #image view widgets
         self.im_l = mammogram_view()
@@ -105,6 +107,7 @@ class view_scan(QtGui.QWidget):
         
 
 
+        
 
 
         
@@ -131,9 +134,9 @@ class view_scan(QtGui.QWidget):
         
         self.layout.addWidget(self.information_btn, 0, 0,1,2) 
         self.layout.addWidget(self.asymmetry_btn, 0, 2,1,2)  
-        self.layout.addWidget(self.artifacts_btn, 0, 4,1,2) 
+        self.layout.addWidget(self.adjacent_btn, 0, 4,1,2) 
         self.layout.addWidget(self.features_btn, 0, 6,1,2)    
-        self.layout.addWidget(self.close_btn, 0, 8,1,2)
+        self.layout.addWidget(self.notes_btn, 0, 8,1,2)
         
         
     
@@ -231,10 +234,9 @@ class view_scan(QtGui.QWidget):
 
     """
 
-
     
     def load_scan(self, im_location = 'left', breast = 'left'):
-        
+
         self.begin_loading()
 
         #saving the files that we want to view into the filenames variable
@@ -346,7 +348,7 @@ class view_scan(QtGui.QWidget):
     """
     def im_buttons(self, mammogram):
         
-        mammogram.index_disp.setText('%d' %(mammogram.currentIndex))
+        mammogram.index_disp.setText('Current Scan: %d' %(mammogram.currentIndex + 1))
         mammogram.exam_index_disp.setText('Exam Number')
         mammogram.breast_disp.setText('Breast')
         
@@ -602,10 +604,10 @@ class view_scan(QtGui.QWidget):
 
 
     """
-    my_maximise()
+    set_stretch()
 
     Description:
-
+    Function will make sure all of the widgets are set to zero stretch
 
     """
     def set_stretch(self):
@@ -649,12 +651,7 @@ class view_scan(QtGui.QWidget):
 
         #temporarily block signals
         self.block('right')
-        #set the breast button to the same as the left view
-        self.im_r._breast_loc = self.im_l._breast_loc
-        self.load_scan(im_location = 'right', breast=self.im_l._breast_loc)
-
-        self.im_r.breast_btn.setCurrentIndex(self.im_l.breast_btn.currentIndex() )
-        self.im_r.exam_index_btn.setCurrentIndex(self.im_l.exam_index_btn.currentIndex() )
+        self.load_right()
 
         #make sure we arent looking at the same frame twice
         #will only happen if the current index is zero
@@ -662,13 +659,49 @@ class view_scan(QtGui.QWidget):
             self.im_r.jump_right()
         else:
             self.im_r.jump_left()
+
+        
+        self.im_r.breast_btn.setCurrentIndex(1)
+            
+        #make sure the colourmap is set to default of grey
+        self.im_r.ui.histogram.gradient.loadPreset('grey')
+        #make sure the signals are unblocked again
+        self.unblock('right')
+        
+        
+        
+        
+        
+    """
+    load_adjacent()
+        
+    Description:
+    Function is connected to the Adjacent menu button
+    Will load in the data for the adjacent breast.
+    
+    
+    """
+    
+    def load_adjacent(self):
+        
+        #temporarily block signals
+        self.block('right')
+        #if the left image view is currently displaying the left breast, lets show the right
+        #breast in the right screen
+        if(self.im_l._breast_loc == 'left'):
+            self.load_right(breast_loc = 'right')
+        else:
+            self.load_right()
+            
+        #make sure the colourmap is set to default of grey
+        self.im_r.ui.histogram.gradient.loadPreset('grey')
         #make sure the signals are unblocked again
         self.unblock('right')
 
 
 
-        
 
+        
 
 
     """
@@ -685,75 +718,97 @@ class view_scan(QtGui.QWidget):
 
     This will enhance the visibility of microcalcifications
 
+    #set a custom colour gradient to make them as visible as posible
+
     """
     
     def show_features(self):
-        
-        #first need to perform preprocessing to remove artifacts
-        self.im_l._features[0].preprocessing()
-        #now extract the features by performing the wavelet packet decomposition
-        self.im_l._features[0].get_features()
-        #now will create a variable that will hold the element wise multiplication of
-        #the detail coefficients in the first level of packet transform
-        print(self.im_l._features[0].indicies[2][0,0])
-        detail = np.zeros(np.shape(self.im_l._features[0].packets[self.im_l._features[0].indicies[2][0,0]].data))
-        detail = self.im_l._features[0].packets[self.im_l._features[0].indicies[2][0,1]].data * self.im_l._features[0].packets[self.im_l._features[0].indicies[2][1,0]].data * self.im_l._features[0].packets[self.im_l._features[0].indicies[2][1,1]].data
-        
-        #now want to copy this data to the image view data
-        
 
+        #temporarily block signals
+        self.block('right')
 
-
+        #now lets load the right image
+        self.load_right()
 
         
+        for ii in range(0, len(self.im_l._features)):
+            #first need to perform preprocessing to remove artifacts
             
+            self.im_r._features[ii].preprocessing()
+            #now extract the features by performing the wavelet packet decomposition
+            self.im_r._features[ii].get_features()
+
+        #now lets set the image data to the multiplication of the horizontal with the vertical
+        self.im_r.set_im('wave')
+
+        #lets set the colormap
+        self.im_r.ui.histogram.gradient.restoreState({'ticks': [(0.005, (0, 10, 185, 50)), (0.05, (0, 50, 10, 255)), (0.08, (0, 100, 10, 255)), (0.09, (20, 100, 10, 255)), (0.15, (20, 80, 0, 255)), (0.2, (100, 0, 0, 255)),(0.3, (150, 0, 0, 255)), (0.00, (0, 0, 0, 255)), (np.nan, (0, 0, 0, 0))], 'mode': 'rgb'})
+        
+        #now lets unblock the signals
+        self.unblock('right')
+
+
+
+
+
+        
+
     """
-    remove_artifacts()
-    
+    load_right()
+
     Description:
-    Called when the remove artifacts button is pressed on the gui
-    
-    Will then use the preprocessing function in the breast class to remove
-    labels, skin and anything else that shouldnt be there
-    """        
-        
-    def remove_artifacts(self):
+    Helper function that will load in data for the right image
 
-        for ii in range(0, self._descriptor.no_scans_left):
-            self._patient_data_l[ii].preprocessing()
-            self._im_l_data = self.align_scan(self._patient_data_l[ii].data)
-        
-        self.im_l.setImage(self._im_l_data)
-        
-        #see if the right image is being used. If it is,
-        #remove that stuff as well
-        if(self._right_used == True):
-            for ii in range(0, self._descriptor.no_scans_right):
-                self._patient_data_r[ii].preprocessing()
-                self._im_r_data = self.align_scan(self._patient_data_r.data)
-                
-            self.im_r.setImage(self._im_r_data)
+    Before calling this function, would most likely want to block the signals
+    for changing image parameters as to not cause an unwanted event
+
+
+    """
+    def load_right(self, breast_loc = None):
+
+        self.im_r._features = []
+        #if breast location isnt defined, lets just set it to the same as the left
+        if(breast_loc == None):
+            breast_loc = self.im_l._breast_loc
             
+        print(self.im_l._breast_loc)
+        #set the breast button to the same as the left view
+        self.im_r._breast_loc = breast_loc
+        self.load_scan(im_location = 'right', breast = breast_loc)
+
+        self.im_r.breast_btn.setCurrentIndex(self.im_l.breast_btn.currentIndex() )
+        self.im_r.exam_index_btn.setCurrentIndex(self.im_l.exam_index_btn.currentIndex() )
 
 
 
-    def track_image(self):
-        print('TODO: add functionality')
 
-
-        
-    def close_window(self):
-        print('TODO: add functionality')
-        self.im_l.setCurrentIndex()
-        
-        
+    
     def display_information(self):
         #lets get the data of the patient we are looking for
         patient_info = self._descriptor.get_patient_info()
         self.information_window.table.set_data(patient_info)
         self.information_window.view.setModel(self.information_window.table)
         self.information_window.view.show()
+        self.information_window.view.setWindowTitle('Mammography-E - Patient Information')
+        self.information_window.view.resize(1600,300)
 
+        
+
+
+
+
+
+    def display_notes(self):
+        self.notes_window.show()
+
+
+        
+
+    def track_image(self):
+        print('TODO: add functionality')
+
+
+                
 
         #code to get the viewing area of an image
         #a = self.im.getView()
@@ -804,6 +859,7 @@ Default Parameters for init
 class mammogram_view(pg.ImageView):
 
     def __init__(self, filenames = None, location = None, breast = 'left'):
+        
         pg.ImageView.__init__(self, view = pg.PlotItem())
         self.rotate_btn = QtGui.QPushButton('Rotate')
         self.rotate_btn.clicked.connect(self._rotate)
@@ -919,10 +975,10 @@ class mammogram_view(pg.ImageView):
 
         #makes for neater code so I am going to be slightly evel and add            
         #a small amount of hardcoding for the dimensions
-        self._rotate_btn_layout = [self._im_layout[2] + self._im_layout[0] + 1, self._im_layout[1], 1,2]
-        self._left_btn_layout = [self._im_layout[2] + self._im_layout[0] + 1, self._im_layout[1] + 2, 1,1]
-        self._index_disp_layout = [self._im_layout[2] + self._im_layout[0] + 1, self._im_layout[1] + 3, 1,1]
-        self._right_btn_layout = [self._im_layout[2] + self._im_layout[0] + 1, self._im_layout[1] + 4, 1,1]
+        self._rotate_btn_layout = [self._im_layout[2] + self._im_layout[0] + 1, self._im_layout[1], 1,1]
+        self._left_btn_layout = [self._im_layout[2] + self._im_layout[0] + 1, self._im_layout[1] + 1, 1,1]
+        self._index_disp_layout = [self._im_layout[2] + self._im_layout[0] + 1, self._im_layout[1] + 2, 1,1]
+        self._right_btn_layout = [self._im_layout[2] + self._im_layout[0] + 1, self._im_layout[1] + 3, 1,1]
 
         self._exam_index_disp_layout = [self._im_layout[2] + self._im_layout[0] + 2, self._im_layout[1], 1,1]
         self._exam_index_layout = [self._im_layout[2] + self._im_layout[0] + 2, self._im_layout[1]+1, 1,1]
@@ -960,6 +1016,16 @@ class mammogram_view(pg.ImageView):
 
         #align scan function is called to turn the data to the correct orientation for viewing
         self._im_data = self.align_scan(view)
+
+        if(view == 'wave'):
+            mask = np.isnan(self._im_data)
+            #now lets invert the mask
+            mask = np.logical_not(mask)
+            #if the view is the wavelet data, will normalise it a bit so it displays nicer
+            self._im_data[mask] = np.abs(self._im_data[mask])
+            self._im_data[mask] = np.multiply(self._im_data[mask], 4096/(np.max(self._im_data[mask])))
+        
+    
         self.setImage(self._im_data)
         
 
@@ -981,7 +1047,7 @@ class mammogram_view(pg.ImageView):
             temp[ii,:,:] = np.rot90(self._im_data[ii,:,:])
 
         self._im_data = temp
-        self.setImage(self._im_data)
+        self.setImage(self._im_data, autoLevels=False)
 
             
 
@@ -1000,6 +1066,9 @@ class mammogram_view(pg.ImageView):
     
     will do a flip up down and rotate 90 degrees clockwise (or 270 degrees counter clockwise)
     
+    Scans within an examination aren't always the same size either.
+    To prevent errors from this, 
+
     @param view = string that will say what type of data we want to view
            valid options:
                   'orig' = default to original mammogram data
@@ -1011,24 +1080,35 @@ class mammogram_view(pg.ImageView):
     def align_scan(self, view = 'orig'):    
 
         num_frames = len(self._features)
-        print(num_frames)
-        temp = np.zeros((num_frames, np.shape(self._features[0].original_scan)[0], np.shape(self._features[0].original_scan)[1]))
-        print('shape of temp')
-        print(np.shape(temp))
+        #now will get the maximum size of the scans in this examination
+        max_size = self.get_max_size(view)
+
+        #create a temporary array to store the frames that has is the  size of the maximum dimensions
+        temp = np.zeros((num_frames, max_size[0], max_size[1]))
+        
         #create array that has dimensions of [num_frames, width, height]
         #switch the width and height so image shows properly
-        temp_flipped = np.zeros((num_frames, np.shape(self._features[0].original_scan)[1], np.shape(self._features[0].original_scan)[0]))
+        temp_flipped = np.zeros((num_frames, np.shape(temp)[2], np.shape(temp)[1]))
         #now set each frame into the temp array
-
         for ii in range(0,num_frames):
-
+            #to account for changes in size of scans between scans from the same examination
+            #am including some array slicing in the temp variable.
+            #if a scan is smaller than the maximum, it will be zero padded to the max size
+            
             if(view == 'orig'):
-                temp[ii,:,:] = np.copy(self._features[ii].original_scan)
-                temp[ii,:,:] = np.flipud(temp[ii,:,:])
-                temp_flipped[ii,:,:] = np.rot90(temp[ii,:,:], k=3)
-
+                #get the size, minus one is to account for zero indexing
+                size = (np.shape(self._features[ii].original_scan))
+                temp[ii,0:size[0],0:size[1]] = np.copy(self._features[ii].original_scan)
+            elif(view == 'wave'):
+                size = (np.shape(self._features[ii].packets[self._features[ii].indicies[2][0,0]].data))
+                temp[ii,0:size[0],0:size[1]] = np.copy(self._features[ii].packets[self._features[ii].indicies[2][0,1]].data) * self._features[ii].packets[self._features[ii].indicies[2][1,0]].data
+                
             else:
                 print('TODO: Add functionality for viewing other type of images')
+
+            temp[ii,:,:] = np.flipud(temp[ii,:,:])
+            #now flip it, k == 3 will flip 270 degrees
+            temp_flipped[ii,:,:] = np.rot90(temp[ii,:,:], k=3)
 
         return temp_flipped
 
@@ -1043,20 +1123,65 @@ class mammogram_view(pg.ImageView):
     """
     def jump_left(self):
         self.jumpFrames(-1)
-        self.index_disp.setText('%d' %(self.currentIndex))
+        self.index_disp.setText('Current Scan: %d' %(self.currentIndex + 1))
         
     def jump_right(self):
         self.jumpFrames(1)
-        self.index_disp.setText('%d' %(self.currentIndex))
+        self.index_disp.setText('Current Scan: %d' %(self.currentIndex + 1))
 
 
 
         
 
 
+    """
+    get_max_size()
 
+    Description:
+    function to return the maximum size of the images in the current scan
+    Is called when we want to update the scan information being displayed
+
+    
+
+    @param view = string to say what view we are looking at.
+           valid options:
+                  'orig' = default to original mammogram data
+                  'pre'  = preprocessed data with artifacts removed
+                  'wave' = view of wavelet decomposition
+    
+    @retval = maximum size of scans in the array. If the maximum size height and width dont occur int
+              the same scan, the return value will be the maximum height and width in any scan
+
+    """
+
+    def get_max_size(self, view):
+
+        max_size = [0,0]
+        #variable that will point to the data we are finding the size of
+        data = []
+
+        #want to loop over all of the scans
+        for ii in range(0, len(self._features)):
+
+            if(view == 'orig'):
+                data = self._features[ii].original_scan
+            elif(view == 'wave'):
+                data = self._features[ii].packets[self._features[ii].indicies[2][0,0]].data
+
+
+            print(np.shape(data))
+            print(len(self._features))
+            #now see if we need to update the maximum found size
+            if( np.shape(data)[0] > max_size[0] ):
+                max_size[0] = np.shape(data)[0]
         
+            if( np.shape(data)[1] > max_size[1] ):
+                max_size[1] = np.shape(data)[1]
 
+
+        #return the list of maximum found height and width
+        return max_size
+                
         
 class window(view_scan):
 
@@ -1084,11 +1209,26 @@ class window(view_scan):
         self.setLayout(self.layout)
         
         #set layout
-        self.layout.addWidget(self.view_mammogram_btn,0,0,10,3)
-        self.layout.addWidget(self.options_btn,10,0,10,3)
+        self.layout.addWidget(self.view_mammogram_btn,120,0,50,100)
+        self.layout.addWidget(self.options_btn,170,0,50,100)
         
         #file dialog member that will be used for opening the files
         self._file_dialog = QtGui.QFileDialog
+        #lets center the window
+        #self.resize(500,500)
+        self.center()
+
+        #setting the logo
+        self.pic = QtGui.QLabel(self)
+        #use full ABSOLUTE path to the image, not relative
+        self.pic.setPixmap(QtGui.QPixmap(os.getcwd() + "/logo.png"))
+        self.layout.addWidget(self.pic,0,0,100,100)
+        
+    def center(self):
+        qr = self.frameGeometry()
+        cp = QtGui.QDesktopWidget().availableGeometry().center()
+        qr.moveCenter(cp)
+        self.move(qr.topLeft())
         
         
         
