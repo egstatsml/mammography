@@ -50,14 +50,14 @@ class view_scan(QtGui.QWidget):
         #member buttons for the viewing screens
         self.information_btn = QtGui.QPushButton('Information')
         self.information_btn.clicked.connect(self.display_information)
-        self.asymmetry_btn = QtGui.QPushButton('Asymmetry')
-        self.asymmetry_btn.clicked.connect(self.load_asymmetry)
+        self.second_btn = QtGui.QPushButton('Second')
+        self.second_btn.clicked.connect(self.load_second)
         self.features_btn = QtGui.QPushButton('Features')
         self.features_btn.clicked.connect(self.show_features)
-        self.notes_btn = QtGui.QPushButton('notes')
+        self.notes_btn = QtGui.QPushButton('Notes')
         self.notes_btn.clicked.connect(self.display_notes)
-        self.adjacent_btn = QtGui.QPushButton('Adjacent')
-        self.adjacent_btn.clicked.connect(self.load_adjacent)
+        self.asymmetry_btn = QtGui.QPushButton('Asymmetry')
+        self.asymmetry_btn.clicked.connect(self.load_asymmetry)
         #buttons that allow  rotating the scans
         #initialising text box and list Widgets
         self.text = QtGui.QLineEdit('enter text')
@@ -69,6 +69,9 @@ class view_scan(QtGui.QWidget):
         self.information_window = information()
         #window for saving notes 
         self.notes_window = notes()
+        #classifier window
+        self.classifier_window = classifier_info()
+        
         
         #image view widgets
         self.im_l = mammogram_view()
@@ -100,7 +103,7 @@ class view_scan(QtGui.QWidget):
         self._patient_data_r = []#feature(levels = 3, wavelet_type = 'haar', no_images = 1) for ii in range(6)]
         self._descriptor = spreadsheet(benign_files=None, run_synapse=False)
         #dictonary that will hold a descriptor and layout id number
-        self._load_scan_dict = {'dimensions_btn' : 0, 'asymmetry_btn' : 1,
+        self._load_scan_dict = {'dimensions_btn' : 0, 'second_btn' : 1,
                                 'previous_btn' : 2, 'artifacts_btn': 3, 'close_btn' : 4,
                                 'im_l': 5, 'im_r': 6}
          
@@ -133,8 +136,8 @@ class view_scan(QtGui.QWidget):
     def menu_buttons(self):
         
         self.layout.addWidget(self.information_btn, 0, 0,1,2) 
-        self.layout.addWidget(self.asymmetry_btn, 0, 2,1,2)  
-        self.layout.addWidget(self.adjacent_btn, 0, 4,1,2) 
+        self.layout.addWidget(self.second_btn, 0, 2,1,2)  
+        self.layout.addWidget(self.asymmetry_btn, 0, 4,1,2) 
         self.layout.addWidget(self.features_btn, 0, 6,1,2)    
         self.layout.addWidget(self.notes_btn, 0, 8,1,2)
         
@@ -209,6 +212,7 @@ class view_scan(QtGui.QWidget):
         self._descriptor.get_most_recent(self._descriptor.current_patient_id)
         #now load the data in
         self.load_scan(im_location, breast)
+        self.im_l.exam_index_btn.setCurrentIndex(self.im_l.exam_index_btn.count()-1)
 
 
         
@@ -269,7 +273,7 @@ class view_scan(QtGui.QWidget):
         elif(im_location == 'right'):
             print(filenames)
             self.im_r.initialise(filenames, im_location)
-            self.im_l._breast_loc = breast
+            self.im_r._breast_loc = breast
             self.im_r.set_im()
             self.im_buttons(self.im_r)
             #now will add the mammogram widget if we need to
@@ -637,7 +641,7 @@ class view_scan(QtGui.QWidget):
 
 
     """
-    load_asymmetry()
+    load_second()
     
     Description:
     Function will load in the data from the right image and place it next to the other scan of
@@ -646,12 +650,12 @@ class view_scan(QtGui.QWidget):
     Will immediately jump to the next frame available
 
     """
-    def load_asymmetry(self):
-
+    def load_second(self):
 
         #temporarily block signals
         self.block('right')
-        self.load_right()
+        print(self.im_l._breast_loc)
+        self.load_right(self.im_l._breast_loc)
 
         #make sure we arent looking at the same frame twice
         #will only happen if the current index is zero
@@ -673,26 +677,29 @@ class view_scan(QtGui.QWidget):
         
         
     """
-    load_adjacent()
+    load_asymmetry()
         
     Description:
-    Function is connected to the Adjacent menu button
-    Will load in the data for the adjacent breast.
+    Function is connected to the Asymmetry menu button
+    Will load in the data for the asymmetry breast.
     
     
     """
     
-    def load_adjacent(self):
+    def load_asymmetry(self):
         
         #temporarily block signals
         self.block('right')
         #if the left image view is currently displaying the left breast, lets show the right
         #breast in the right screen
+        print(self.im_l._breast_loc)
         if(self.im_l._breast_loc == 'left'):
             self.load_right(breast_loc = 'right')
+            self.im_r.breast_btn.setCurrentIndex(1)
         else:
-            self.load_right()
-            
+            self.load_right(breast_loc = 'left')
+            self.im_r.breast_btn.setCurrentIndex(0)
+        
         #make sure the colourmap is set to default of grey
         self.im_r.ui.histogram.gradient.loadPreset('grey')
         #make sure the signals are unblocked again
@@ -743,11 +750,14 @@ class view_scan(QtGui.QWidget):
 
         #lets set the colormap
         self.im_r.ui.histogram.gradient.restoreState({'ticks': [(0.005, (0, 10, 185, 50)), (0.05, (0, 50, 10, 255)), (0.08, (0, 100, 10, 255)), (0.09, (20, 100, 10, 255)), (0.15, (20, 80, 0, 255)), (0.2, (100, 0, 0, 255)),(0.3, (150, 0, 0, 255)), (0.00, (0, 0, 0, 255)), (np.nan, (0, 0, 0, 0))], 'mode': 'rgb'})
+
         
         #now lets unblock the signals
         self.unblock('right')
-
-
+        
+        #lets open the classifier information window
+        self.classifier_window.show()
+        
 
 
 

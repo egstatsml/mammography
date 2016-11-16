@@ -130,3 +130,34 @@ class notes(QtGui.QWidget):
 
     def update_label(self):
         self.status_label.setText('Saved')
+
+
+
+
+
+
+
+class classifier_info(QtGui.QWidget):
+
+    def __init__(self):
+        QtGui.QWidget.__init__(self)
+        self.setWindowTitle('Mammograph-E - Classifier Information')
+        self.output_label = QtGui.QLabel(self)
+        self.text_box = QtGui.QTextEdit(self)
+
+        #lets set the text
+        self.output_label.setText('Classifier Output')
+        self.text_box.setText('Cancer Found = False')
+        self.text_box.append('Micocalcifications Found = True')
+        self.text_box.append('Masses Found = False')
+        self.text_box.append('Architectual Distortion Present = False')
+        self.text_box.append('Confidence = 50%')
+
+        self.resize(600, 338)
+        self.output_label.resize(600,30)
+        self.output_label.move(5,5)
+        self.text_box.resize(600, 350)
+        self.text_box.move(5, 40)
+        
+
+

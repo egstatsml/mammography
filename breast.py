@@ -61,7 +61,7 @@ class breast(object):
 
         self.data = []                           #the mammogram
         self.original_scan = []
-        self.pectoral_mask = []                  #binary map ofpectoral muscle
+        self.pectoral_mask = []                  #binary map of pectoral muscle
         self.breast_mask = []                    #binary map of breast
         self.pectoral_present = False
         self.pectoral_muscle_removed = False

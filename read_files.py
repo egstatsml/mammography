@@ -39,271 +39,116 @@ class spreadsheet(object):
                          to suit synapse servers if we are
 
     """
-    def __init__(self, directory = './', benign_files = True, run_synapse = False):
+    def __init__(self, directory = './', training = True, run_synapse = False):
 
         #if we are running on synapse, change the file paths a bit
         if(run_synapse == True):
             print(run_synapse)
             self.metadata = pd.read_csv('/exams_metadata_pilot.tsv', sep='\t')
             self.crosswalk = pd.read_csv('/images_crosswalk_pilot.tsv', sep='\t')        
-
+            self.training_path = '/trainingData/'
         #else everything is in the source directory so dont worry
         else:
             self.metadata = pd.read_excel( directory + 'exams_metadata_pilot.xlsx')
             self.crosswalk = pd.read_excel( directory + 'images_crosswalk_pilot.xlsx')        
-
-        self.run_synapse = run_synapse
+            self.training_path = './pilot_images/'
+            
+        #now setting the member variables
+        self.run_synapse = run_synapse  #save whether we are running on the synapse servers
         self.total_no_exams = self.metadata.shape[0] - 1
         self.no_images = self.crosswalk.shape[0] - 1
+        self.run_synapse = run_synapse
+        self.cancer = False
+        self.filenames = [] #list that contains all of the filenames
+        self.file_pos = 0   #the location of the current file we are looking for
+
+        #lets load in all of the files
+        if(training):
+            self.get_training_scans()
+        else:
+            print('Have only implemented training so far')
+
+        self.no_scans = len(self.filenames)
+
+    """
+    get_training_data()
+
+    Description:
+    Will call the get_all_scans() function with the training parameter set, and will then 
+    load in all of the files
+
+    """
+    
+    def get_training_scans(self):
+
+        #call the get_all_scans function and tell it to look in the training data
+        self.get_all_scans('training')
 
         
-        self.exam_pos = -1          #patient position in the metadata spreadsheet
-        self.current_patient_id = 0
-        self.exam_index = 0
-        self.benign_files = benign_files
-        self.no_exams_patient = 1
-        self.no_benign_scans = 0       #number of cancer free image scans we have in the sample
-        self.no_malignant_scans = 0    #number of cancerous image scans
-        self.image_index = 0
-        self.no_left_scans = 0 #number of scan for each breast
-        self.no_right_scans = 0 #should be the same but I am double checking
-        self.images_in_exam = 0
-        self.image_view = []
-        self.cancer_l = False
-        self.cancer_r = False
-        self.breast = 'left'
-        self.left_index = 0
-        self.right_index = 0
-        self.no_scans_left = 0
-        self.no_scans_right = 0
-        self.filename_l = []  #list containing the filenames of the left and right breast scans
-        self.filename_r = []
+
+    """
+    get_all_scans()
+
+    Description:
+    Function will load in all of the filenames available for the scans and store them in a list.
+    Will use member variable self.run_synapse to see if we are running on local machine or on synapse server
+
+
+    @param directory = string to say where we are looking for the data
+                 'training' = look in the training directory
+                 'classifying' = look in the classifying directory
+    """
+
+    def get_all_scans(self, directory):
         
         
-        self.malignant_count = 0
-        self.benign_count = 0
-        self._count_files()   #function that will count the number of benign and cancerous files we have in the sample
+        if(directory == 'training'):
+            #now lets load in all of the filenames
+            for (data_dir, dirnames, filenames) in os.walk(self.training_path):
+                self.filenames.extend(filenames)
+                break
+
+            else:
+                print('have only implemented training this far')
+
+
+
+        
 
     """
     next_scan()
 
     Description:
-    Will load in the parameters for the next mammogram scan
-    If we have reached the end of this examination (eg. done all of the left and right scans in this examination),
-    will call the get benign function to get the next patients metadata
-
-
-    """
-    def next_scan(self):
-
-        #see if we have gone through all of the left images_in_exam
-        #if yes, then we just need to get the next scan
-        #subtracting 1 to make it zero based
-
-        if(self.left_index >= (self.no_scans_left)) & ( self.right_index >= (self.no_scans_right)):
-            #if we want the next benign file
-
-            if(self.benign_files == True):
-
-                #just use a loop that will keep searching until it finds a benign scan
-                #meaning that both breasts arent cancerous
-                #basically a do while loop
-                while(True):
-
-                    self.get_benign()
-                    if( (self.cancer_l == False) |  (self.cancer_r == False)):
-                        #will break the loop
-                        break
-                    
-            #if we are getting the malignant scans
-            elif(self.benign_scans == False):
-                while(True):
-                    self.get_malignant()
-                    if( (self.cancer_l == True) |  (self.cancer_r == True) ):
-                        #will break the loop
-                        break
-                    
-            #otherwise we will be loading both in
-            else:
-                print('Error: If you want to load any scan in, use get_either function')
-                sys.exit()
-                
-                
-                
-        if(self.left_index < (self.no_scans_left)):
-            file_name = self._return_filename('left')
-            self.left_index = self.left_index + 1
-            
-        elif( self.right_index < (self.no_scans_right) ):
-            file_name = self._return_filename('right')
-            self.right_index = self.right_index + 1
-            
-        return file_name
-    
-    
-    
-    
-    
-    
-    """
-    get_benign()
-    
-    Description:
-    function will load the next benign examination
-    If have gone through all the scans in the exam
-    
-    """
-    
-    
-    
-        
-    
-    def get_benign(self):
-        
-        #lets increment our patient position counter
-        self.exam_pos = self.exam_pos +1
-        self.patient_id = int(self.metadata.iloc[self.exam_pos,0])
-        self.filename_l = []
-        self.filename_r = []
-        self.left_index = 0
-        self.right_index = 0
-        self.image_index = 1
-        self.exam_index = 1
-        self.breast = 'left'
-        
-        #see how many exams there are
-        #this will create a mask to help me access just the elements with the patient I am interested in
-        print(self.patient_id)
-        
-        ########################################
-        # Check this it might not be right     #
-        ########################################
-        temp = self.crosswalk['patientId'] == self.patient_id
-        #the maximum value from the exam index will tell us how many exams were done per patient_id
-        self.no_exams_patient = np.max(self.crosswalk[temp])
-        
-        
-        #now make sure this scan doesnt have cancer
-        self.cancer_l, self.cancer_right = self.check_cancer()
-        #now lets load all of the file names for this examination
-        #will also get number of scans etc. for current patient, current exam and each breast
-        self.get_filenames()
-        print(self.filename_l)
-        print(self.filename_r)
-        
-        
-        
-        #since in this instance we want benign scans only, if the scans are malignant, will just set the number of scans for that
-        #breast to zero so we dont look at it
-        if(self.cancer_l):
-            self.no_scans_left = 0
-            #change to the right breast
-            self.breast = 'right'
-            
-        if(self.cancer_r):
-            self.no_scans_right = 0
-            
-            
-            
-            
-            
-            
-            
-            
-    def get_malignant(self):
-        print('getting malignant scan')
-        #will keep looping through and searching until we find a scan that contains cancerous cells
-        self.cancer_l = False
-        self.cancer_r = False
-        while( (self.cancer_l == False) & (self.cancer_r == False)):
-            
-            #lets increment our patient position counter
-            self.exam_pos = self.exam_pos +1
-            self.patient_id = int(self.metadata.iloc[self.exam_pos,0])
-            self.filename_l = []
-            self.filename_r = []
-            self.left_index = 0
-            self.right_index = 0
-            self.image_index = 1
-            self.exam_index = 1
-            self.breast = 'left'
-
-            #see how many exams there are
-            #this will create a mask to help me access just the elements with the patient I am interested in
-            print(self.patient_id)
-
-            ########################################
-            # Check this it might not be right     #
-            ########################################
-            temp = self.crosswalk['patientId'] == self.patient_id
-            #the maximum value from the exam index will tell us how many exams were done per patient_id
-            self.no_exams_patient = np.max(self.crosswalk[temp])
-
-
-            #now make sure this scan doesnt have cancer
-            self.cancer_l, self.cancer_right = self.check_cancer()
-        #now lets load all of the file names for this examination
-        #will also get number of scans etc. for current patient, current exam and each breast
-        self.get_filenames()
-        print(self.filename_l)
-        print(self.filename_r)
-
-        #since in this instance we want benign scans only, if the scans are malignant, will just set the number of scans for that
-        #breast to zero so we dont look at it
-        if(self.cancer_l == False):
-            self.no_scans_left = 0
-            #change to the right breast
-            self.breast = 'right'
-
-        if(self.cancer_r == False):
-            self.no_scans_right = 0
-
-
-
-
-
-    """
-    get_either()
-
-    Description:
     Function will just get the next available scan, doesn't matter what type it is
     will just get the next scan
     
+    Will use the filename of the scan and backtrack to the metadata spredsheet to see if it is
+    a cancerous scan or not
+
     """
-    def get_either(self):
-        #lets increment our patient position counter
-        self.exam_pos = self.exam_pos +1
-        self.patient_id = int(self.metadata.iloc[self.exam_pos,0])
-        self.filename_l = []
-        self.filename_r = []
-        self.left_index = 0
-        self.right_index = 0
-        self.image_index = 1
-        self.exam_index = 1
-        self.breast = 'left'
-            
-        #see how many exams there are
-        #this will create a mask to help me access just the elements with the patient I am interested in
-        print(self.patient_id)
+    
+    def next_scan(self):
         
-        ########################################
-        # Check this it might not be right     #
-        ########################################
-        temp = self.crosswalk['patientId'] == self.patient_id
-        #the maximum value from the exam index will tell us how many exams were done per patient_id
-        self.no_exams_patient = np.max(self.crosswalk[temp])
+        #find the patient number of the current scan, the exam number ant the breast we are
+        #looking at
+
+        current_file = self.filenames[self.file_pos]
+        #if we arent on the synapse server, will need to add the .gz suffix
+        if(self.run_synapse == False):
+            current_file = current_file + '.gz'
         
-        #now make sure this scan doesnt have cancer
-        self.cancer_l, self.cancer_right = self.check_cancer()
-        #now lets load all of the file names for this examination
-        #will also get number of scans etc. for current patient, current exam and each breast
-        self.get_filenames()
-        print(self.filename_l)
-        print(self.filename_r)
+        temp = (self.crosswalk['filename'] == current_file)
+        crosswalk_data = self.crosswalk.loc[temp,:]
+        
+        #now lets check if this file has cancer
+        self.check_cancer(crosswalk_data)
+        
+        #increment the scan position
+        self.file_pos = self.file_pos + 1
 
-
-
-
+        #now return the filename with the path
+        #am including a minus one for the file position because we just incremented it
+        return self.training_path + self.filenames[self.file_pos -1]
 
         
 
@@ -313,25 +158,30 @@ class spreadsheet(object):
     Description:
     Will just read the spreadsheet to see if this current scan is a malignant case
 
-    @param exam_pos = location of patient position in the spreadsheet
-                         default to the current patient but may want to look at any patient_id
-
     @retval boolean value for left and right breast.
             True if malignant, False if benign
 
     """
     
-    def check_cancer(self, exam_pos = np.nan):
-
-        #if there wasnt a specific patient position input to check, just use the current one from the scanning procedure
-        if(np.isnan(exam_pos)):
-            exam_pos = self.exam_pos
+    def check_cancer(self, crosswalk_data):
 
         #get just the metadata of this current exam
-        scan_metadata = self.metadata.iloc[exam_pos,:]
+        #by finding the row with this patient id and exam number
+        #finding these individually, it's not the most elegant way to do it,
+        #but it is the clearest
+        patient_mask = (self.metadata['patientId'] == crosswalk_data.iloc[0,0])
+        exam_mask = (self.metadata['examIndex'] == crosswalk_data.iloc[0,1])
+        mask = (patient_mask & exam_mask)
         
+        scan_metadata = self.metadata.loc[mask,:]
         #the spreadsheet will read a one if there is cancer
-        return (scan_metadata['cancerL'] == 1), (scan_metadata['cancerR'] == 1)
+        if(crosswalk_data.iloc[0,2] == 'L') & (scan_metadata.iloc[0,3] == 1):
+            self.cancer = True
+        elif(crosswalk_data.iloc[0,2] == 'R') & (scan_metadata.iloc[0,4] == 1):
+            self.cancer = True
+        else:
+            self.cancer = False
+            
 
 
 
@@ -339,6 +189,9 @@ class spreadsheet(object):
     #just creating a mask that will tell me which rows to look at in the crosswalk spreadsheet
     #to get the filenames of the scans
     
+
+
+
     
     
     def get_filenames(self):
@@ -361,55 +214,6 @@ class spreadsheet(object):
             right_name = right_filenames.iloc[ii]
             self.filename_r.append(right_name)
 
-
-
-
-
-
-
-
-
-    """
-    count_files()
-
-    Description:
-    Function will go through the metadata spreadsheets and count the number of cancerous and malignant scans we have
-    
-
-
-    """
-
-    def _count_files(self):
-        
-        for n in range(1,self.total_no_exams):
-            #will go through and find all of the scans per examination
-            #first lets see which exam number we are looking at
-            patient_id = int(self.metadata.iloc[n, 0])
-            exam_index = int(self.metadata.iloc[n,1])
-            
-            #now will check cancer for this exam
-            left, right = self.check_cancer(n)
-
-            num_left = np.sum( (self.crosswalk['patientId'] == patient_id) & (self.crosswalk['examIndex'] == exam_index) & (self.crosswalk['imageView'].str.contains('L')) )
-            num_right = np.sum( (self.crosswalk['patientId'] == patient_id) & (self.crosswalk['examIndex'] == exam_index) & (self.crosswalk['imageView'].str.contains('R')) )
-
-            if(left == True):
-                self.malignant_count = self.malignant_count + num_left
-            else:
-                self.benign_count = self.benign_count + num_left
-            
-            if(right == True):
-                self.malignant_count = self.malignant_count + num_right
-            else:
-                self.benign_count = self.benign_count + num_right
-
-        print('benign_count = %d' %(self.benign_count))
-        print('malignant_count = %d' %(self.malignant_count))                
-
-        #find the number of unique patients as well
-        self.no_patients = self.metadata.patientId.nunique()
-        print('number of unique patients = %d' %(self.no_patients))
-        
 
         
     
@@ -448,8 +252,14 @@ class spreadsheet(object):
     
     
     
-    
-    
+
+
+
+
+    #####################################################################
+    # Functions that were used by the gui for ENB345
+    #
+    #####################################################################    
     
     """
     get_most_recent()
@@ -483,8 +293,7 @@ class spreadsheet(object):
         
         
         
-        
-        
+              
         
     
     """
@@ -546,3 +355,5 @@ class spreadsheet(object):
         #now return the cropped database
         return patient_info
         
+
+
