@@ -1,0 +1,74 @@
+#!/usr/bin/env python
+
+import os
+import re
+import subprocess
+import logging
+import optparse
+import sys
+import sh
+
+
+#python shell script to install all of the dependencies for the DREAM challenge source
+
+
+logging.basicConfig(level=logging.INFO,
+                    format='%(asctime)s %(levelname)s %(message)s')
+
+
+
+
+
+
+
+
+def main():
+
+    #will be super tedious, but will just run the script with all of the
+    #data
+    print os.getcwd()
+    os.system('pwd')
+    scan_type = get_args(sys.argv)
+    scan = description(scan_type)
+    #change to the original directory
+    #call_command('cd ~/Gatton_field_testing/29_06')
+    #now loop through all the folders and run the script
+    
+    my_call('pip')
+
+
+        
+def call_command(command):
+    process = subprocess.Popen(command.split(' '),
+                               stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE)
+    return process.communicate()
+
+def my_call(arg = ' '):
+    subprocess.call(arg, shell=True)
+    print arg
+
+
+
+
+def get_args(argv):
+    if(len(argv) < 2):
+        print('Must enter more than one argument')
+        print(' -g = grain scan, -s = stem scan')
+        sys.exit()
+
+    elif( str(argv[1]) not in ('-g' ,'-s') ):
+        print('Incorrect argument for scan')
+        print(' -g = grain scan, -s = stem scan')
+        print(str(argv[1]))
+        sys.exit()
+    else:
+        if( str(argv[1]) in ('-g')):
+            return '-g'
+        else:
+            return '-s'
+
+
+
+if __name__ == "__main__":
+    main()
