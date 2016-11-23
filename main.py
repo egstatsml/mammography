@@ -27,6 +27,7 @@ from matplotlib import pyplot as plt
 from matplotlib import cm
 import scipy
 from scipy import signal as signal
+from scipy.optimize import minimize, rosen, rosen_der
 from scipy.ndimage import filters as filters
 from scipy.ndimage import measurements as measurements
 from skimage.transform import (hough_line, hough_line_peaks,
@@ -36,7 +37,9 @@ from skimage import measure
 from sklearn import svm
 from sklearn.externals import joblib
 from skimage import feature
-from skimage.filters import roberts, sobel, scharr, prewitt
+from skimage.morphology import disk
+from skimage.filters import roberts, sobel, scharr, prewitt, threshold_otsu, rank
+from skimage.util import img_as_ubyte
 from skimage.feature import corner_harris, corner_subpix, corner_peaks
 from scipy import ndimage as ndi
 
@@ -44,8 +47,6 @@ from scipy import ndimage as ndi
 from breast import breast
 from feature_extract import feature
 from read_files import spreadsheet
-
-
 
 
 """
@@ -90,6 +91,10 @@ def create_classifier_arrays(scan_data, cancer_status):
     return X,Y
 
 
+
+
+
+
 RUN_SYNAPSE = False
 descriptor = spreadsheet(training=True, run_synapse = RUN_SYNAPSE)
 
@@ -105,31 +110,23 @@ scan_data = feature(levels = 3, wavelet_type = 'haar', no_images = descriptor.no
 
 while(descriptor.file_pos < descriptor.no_scans):
 
+
+    
     #load in a file
-    file_path = descriptor.next_scan()
+    #file_path = descriptor.next_scan()
+    file_path = './pilot_images/570141.dcm'
     print(file_path)
-    try:
-        scan_data.initialise(file_path)
-        scan_data.preprocessing()
-        scan_data.get_features()
-        cancer_status.append(descriptor.cancer)
 
-        #plotting some figures here, can uncomment to see how the preprocessing is going, and a histogram of the mammogram
-        #plt.figure()
-        #plt.subplot(211)
-        #hist, bin_edges = np.histogram(scan_data.data[np.isfinite(scan_data.data)], bins=400)
-        #plt.plot(hist)
-        #plt.xlim([1,len(hist)])
-        #plt.ylim([0, np.max(hist[1:-1]) * 1.1])
-        #plt.subplot(212)
-        #scan_data.data[scan_data.data < 600] = 0
-        #plt.imshow(scan_data.data)
-        #plt.show()
-        #plt.title('histogram of breast tissue')
+    #try:
+    scan_data.initialise(file_path)
+    scan_data.preprocessing()
+    scan_data.cross_entropy_threshold()
+    scan_data.get_features()
+    cancer_status.append(descriptor.cancer)
 
-    except:
-        print('Error with current file %s' %(file_path))
-        error_files.append(file_path)
+    #except:
+    print('Error with current file %s' %(file_path))
+    error_files.append(file_path)
 
 
 

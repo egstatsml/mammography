@@ -44,6 +44,8 @@ from scipy import ndimage as ndi
 import pywt
 
 
+
+
 """
 Defining the breast class
 
@@ -63,6 +65,7 @@ class breast(object):
         self.original_scan = []
         self.pectoral_mask = []                  #binary map of pectoral muscle
         self.breast_mask = []                    #binary map of breast
+        self.fibroglandular_mask = []            #binary map of fibroglandular tissue
         self.pectoral_present = False
         self.pectoral_muscle_removed = False
         self.label_removed = False
@@ -72,9 +75,10 @@ class breast(object):
         self.im_height = 0
         self.area = 0
         self.boundary = []
+        self.boundary_y= []
         self.nipple_x = 0
         self.nipple_y = 0
-        
+        self.threshold = 0                #threshold for segmenting fibroglandular disk        
         
         if(file_path != None):
             self.initialise(file_path)
@@ -256,12 +260,11 @@ class breast(object):
 
         #if the majority of these pixels read greater than the average, then
         #pectoral muscle is said to be present and we should find it
-        if(count >= (100.0*50.0*0.8)):
+        if(count >= (100.0*50.0*0.5)):
             self.pectoral_present = True
             return True
         else:
             return False
-
 
 
 
@@ -287,6 +290,8 @@ class breast(object):
     """
 
     def remove_pectoral_muscle(self):
+
+        print('found pectoral muscle')
         self.pectoral = np.zeros(np.shape(self.data), dtype=bool)        #cpy the image and apply the first threshold
         #will remove the components of the pectoral muscle
         thresh = np.copy(self.data[0:self.im_height/2, 0:self.im_width/2])
@@ -366,16 +371,24 @@ class breast(object):
 
     def breast_boundary(self):
 
-        temp = np.copy(self.data)
+        temp = np.copy(self.data.astype(np.int))
         
-        temp = filters.gaussian_filter(temp,5) 
+        #now do a directional blur to the left
+        print('start blurring')              
+        blur_kernel = np.zeros((3,15), dtype=np.int)
+        kernel_height = np.shape(blur_kernel)[0]
+        kernel_width = np.shape(blur_kernel)[1]
+        for ii in range(0,kernel_height):
+            blur_kernel[ii,kernel_width/2:-1] = np.arange(kernel_width/2,0,-1)
+
+        enhance = signal.fftconvolve(temp, blur_kernel, 'same')
         
-        #do some contrast enhancement
-        enhance = temp
-        enhance[enhance > 1] = 1.0
+        print('done blurring')
+        enhance[enhance < 10] = 0
+        enhance[enhance > 10] = 1.0
         label_mask, num_labels = measurements.label(enhance)
         self.breast_mask = np.zeros(np.shape(self.data))
-
+        
         #now will see how many labels there are
         #in an ideal scenario, there should only be two, the breast being scanned,
         #and the background
@@ -386,6 +399,7 @@ class breast(object):
 
         #if the number of labels is greater than two, will get rid of the ones not needed
 
+        print(num_labels)
         if(num_labels >=  1):
 
             for ii in range(0, num_labels+1):
@@ -399,8 +413,8 @@ class breast(object):
                 if( (np.sum(np.multiply(component,self.data))) < (np.sum(component))):
                    #then it is backgoundnp.sum(np.multiply(component,im)                      
                    #TODO - do something here
-                    print('its background yo')
-
+                    print('Found the background')
+                    
                 #now we will see if we are somewhere far to the right, like some stray component
                 #that got included for some reason
                 #will do that by just seeing if any pixel is located in the first quarter
@@ -442,7 +456,7 @@ class breast(object):
         #get just a graph of the boundary
         #y is the y position of the image, and will use as independant variable here
         y,boundary = self.thin_boundary(edges)
-
+        
         #remove any extra skin bits that have made it this far
         y, boundary = self.remove_skin(boundary, y)
 
@@ -455,7 +469,15 @@ class breast(object):
             self.nipple_x = np.max(stationary_x)
             self.nipple_y = stationary_y[stationary_x == self.nipple_x] + y[0]
             
-        self.boundary = boundary.astype('uint8')
+        self.boundary = boundary.astype(np.int)
+        self.boundary_y = y
+
+        plt.figure()
+        plt.plot(self.boundary)
+        plt.show()
+        print(y)
+
+
 
 
 
@@ -467,11 +489,12 @@ class breast(object):
 
 
     def thin_boundary(self, edges):
-        y_temp, boundary_temp = np.where(edges > 0.01)
+        y_temp, boundary_temp = np.where(np.abs(edges) > 0.01)
         
         #now will loop through to make sure there is only one boundary location for each boundary position
         #if there are multiple boundary points at the same location, will just take the outermost position
-
+        print(y_temp)
+        
         #finding the range of our loop
         y_min = np.min(y_temp)
         y_max = np.max(y_temp)
@@ -482,8 +505,7 @@ class breast(object):
         for ii in range(0, np.shape(y)[0]):
             boundary[ii] = np.max(boundary_temp[y_temp == ii+y_min])
 
-            #boundary[boundary > 0] = 1
-        #boundary = boundary.astype('uint8')
+
         return y, boundary
 
                                  
@@ -555,6 +577,10 @@ class breast(object):
     
     def remove_skin(self, boundary, y):
 
+
+        plt.figure()
+        plt.imshow(self.data)
+        plt.show()
         
         y_orig = y[0]
         
@@ -603,3 +629,129 @@ class breast(object):
 
 
         return y, boundary
+
+
+
+
+
+
+    
+        
+    """
+    cross_entropy_threshold()
+    
+    Description:
+    Creating adaptive threshold for segmenting fibroglandular disk
+    and dense breast tissue.
+    
+    The function uses the minimum cross entropy between the two classes
+    to find the threshold. Minimum cross entropy developed by Li, C. and Lee, C
+    Is a wrapper function, the cross entropy (eta)  is calculated using a helper function
+    
+
+    Also creating a mask of the breast boundary as well. The breast skin has higher intensity, 
+    and won't contain any useful information, so wont use the breast skin region for thresholding
+
+
+    Reference
+    
+    @article{Li_1993,
+            doi = {10.1016/0031-3203(93)90115-d},
+            url = {http://dx.doi.org/10.1016/0031-3203(93)90115-d},
+            year = 1993,
+            month = {apr},
+            publisher = {Elsevier {BV}},
+            volume = {26},
+            number = {4},
+            pages = {617--625},
+            author = {C.H. Li and C.K. Lee},
+            title = {Minimum cross entropy thresholding},
+            journal = {Pattern Recognition}
+    }
+    """
+    
+    def cross_entropy_threshold(self):
+        
+        #deep copy of image data
+        temp = np.copy(self.data)
+        #creating a mask of the breast boundary
+        edge_mask = np.zeros(np.shape(self.data), dtype=np.uint8)
+        
+        print(len(self.boundary))
+        for ii in range(0, len(self.boundary)):
+            for jj in range(0, 20):
+                edge_mask[self.boundary_y[ii], self.boundary[ii] - 20 + jj] = 1
+
+
+        #now lets just use the points where it isnt the edge of the skin
+        temp = temp[edge_mask == 0]
+        temp = temp[np.isfinite(temp)]
+        #lets get rid of zero value pixels
+        temp = temp[temp > 0]        
+        eta = 10e10        #large value of eta that will be overwritten
+                
+        hist = np.histogram(temp, bins = 4096)
+        hist = hist[0]
+        for t in range(300, 3000):
+            current_eta = self.calc_eta(t, hist)
+            if(current_eta < eta):
+                eta = current_eta
+                self.threshold = t
+                
+        print('best threshold value = %d' %self.threshold)
+
+        #creating mask of breast boundary
+        
+        pdf = np.histogram(temp, 4096, density=True)
+        cdf = np.cumsum(pdf[0])
+
+        #find the 0.95 value in the cdf
+        #the axis is still in the pdf, and use this to find the pixel value
+        axis = pdf[1][0:-1]
+        upper_limit = axis[cdf >= 0.95]
+        upper_limit = upper_limit[0]
+
+        #now will use this to create a binary mask of the fibroglandular disk/dense tissue
+        self.fibroglandular_mask = (self.data > self.threshold) & (self.data < upper_limit)
+        
+        
+
+    """
+    calc_eta()
+    
+    Description:
+    Helper function used to calculate the cross entropy (eta) for different threshold values
+    Cross entropy calculations from paper referenced for cross_entropy_threshold()
+    
+    The cross entropy between the data above and below the threshod value is found
+    
+    @param t = threshold value
+    @param hist = histogram of data
+    
+    @retval eta = cross entropy
+    
+    """
+    
+    def calc_eta(self, t, hist):
+        
+        #creating arrays for the two data sets
+        mu_1_data = hist[1:t-1]
+        mu_2_data = hist[t:-1]
+        
+        #creating index values
+        mu_1_range = np.arange(1,t-1)
+        mu_2_range = np.arange(t,4096-1)
+        #numerator parts for cross entropy
+        mu_1_num = mu_1_data*mu_1_range
+        mu_2_num = np.multiply(mu_2_data, mu_2_range)
+
+        mu_1 = (np.sum(mu_1_num)) / (np.sum(mu_1_data))
+        mu_2 = (np.sum(mu_2_num)) / (np.sum(mu_2_data))
+        
+        #calculating cross entropy
+        eta = np.sum( np.multiply(mu_1_num, np.divide(np.log(mu_1_range), mu_1))) + np.sum( np.multiply(mu_2_num, np.divide(np.log(mu_2_range), mu_2)))
+
+        return eta                               
+    
+        
+        

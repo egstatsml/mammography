@@ -17,9 +17,6 @@ to be used for training the classifier.
 """
 
 
-
-
-
 import dicom
 import os
 import numpy as np
@@ -76,11 +73,13 @@ class feature(breast):
         self.no_images = no_images
         self.current_image_no = -1     #this will increment as we load in every individual scan
         
+        
+        
         self.__initialise_feature_lists()
         if(file_path != None):
             self.initialise(file_path)
-
-
+        
+        
         
 
 
@@ -107,7 +106,14 @@ class feature(breast):
         self.current_image_no = self.current_image_no + 1
         #do the wavelet packet decomposition
         
+        
+        
 
+
+
+
+
+        
         
     """
     find_indicies()
@@ -155,7 +161,7 @@ class feature(breast):
         #if it is, lets print something to let them know
         if(self.levels > self.packets.maxlevel):
             print('number of levels given is too large')
-            print('Maximum level of %d, level decomp given is %d' %(self.packets.maxlevel, levels))
+            print('Maximum level of %d, level decomp given is %d' %(self.packets.maxlevel, self.levels))
             print('Set to max level and will continue')
             self.levels = self.packets.maxlevel
             #will have to reinitialise the feature lists
