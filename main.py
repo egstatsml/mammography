@@ -31,8 +31,7 @@ from scipy import signal as signal
 from scipy.optimize import minimize, rosen, rosen_der
 from scipy.ndimage import filters as filters
 from scipy.ndimage import measurements as measurements
-from skimage.transform import (hough_line, hough_line_peaks,
-                               probabilistic_hough_line)
+from skimage.transform import (hough_line, hough_line_peaks, probabilistic_hough_line)
 import pywt
 from skimage import measure
 from sklearn import svm
@@ -69,7 +68,7 @@ def create_classifier_arrays(scan_data, cancer_status):
     num_files = len(cancer_status)
     no_features = 6
     no_packets = 4
-    X = np.zeros((num_files, no_features * no_packets)) 
+    X = np.zeros((num_files, no_features * no_packets))
     Y = np.zeros((num_files,1))
     Y[cancer_status == True] = 1
     Y = np.ravel(Y)
@@ -86,9 +85,9 @@ def create_classifier_arrays(scan_data, cancer_status):
             X[ii, jj*no_features + 1] = entropy[0,jj]
             X[ii, jj*no_features + 2] = energy[0,jj]
             X[ii, jj*no_features + 3] = contrast[0,jj]
-            X[ii, jj*no_features + 4] = dissimilarity[0,jj]            
+            X[ii, jj*no_features + 4] = dissimilarity[0,jj]
             X[ii, jj*no_features + 5] = correlation[0,jj]
-                   
+            
     return X,Y
 
 
@@ -107,27 +106,25 @@ scan_data = feature(levels = 3, wavelet_type = 'haar', no_images = descriptor.no
 
 
 
-
+print(descriptor.no_scans)
 
 while(descriptor.file_pos < descriptor.no_scans):
 
-
-    
     #load in a file
     #file_path = descriptor.next_scan()
     file_path = './pilot_images/570141.dcm'
     print(file_path)
-
-    #try:
-    scan_data.initialise(file_path)
-    scan_data.preprocessing()
-    scan_data.cross_entropy_threshold()
-    scan_data.get_features()
-    cancer_status.append(descriptor.cancer)
-
-    #except:
-    print('Error with current file %s' %(file_path))
-    error_files.append(file_path)
+    
+    try:
+        scan_data.initialise(file_path)
+        scan_data.preprocessing()
+        scan_data.cross_entropy_threshold()
+        scan_data.get_features()
+        cancer_status.append(descriptor.cancer)
+    
+    except:
+        print('Error with current file %s' %(file_path))
+        error_files.append(file_path)
 
 
 
@@ -164,7 +161,7 @@ joblib.dump(clf,'filename.pkl')
 
 
 
-            
+
 ## some old file paths that can be handy whilst testing
 #file_path = '/home/ethan/DREAM/pilot_images/111359.dcm' #image without pectoral muscle
 #file_path = '/home/ethan/DREAM/pilot_images/134060.dcm' #image with pectoral muscle
