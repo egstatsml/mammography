@@ -104,7 +104,7 @@ class feature(breast):
         #call the breast initialise function first
         breast.initialise(self, file_path)
         #increment the image number
-        self.current_image_no = self.current_image_no + 1
+        #self.current_image_no = self.current_image_no + 1
         #do the wavelet packet decomposition
         
         

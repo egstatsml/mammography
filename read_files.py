@@ -43,6 +43,7 @@ class spreadsheet(object):
     def __init__(self, directory = './', training = True, run_synapse = False):
         
         #if we are running on synapse, change the file paths a bit
+        self.run_synapse = run_synapse
         if(run_synapse == True):
             print(run_synapse)
             self.metadata = pd.read_csv('/exams_metadata_pilot.tsv', sep='\t')
@@ -143,16 +144,8 @@ class spreadsheet(object):
         #looking at
         
         current_file = self.filenames[self.file_pos]
-        #if we arent on the synapse server, will need to add the .gz suffix, which is used on
-        #the metadata and crosswalks spreadsheets
-        if(self.run_synapse == False):
-            current_file = current_file + '.gz'
-            
-        temp = (self.crosswalk['filename'] == current_file)
-        crosswalk_data = self.crosswalk.loc[temp,:]
-        
         #now lets check if this file has cancer
-        self.check_cancer(crosswalk_data)
+        self.check_cancer(current_file)
         
         #increment the scan position
         self.file_pos = self.file_pos + 1
@@ -163,16 +156,32 @@ class spreadsheet(object):
     
     
     
+    def check_cancer(self, filename):
+        
+        #if we arent on the synapse server, will need to add the .gz suffix, which is used on
+        #the metadata and crosswalks spreadsheets
+        if(self.run_synapse == False):
+            filename = filename + '.gz'
+            
+        temp = (self.crosswalk['filename'] == filename)
+        crosswalk_data = self.crosswalk.loc[temp,:]        
+
+        #now use the helper function to actually check for cancer
+        self._check_cancer(crosswalk_data)
+
+    
+    
+    
     """
-    check_cancer()
+    _check_cancer()
     
     Description:
     Will just read the spreadsheet to see if this current scan is a malignant case
-
+    
     """
     
-    def check_cancer(self, crosswalk_data):
-
+    def _check_cancer(self, crosswalk_data):
+        
         #get just the metadata of this current exam
         #by finding the row with this patient id and exam number
         #finding these individually, it's not the most elegant way to do it,
@@ -180,28 +189,26 @@ class spreadsheet(object):
         patient_mask = (self.metadata['patientId'] == crosswalk_data.iloc[0,0])
         exam_mask = (self.metadata['examIndex'] == crosswalk_data.iloc[0,1])
         mask = (patient_mask & exam_mask)
-        
         scan_metadata = self.metadata.loc[mask,:]
+        
         #the spreadsheet will read a one if there is cancer
-        if(crosswalk_data.iloc[0,2] == 'L') & (scan_metadata.iloc[0,3] == 1):
+        if('L' in str(crosswalk_data.iloc[0,2])) & (scan_metadata.iloc[0,3] == 1):
+
             self.cancer = True
         elif(crosswalk_data.iloc[0,2] == 'R') & (scan_metadata.iloc[0,4] == 1):
             self.cancer = True
         else:
             self.cancer = False
             
-
-
-
-
+            
+            
+            
     #just creating a mask that will tell me which rows to look at in the crosswalk spreadsheet
     #to get the filenames of the scans
     
-
-
-
-    
-    
+            
+            
+            
     def get_filenames(self):
         
         left = (self.crosswalk['patientId'] == self.patient_id) & (self.crosswalk['examIndex'] == self.exam_index) & (self.crosswalk["imageView"].str.contains('L')) 

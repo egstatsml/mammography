@@ -27,7 +27,7 @@ from scipy import ndimage as ndi
 
 import threading
 import Queue
-import time
+import timeit
 import multiprocessing
 from my_thread import my_thread
 
@@ -69,25 +69,16 @@ def create_classifier_arrays(threads, num_scans):
     while (ii < num_scans) & (t < len(threads)):    
         
         #get the features from the current scan in the current thread
-        print(threads[t].scan_data.homogeneity[t_ii][2])
-        print(np.shape(threads[t].scan_data.homogeneity[t_ii][2]))
-        homogeneity = threads[t].scan_data.homogeneity[t_ii][2].reshape(1,-1)
-        entropy = threads[t].scan_data.entropy[t_ii][2].reshape(1,-1)
-        energy = threads[t].scan_data.energy[t_ii][2].reshape(1,-1)
-        contrast = threads[t].scan_data.contrast[t_ii][2].reshape(1,-1)
-        dissimilarity = threads[t].scan_data.dissimilarity[t_ii][2].reshape(1,-1)
-        correlation = threads[t].scan_data.correlation[t_ii][2].reshape(1,-1)
+        homogeneity = threads[t].scan_data.homogeneity[t_ii][0].reshape(1,-1)
+        entropy = threads[t].scan_data.entropy[t_ii][0].reshape(1,-1)
+        energy = threads[t].scan_data.energy[t_ii][0].reshape(1,-1)
+        contrast = threads[t].scan_data.contrast[t_ii][0].reshape(1,-1)
+        dissimilarity = threads[t].scan_data.dissimilarity[t_ii][0].reshape(1,-1)
+        correlation = threads[t].scan_data.correlation[t_ii][0].reshape(1,-1)
         
-        t_ii += 1
-        #see if it is time to move on to the next thread
-        if(t_ii == threads[t].scans_processed):
-            #increment the thread index
-            t += 1
-            #set the scan index for the thread back to zero(the firt scan in the new thread)
-            t_ii = 0
         
         for jj in range(0,no_packets):
-            print('packet number = %d' %jj)
+
             X[ii, jj*no_features] = homogeneity[0,jj]
             X[ii, jj*no_features + 1] = entropy[0,jj]
             X[ii, jj*no_features + 2] = energy[0,jj]
@@ -100,11 +91,21 @@ def create_classifier_arrays(threads, num_scans):
         Y[ii,0] = threads[t].cancer_status[t_ii]    
         ii += 1
         
+        t_ii += 1
+        #see if it is time to move on to the next thread
+        if(t_ii == threads[t].scans_processed):
+            #increment the thread index
+            t += 1
+            #set the scan index for the thread back to zero(the firt scan in the new thread)
+            t_ii = 0
+            
     #make Y a 1-d array so the SVM classifier can handle it properly
     #and also set it to a 1/0 binary array instead of True/False boolean array
+
     Y[Y == True] = 1
-    y[Y == False] = 0
+    Y[Y == False] = 0
     Y = np.ravel(Y)
+
     return X,Y
 
 
@@ -117,7 +118,7 @@ def create_classifier_arrays(threads, num_scans):
 #####################################################
 
 #start the program timer
-program_start = time.clock()
+program_start = timeit.default_timer()
 
 descriptor = spreadsheet(training=True, run_synapse = False)
 threads = []
@@ -139,7 +140,7 @@ for ii in range(0, descriptor.no_scans):
     my_thread.q_cancer.put(descriptor.cancer_list[ii])
     my_thread.t_lock.release()
     
-    
+
 #now some code to make sure it all runs until its done
 #keep this main thread open until all is done
 while (not my_thread.q.empty()):
@@ -167,6 +168,7 @@ error_database.to_csv('error_files.csv')
 #now lets train our classifier
 #will just use the features from the approximation wavelet decomps
 
+
 X,Y = create_classifier_arrays(threads, descriptor.no_scans)
 clf = svm.SVC()
 clf.fit(X,Y)
@@ -179,15 +181,15 @@ print('---- TIME INFORMATION ----')
 print('Time for each thread to process a single scan')
 for t in threads:
     print('Thread %d :' %(t.t_id))
-    print('Average Time  = %f s' %(np.mean(t.processing_time)))
-    print('Max Time  = %f s' %(np.max(t.processing_time)))
-    print('Min Time  = %f s' %(np.min(t.processing_time)))
+    print('Average Time  = %f s' %(np.mean(t.time_process)))
+    print('Max Time  = %f s' %(np.max(t.time_process)))
+    print('Min Time  = %f s' %(np.min(t.time_process)))
     print(' ')
 
 #printing the total run time of the program
-run_total_sec = time.clock() - program_start
-run_hours = run_total_sec % 3600
-run_mins = (run_total_sec - run_hours * 60) % 60
+run_total_sec = timeit.default_timer() - program_start
+run_hours = run_total_sec / 3600
+run_mins = (run_total_sec - run_hours * 60) / 60
 run_secs = (run_total_sec - run_hours * 3600 -  run_mins * 60)
 
 print('Run Time for %d scans = %hours %d minutes and %f seconds' %(descriptor.no_scans, run_hours, run_mins, run_secs))

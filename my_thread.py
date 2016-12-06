@@ -1,6 +1,6 @@
 #!/usr/bin/python
 import threading
-import time
+import timeit
 import Queue
 import gc
 
@@ -144,17 +144,36 @@ class my_thread(threading.Thread):
         while not self.exit_flag:
             #lock the threads so only one is accessing the queue at a time
             #start the preprocessing timer
-            start_time = time.clock()
+            start_time = timeit.default_timer()
             self.t_lock.acquire()
             if(not (self.q.empty()) ):
                 file_path = self.data_path + self.q.get()
+                self.cancer_status.append( self.q_cancer.get() )
                 self.t_lock.release()
                 
                 try:
-                    #now we have the right filename, lets do the processing of it
+                #now we have the right filename, lets do the processing of it
                     self.scan_data.initialise(file_path)
                     self.scan_data.preprocessing()
                     self.scan_data.get_features()
+
+                    #testing the feature extraction to see how if it is being stored correctly
+                    print('Testing Features')
+                    level = 1
+                    image_no = self.scan_data.current_image_no
+                    print('image_no = %d' %image_no)
+                    #print(self.scan_data.homogeneity)
+                    #print(self.scan_data.homogeneity[image_no][0])
+                    #print(self.scan_data.homogeneity[image_no][level])
+                    #print(self.scan_data.homogeneity[image_no][2])
+                    #print(self.scan_data.energy[image_no][level])
+                    #print(self.scan_data.energy[image_no][level][2])
+                    #print(self.scan_data.contrast[image_no][level])
+                    #print(self.scan_data.dissimilarity[image_no][level])
+                    #print(self.scan_data.correlation[image_no][level])
+                    #print(self.scan_data.entropy[image_no][level])
+
+
                     #now that we have the features, we want to append them to the list of features
                     #The list of features is shared amongst all of the class instances, so
                     #before we add anything to there, we should lock other threads from adding
@@ -162,10 +181,14 @@ class my_thread(threading.Thread):
                     self.t_lock.acquire()
                     self.cancer_status.append(self.q_cancer.get())
                     self.t_lock.release()
-                    self.time_process.append(time.clock() - start_time)
+                    self.time_process.append(timeit.default_timer() - start_time)
                     print('time = %d s' %self.time_process[-1])
                     self.scan_data.current_image_no += 1   #increment the image index
                     self.scans_processed += 1              #increment the image counter
+                    
+                    #just doing a few scans at the moment whilest debugging
+                    if(self.scans_processed > 10):
+                        with self.q.mutex: self.q.queue.clear()
                     
                 except:
                     print('Error with current file %s' %(file_path))
