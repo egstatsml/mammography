@@ -85,7 +85,7 @@ class breast(object):
         if(file_path != None):
             self.initialise(file_path)
             
-        
+            
             
             
     """
@@ -107,6 +107,15 @@ class breast(object):
         self.data = self.data.astype(float)
         self.original_scan = np.copy(self.data)
         self.check_orientation()
+        
+        
+        
+    def cleanup(self):
+        self.data = []                           #the mammogram
+        self.original_scan = []
+        self.pectoral_mask = []                  #binary map of pectoral muscle
+        self.breast_mask = []                    #binary map of breast
+        self.fibroglandular_mask = []            #binary map of fibroglandular tissue
         
         
     """
@@ -267,14 +276,14 @@ class breast(object):
             return True
         else:
             return False
-
-
-
         
-
+        
+        
+        
+        
     """
     remove_pectoral_muscle()
-
+    
     Description: 
     Will check to see if there is pectoral muscle in the image
     If there is, will set all the pectoral muscle values to zero
@@ -293,8 +302,8 @@ class breast(object):
 
     def remove_pectoral_muscle(self):
 
-        print('found pectoral muscle')
-        self.pectoral = np.zeros(np.shape(self.data), dtype=bool)        #cpy the image and apply the first threshold
+
+        self.pectoral = np.zeros(np.shape(self.data), dtype=bool)        #copy the image and apply the first threshold
         #will remove the components of the pectoral muscle
         thresh = np.copy(self.data[0:self.im_height/2, 0:self.im_width/2])
         #will crop the image first, as the pectoral muscle will never be in the right hand side of the image
@@ -337,9 +346,9 @@ class breast(object):
                 self.data[0:np.floor(y).astype(int), x] = 0
                 #set these locations in the pectoral muscle binary map to true
                 self.pectoral[0:np.floor(y).astype(int), x] = True
-
-
-
+                
+                
+                
         self.pectoral_removed = True
         
 
@@ -376,7 +385,7 @@ class breast(object):
         temp = np.copy(self.data.astype(np.int))
         
         #now do a directional blur to the left
-        print('start blurring')              
+
         blur_kernel = np.zeros((3,15), dtype=np.int)
         kernel_height = np.shape(blur_kernel)[0]
         kernel_width = np.shape(blur_kernel)[1]
@@ -385,7 +394,7 @@ class breast(object):
             
         enhance = signal.fftconvolve(temp, blur_kernel, 'same')
         
-        print('done blurring')
+
         enhance[enhance < 10] = 0
         enhance[enhance > 10] = 1.0
         label_mask, num_labels = measurements.label(enhance)
@@ -401,7 +410,7 @@ class breast(object):
         
         #if the number of labels is greater than two, will get rid of the ones not needed
         
-        print(num_labels)
+        
         if(num_labels >=  1):
             
             for ii in range(0, num_labels+1):
@@ -415,7 +424,7 @@ class breast(object):
                 if( (np.sum(np.multiply(component,self.data))) < (np.sum(component))):
                     #then it is backgoundnp.sum(np.multiply(component,im)                      
                     #TODO - do something here
-                    print('Found the background')
+                    pass
                     
                 #now we will see if we are somewhere far to the right, like some stray component
                 #that got included for some reason
@@ -478,42 +487,43 @@ class breast(object):
         #plt.figure()
         #plt.plot(self.boundary)
         #plt.show()
-        #print(y)
-
-
-
-
-
-
-
-
-
-
-
-
+    
+    
+    
+    
+    
+    
+    
+    
+    
+        
+        
+        
+        
+        
     def thin_boundary(self, edges):
         y_temp, boundary_temp = np.where(np.abs(edges) > 0.01)
         
         #now will loop through to make sure there is only one boundary location for each boundary position
         #if there are multiple boundary points at the same location, will just take the outermost position
-        print(y_temp)
+        
         
         #finding the range of our loop
         y_min = np.min(y_temp)
         y_max = np.max(y_temp)
         y = np.arange(y_min,y_max)
         boundary = np.zeros(np.shape(y))
-
+        
         #want last value inclusive
         for ii in range(0, np.shape(y)[0]):
             boundary[ii] = np.max(boundary_temp[y_temp == ii+y_min])
-
-
-        return y, boundary
-
-                                 
             
-
+            
+        return y, boundary
+    
+    
+    
+    
     """
     stationary_points()
     
@@ -557,15 +567,6 @@ class breast(object):
     TODO
     
     USE Y ORIG VALUE BEFORE CHANGING BOUNDARIES
-
-
-
-
-
-
-
-
-
     remove_skin()
     
     Description:
@@ -680,7 +681,7 @@ class breast(object):
         #creating a mask of the breast boundary
         edge_mask = np.zeros(np.shape(self.data), dtype=np.uint8)
         
-        print(len(self.boundary))
+
         for ii in range(0, len(self.boundary)):
             for jj in range(0, 20):
                 edge_mask[self.boundary_y[ii], self.boundary[ii] - 20 + jj] = 1
@@ -701,7 +702,7 @@ class breast(object):
                 eta = current_eta
                 self.threshold = t
                 
-        print('best threshold value = %d' %self.threshold)
+                
         
         #creating mask of breast boundary
         

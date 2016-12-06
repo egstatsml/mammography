@@ -33,22 +33,22 @@ class spreadsheet(object):
     
     Description:
     
-
+    
     @param benign_files = boolean to tell us if we want benign or malignant scans
     @param run_synapse = boolean to let us know is we are running on synapse server or
                          just testing on my computer. Will change the paths for accessing the data
                          to suit synapse servers if we are
-
+    
     """
     def __init__(self, directory = './', training = True, run_synapse = False):
-
+        
         #if we are running on synapse, change the file paths a bit
         if(run_synapse == True):
             print(run_synapse)
             self.metadata = pd.read_csv('/exams_metadata_pilot.tsv', sep='\t')
             self.crosswalk = pd.read_csv('/images_crosswalk_pilot.tsv', sep='\t')        
             self.training_path = '/trainingData/'
-        #else everything is in the source directory so dont worry
+            #else everything is in the source directory so dont worry
         else:
             self.metadata = pd.read_excel( directory + 'exams_metadata_pilot.xlsx')
             self.crosswalk = pd.read_excel( directory + 'images_crosswalk_pilot.xlsx')        
@@ -59,47 +59,48 @@ class spreadsheet(object):
         self.total_no_exams = self.metadata.shape[0] - 1
         self.no_images = self.crosswalk.shape[0] - 1
         self.run_synapse = run_synapse
-        self.cancer = False
+        self.cancer = False     #cancer status of the current scan
+        self.cancer_list = []   #list of cancer status for all of the scans
         self.filenames = [] #list that contains all of the filenames
         self.file_pos = 0   #the location of the current file we are looking for
-
+        
         #lets load in all of the files
         if(training):
             self.get_training_scans()
         else:
             print('Have only implemented training so far')
-
+            
         self.no_scans = len(self.filenames)
-
+        
     """
     get_training_data()
-
+    
     Description:
     Will call the get_all_scans() function with the training parameter set, and will then 
     load in all of the files
-
+    
     """
     
     def get_training_scans(self):
-
+        
         #call the get_all_scans function and tell it to look in the training data
         self.get_all_scans('training')
-
         
-
+        
+        
     """
     get_all_scans()
-
+    
     Description:
     Function will load in all of the filenames available for the scans and store them in a list.
     Will use member variable self.run_synapse to see if we are running on local machine or on synapse server
-
-
+    
+    
     @param directory = string to say where we are looking for the data
                  'training' = look in the training directory
                  'classifying' = look in the classifying directory
     """
-
+    
     def get_all_scans(self, directory):
         
         
@@ -108,36 +109,45 @@ class spreadsheet(object):
             for (data_dir, dirnames, filenames) in os.walk(self.training_path):
                 self.filenames.extend(filenames)
                 break
-
-            else:
-                print('have only implemented training this far')
-
-
-
-        
-
+            
+            #now will add the cancer status of these files
+            for ii in range(0, len(self.filenames)):
+                self.next_scan()
+                self.cancer_list.append(self.cancer)
+                
+            #after done adding the cancer status, will set reset the file position back to the start (0)
+            self.file_pos = 0
+            
+        else:
+            print('have only implemented training this far')
+                
+                
+                
+                
+                
     """
     next_scan()
-
+    
     Description:
     Function will just get the next available scan, doesn't matter what type it is
     will just get the next scan
     
     Will use the filename of the scan and backtrack to the metadata spredsheet to see if it is
     a cancerous scan or not
-
+    
     """
     
     def next_scan(self):
         
         #find the patient number of the current scan, the exam number ant the breast we are
         #looking at
-
+        
         current_file = self.filenames[self.file_pos]
-        #if we arent on the synapse server, will need to add the .gz suffix
+        #if we arent on the synapse server, will need to add the .gz suffix, which is used on
+        #the metadata and crosswalks spreadsheets
         if(self.run_synapse == False):
             current_file = current_file + '.gz'
-        
+            
         temp = (self.crosswalk['filename'] == current_file)
         crosswalk_data = self.crosswalk.loc[temp,:]
         
@@ -146,21 +156,18 @@ class spreadsheet(object):
         
         #increment the scan position
         self.file_pos = self.file_pos + 1
-
+        
         #now return the filename with the path
         #am including a minus one for the file position because we just incremented it
         return self.training_path + self.filenames[self.file_pos -1]
-
-        
-
+    
+    
+    
     """
     check_cancer()
-
+    
     Description:
     Will just read the spreadsheet to see if this current scan is a malignant case
-
-    @retval boolean value for left and right breast.
-            True if malignant, False if benign
 
     """
     
@@ -214,14 +221,14 @@ class spreadsheet(object):
         for ii in range(0, np.sum(right)):
             right_name = right_filenames.iloc[ii]
             self.filename_r.append(right_name)
-
-
         
-    
-
+        
+        
+        
+        
     """
     return_filename()
-
+    
     Description:
     Function will return the filename of the current scan we are looking at
    
@@ -229,23 +236,23 @@ class spreadsheet(object):
     @param file_index = index to say which fielename in the list we are looking at
     
     @retval string containing current path to scan we want to look at
-
+    
     """
     def _return_filename(self, breast):
-
+        
         if(self.run_synapse == True):
             base_dir = '/trainingData'
         else:
             base_dir = './pilot_images/'
-
+            
         if(breast == 'left'):
             return base_dir + str(self.filename_l[self.left_index][0:-3])
         else:
             return base_dir + str(self.filename_r[self.right_index][0:-3])
-
-
-
-
+        
+        
+        
+        
     def filenames(self):
         base_dir = './pilot_images/'
         return  base_dir + str(self.filename_l[self.left_index][0:-3]), base_dir + str(self.filename_r[self.left_index][0:-3])
@@ -253,10 +260,10 @@ class spreadsheet(object):
     
     
     
-
-
-
-
+    
+    
+    
+    
     #####################################################################
     # Functions that were used by the gui for ENB345
     #
@@ -355,6 +362,6 @@ class spreadsheet(object):
         patient_info = pd.concat([patient_info,data_values], ignore_index=True)
         #now return the cropped database
         return patient_info
-        
+    
 
 

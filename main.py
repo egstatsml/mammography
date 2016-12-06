@@ -17,6 +17,8 @@ main functionality for reading in the files
 
 
 """
+import os
+import psutil
 
 
 import dicom
@@ -109,7 +111,7 @@ scan_data = feature(levels = 3, wavelet_type = 'haar', no_images = descriptor.no
 print(descriptor.no_scans)
 
 while(descriptor.file_pos < descriptor.no_scans):
-
+    
     #load in a file
     #file_path = descriptor.next_scan()
     file_path = './pilot_images/570141.dcm'
@@ -121,13 +123,18 @@ while(descriptor.file_pos < descriptor.no_scans):
         scan_data.cross_entropy_threshold()
         scan_data.get_features()
         cancer_status.append(descriptor.cancer)
-    
+        
     except:
         print('Error with current file %s' %(file_path))
         error_files.append(file_path)
 
+    process = psutil.Process(os.getpid())
+    print('checking memory')
+    print(process.memory_info().rss)
 
-
+        
+    
+    
 #will be here after have run through everything
 #lets save the features we found, and the file ID's of any that
 #created any errors so I can have a look later
@@ -143,21 +150,8 @@ X,Y = create_classifier_arrays(scan_data, cancer_status)
 clf = svm.SVC()
 clf.fit(X,Y)
 
-
 #now will save the model, then can have a look how it all performed a try it out
 joblib.dump(clf,'filename.pkl')
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

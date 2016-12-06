@@ -157,7 +157,7 @@ class feature(breast):
 
         #perform the wavelet decomposition
         self.packets = pywt.WaveletPacket2D(data=self.data.astype(float), wavelet=self.wavelet_type, mode='sym')
-
+        
         #check that the number of levels isnt to high
         #if it is, lets print something to let them know
         if(self.levels > self.packets.maxlevel):
@@ -167,17 +167,17 @@ class feature(breast):
             self.levels = self.packets.maxlevel
             #will have to reinitialise the feature lists
             self.__initialise_feature_lists()
-
+            
         #now lets put the indicies for each level in a nice format that is pleseant to index
         #indicies will be a list of numpy arrays for each level
         self.find_indicies()
         
-
+        
         
         if(level == 'all'):
             for ii in range(0, self.levels):
                 self._get_features_level(ii)
-
+                
         #else will just get the features of a single level
         #not sure why would want to do this, but might be handy?
         else:
@@ -191,18 +191,18 @@ class feature(breast):
 
 
     
-
+    
     """
     _get_features_level()
-
+    
     Description:
     Will use the co-occurance matrix of the wavelet decomp level to find texture features
     
     features will be saved per decomposition level, so will ha
     @param level = level of decomp we are finding the features for
-
+    
     """
-
+    
     def _get_features_level(self, level):
         
         #initialise array for each decomp branch to hold the features
@@ -213,11 +213,11 @@ class feature(breast):
         self.contrast[image_no][level] = np.zeros(np.shape(self.indicies[level]))
         self.dissimilarity[image_no][level] = np.zeros(np.shape(self.indicies[level]))
         self.correlation[image_no][level] = np.zeros(np.shape(self.indicies[level]))
-
-
+        
+        
         #features above will be an array according to the level of decomp from
         #wavelet packet level we are at
-
+        
         for ii in range(0, np.shape(self.indicies[level])[0]):
             for jj in range(0, np.shape(self.indicies[level])[1]):
                 
@@ -232,7 +232,7 @@ class feature(breast):
                 self.dissimilarity[image_no][level][ii,jj] = greycoprops(glcm, prop='dissimilarity')[0,0]
                 self.correlation[image_no][level][ii,jj] = greycoprops(glcm, prop='correlation')[0,0]
                 self.entropy[image_no][level][ii,jj] = entropy.shannon_entropy(temp)
-
+                
         """
         temp =  self.packets[self.indicies[0][0,1]].data * self.packets[self.indicies[0][1,0]].data# * self.packets[self.indicies[0][1,1]].data
         plt.figure()
@@ -240,17 +240,24 @@ class feature(breast):
         plt.colorbar()
         plt.show()        
         """
-
-
-
-
-
-
-
+    
+    
+    def _crop_features(self, num_scans):
         
+        self.homogeneity = self.homogeneity[0:num_scans][:][:] 
+        self.energy = self.energy[0:num_scans][:][:] 
+        self.contrast = self.contrast[0:num_scans][:][:] 
+        self.dissimilarity = self.dissimilarity[0:num_scans][:][:] 
+        self.correlation = self.correlation[0:num_scans][:][:] 
+        self.entropy = self.entropy[0:num_scans][:][:] 
+        
+    
+    
+    
+    
     """
     __initialise_feature_lists()
-
+    
     Description:
     Is a helper function called by the __init__ function to create a multidimensional
     list to store the features from the breast scan.
@@ -259,29 +266,29 @@ class feature(breast):
     
     Eg. if we want 3 levels of decomp, will be 
     [ [ np.array of features for each wavelet packet  ]    ]
-
+    
     This allows us to have a list of features for each image we scan, with detail features from
     wavelet decomp from each level
-
+    
     Features will look like
     self.homogeneity[file_number][level_wavelet_decomposition][array_wavelet_decomposition_indicies]
     
     Isnt that nice :)
-
-
+    
+    
     """
     
     
     def __initialise_feature_lists(self):
-
-
+        
+        
         self.homogeneity = [[0 for j in xrange(self.levels)] for i in xrange(self.no_images)]
         self.energy = [[0 for j in xrange(self.levels)] for i in xrange(self.no_images)]
         self.contrast = [[0 for j in xrange(self.levels)] for i in xrange(self.no_images)]
         self.dissimilarity = [[0 for j in xrange(self.levels)] for i in xrange(self.no_images)]
         self.correlation = [[0 for j in xrange(self.levels)] for i in xrange(self.no_images)]
         self.entropy = [[0 for j in xrange(self.levels)] for i in xrange(self.no_images)]
-
+        
         
         
         
