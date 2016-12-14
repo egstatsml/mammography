@@ -53,7 +53,7 @@ class spreadsheet(object):
         else:
             self.metadata = pd.read_excel( directory + 'exams_metadata_pilot.xlsx')
             self.crosswalk = pd.read_excel( directory + 'images_crosswalk_pilot.xlsx')        
-            self.training_path = './pilot_images/'
+            self.training_path = '/media/dperrin/pilot_images/'
             
         #now setting the member variables
         self.run_synapse = run_synapse  #save whether we are running on the synapse servers

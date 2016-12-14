@@ -68,6 +68,7 @@ class breast(object):
         self.pectoral_mask = []                  #binary map of pectoral muscle
         self.breast_mask = []                    #binary map of breast
         self.fibroglandular_mask = []            #binary map of fibroglandular tissue
+        self.microcalcs_mask = []       #binary map of microcalcifications
         self.pectoral_present = False
         self.pectoral_muscle_removed = False
         self.label_removed = False
@@ -81,7 +82,7 @@ class breast(object):
         self.nipple_x = 0
         self.nipple_y = 0
         self.threshold = 0                #threshold for segmenting fibroglandular disk
-        
+        self.file_path = []
         if(file_path != None):
             self.initialise(file_path)
             
@@ -101,11 +102,12 @@ class breast(object):
     
     """
     def initialise(self, file_path):
-        file = dicom.read_file(file_path)
+        self.file_path = file_path
+        file = dicom.read_file('/media/dperrin/' +  file_path[1::])
         self.data = np.fromstring(file.PixelData,dtype=np.int16).reshape((file.Rows,file.Columns))
+        self.original_scan = np.copy(self.data)
         #convert the data to floating point now
         self.data = self.data.astype(float)
-        self.original_scan = np.copy(self.data)
         self.check_orientation()
         
         
@@ -116,6 +118,9 @@ class breast(object):
         self.pectoral_mask = []                  #binary map of pectoral muscle
         self.breast_mask = []                    #binary map of breast
         self.fibroglandular_mask = []            #binary map of fibroglandular tissue
+        self.microcalcs_mask = []            #binary map of fibroglandular tissue        
+        self.boundary = []
+        self.boundary_y= []
         
         
     """
@@ -234,8 +239,7 @@ class breast(object):
                 #see if most of the pixels are background, and if there has been no change over mid part of cdf
                 if( (cdf[0] > threshold_val) &( np.abs(cdf[1000] - cdf[100]) < 0.001 )):
                     
-                    self.data[y:y+200,x:x+200] = 0
-                    
+                    self.data[y:y+200,x:x+200] = 0                    
                     
                 y = y+200
                 x = x+200
@@ -681,7 +685,7 @@ class breast(object):
         #creating a mask of the breast boundary
         edge_mask = np.zeros(np.shape(self.data), dtype=np.uint8)
         
-
+        
         for ii in range(0, len(self.boundary)):
             for jj in range(0, 20):
                 edge_mask[self.boundary_y[ii], self.boundary[ii] - 20 + jj] = 1
@@ -703,7 +707,7 @@ class breast(object):
                 self.threshold = t
                 
                 
-        
+                
         #creating mask of breast boundary
         
         pdf = np.histogram(temp, 4096, density=True)
@@ -756,3 +760,69 @@ class breast(object):
         eta = np.sum( np.multiply(mu_1_num, np.divide(np.log(mu_1_range), mu_1))) + np.sum( np.multiply(mu_2_num, np.divide(np.log(mu_2_range), mu_2)))
         
         return eta                                  
+
+
+
+
+
+
+
+
+
+
+
+    def search_microcalcifications(self):
+        #testing microcalcification detection
+        a = np.copy(self.scan_data.data)
+        a = pywt.dwt2(a, 'haar')
+        #do it again to the approximation level
+        b = pywt.dwt2(a[0], 'haar')
+        #now set the approximation coefficients to zero
+        b[0][b[0] > 1] =  0
+        #now do the reconstruction of the second level
+        c = pywt.idwt2(b, 'haar')
+        
+        a = list(a)
+        a[0] = c
+        a = tuple(a)
+        sig = pywt.idwt2(a, 'haar')
+        
+        #find absolute value
+        sig = np.abs(sig)
+        
+        #now lets find the mean of the signal
+        sig[ sig < (np.nanmean(sig) * 1.5)] = 0
+        #now use this on the original to get only spots with high intensity
+        sig = sig * self.scan_data
+        
+        sig[ sig < (np.nanmean(sig) * 1.5)] = 0
+        
+        #now blur the image with large std to create mask that covers all of the microcalcifications
+        sig = filters.gaussian_filter(sig,30) 
+        
+        #now use this to find a mask of the microcalcifications
+        sig[(sig > 0) & (np.isfinite(sig))] = 1
+        
+        self.microccalcifications_mask = np.array((np.shape(sig)), dtype=bool)
+        self.microcalcifications_mask[sig == 1] = True
+        self.microcalcifications_mask[sig != 1] = False        
+        
+        
+        
+        
+        #fig = plt.figure()
+        #ax1 = fig.add_subplot(1,2,1)
+        #ax1.imshow(self.scan_data.data)
+        #ax2 = fig.add_subplot(1,2,2)
+        #ax2.imshow(sig)
+        #fig.colorbar(ax2)
+        #fig.savefig(os.getcwd() + '/figs/' + file_path[-10:-3] + 'png')
+        #fig.clf()
+        #plt.close()
+        
+        a = []
+        b = []
+        c = []
+        sig = []
+        ax1 = []
+        ax2 = []

@@ -53,7 +53,7 @@ class feature(breast):
 
     def __init__(self, file_path = None, wavelet_type = 'haar', levels = 3, benign_scans = True, no_images = 1):
         breast.__init__(self, file_path)
-
+        
         self.packets = []             #wavelet packets for each level of decomposition
         self.levels = levels          #level of wavelet packet decomposition wanted. If this
                                       #level is larger than the maximum possible level of decomposition, the
@@ -63,12 +63,31 @@ class feature(breast):
         #these will be a list of arrays as well, the same size as the indicies
         #will calculate these features for each wavelet level for each branch using the
         #co-occurrance matrix
+        
+        #GLOBAL FEATURES
         self.homogeneity = []
         self.entropy = []
         self.energy = []
         self.contrast = []
         self.dissimilarity = []
         self.correlation = []
+        
+        #FEATURES FROM FIBROGLANDULAR DISK
+        self.fibro_homogeneity = []
+        self.fibro_entropy = []
+        self.fibro_energy = []
+        self.fibro_contrast = []
+        self.fibro_dissimilarity = []
+        self.fibro_correlation = []
+        
+        #FEATURES FROM MICROCALCIFICATIONS
+        self.micro_homogeneity = []
+        self.micro_entropy = []
+        self.micro_energy = []
+        self.micro_contrast = []
+        self.micro_dissimilarity = []
+        self.micro_correlation = []
+        
         self.indicies = []            #way to index each decomposition level
         self.benign_scans = benign_scans
         self.no_images = no_images
@@ -79,14 +98,14 @@ class feature(breast):
         self.__initialise_feature_lists()
         if(file_path != None):
             self.initialise(file_path)
+            
         
         
         
-
-
+        
     """
     initialise()
-
+    
     Description:
     Function will be called either from the the __init__ function, or from the main function to initialise
     the wavelet decomposition of the data
@@ -109,11 +128,11 @@ class feature(breast):
         
         
         
-
-
-
-
-
+        
+        
+        
+        
+        
         
         
     """
@@ -135,26 +154,26 @@ class feature(breast):
             self.indicies.append( temp.reshape( [np.sqrt(np.shape(temp)), np.sqrt(np.shape(temp))] ))
             
             
-        
-    
-
-
+            
+            
+            
+            
     """
     get_features()
-
+    
     Description:
     wrapper function that will call get the features of specified level
     if no input level is specified, will get the features of every level
-
+    
     @param level = level we want to evaluate. if selecting particular level, should be
                    integer, or maybe array or list.
                    Default = 'all' and is where we will do all of them
     
-
+    
     """
-
+    
     def get_features(self, level = 'all'):
-
+        
         #perform the wavelet decomposition
         self.packets = pywt.WaveletPacket2D(data=self.data.astype(float), wavelet=self.wavelet_type, mode='sym')
         
@@ -182,16 +201,16 @@ class feature(breast):
         #not sure why would want to do this, but might be handy?
         else:
             self._get_features_level(level)
-
-
-
-
-
-
-
-
-    
-    
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
     """
     _get_features_level()
     
@@ -221,10 +240,9 @@ class feature(breast):
         for ii in range(0, np.shape(self.indicies[level])[0]):
             for jj in range(0, np.shape(self.indicies[level])[1]):
                 
-                #find co-occurance matrix and convert to uint8
-                temp = np.copy(self.packets[self.indicies[level][ii,jj]].data)
-                temp = temp.astype('uint8')
-                glcm = greycomatrix(temp, [0],[0], levels=256, symmetric=True, normed=True)
+                temp, glcm = self._comatrix(level, ii, jj)
+                #glcm = greycomatrix(temp, [0],[0], levels=256, symmetric=True, normed=True)
+                
                 
                 self.homogeneity[image_no][level][ii,jj] = greycoprops(glcm, prop='homogeneity')[0,0]
                 self.energy[image_no][level][ii,jj] = greycoprops(glcm, prop='energy')[0,0]
@@ -233,6 +251,15 @@ class feature(breast):
                 self.correlation[image_no][level][ii,jj] = greycoprops(glcm, prop='correlation')[0,0]
                 self.entropy[image_no][level][ii,jj] = entropy.shannon_entropy(temp)
                 
+                
+                #print('homogeneity = %f ' %self.homogeneity[image_no][level][ii,jj])
+                #print('energy = %f ' %self.energy[image_no][level][ii,jj])
+                #print('contrast = %f ' %self.contrast[image_no][level][ii,jj]) 
+                #print('dissimilarity = %f ' %self.dissimilarity[image_no][level][ii,jj])
+                #print('correlation = %f ' %self.correlation[image_no][level][ii,jj])
+                #print('entropy = %f ' %self.entropy[image_no][level][ii,jj])
+                
+                
         """
         temp =  self.packets[self.indicies[0][0,1]].data * self.packets[self.indicies[0][1,0]].data# * self.packets[self.indicies[0][1,1]].data
         plt.figure()
@@ -240,8 +267,57 @@ class feature(breast):
         plt.colorbar()
         plt.show()        
         """
-    
-    
+        
+        
+        
+        
+        
+        
+        
+    def _comatrix(self,level, ii,jj):
+        
+        #find co-occurance matrix and convert to uint8
+        temp = self.packets[self.indicies[level][ii,jj]].data
+        temp = temp.astype(float)
+        temp_mask = (np.isfinite(temp))
+        
+        #this will be a float value, so lets scale it to be within uint8 range
+        #will also do some error checking, as sometimes the values may be negative
+        
+        min_val = np.min(temp[temp_mask])
+        #probably be negative, but if it isn't, set it to zero
+        if min_val > 0: min_val = 0
+        #make all the values positive
+        
+        temp = temp + abs(min_val)
+        max_val = np.max(temp[temp_mask]) 
+        #probably be positive, but if it isn't, set it to one
+        #wont set it to zero, as this is what we are using to scale it so we will be dividing by this
+        if max_val < 0: max_val = 1
+        
+        #now lets scale it by and less than 2^8
+        temp = np.multiply(temp, (255 /max_val))
+        
+        #print np.max(temp[np.isfinite(temp)])
+        #now will set all the values equal to nan to 2**8
+        temp[temp == np.nan] = 256
+        
+        #now find the co-occurance matrix
+        glcm = greycomatrix(temp.astype('uint16'), [1],[0], levels=256, symmetric=True, normed=True)
+        #now lets crop it to get rid of the readings that were interpreted as nan
+        glcm = glcm[0:255, 0:255,:,:]        
+        
+        return temp, glcm
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
     def _crop_features(self, num_scans):
         
         self.homogeneity = self.homogeneity[0:num_scans][:][:] 
@@ -251,10 +327,10 @@ class feature(breast):
         self.correlation = self.correlation[0:num_scans][:][:] 
         self.entropy = self.entropy[0:num_scans][:][:] 
         
-    
-    
-    
-    
+        
+        
+        
+        
     """
     __initialise_feature_lists()
     
@@ -273,14 +349,12 @@ class feature(breast):
     Features will look like
     self.homogeneity[file_number][level_wavelet_decomposition][array_wavelet_decomposition_indicies]
     
-    Isnt that nice :)
-    
+    Isnt that nice :)    
     
     """
     
     
-    def __initialise_feature_lists(self):
-        
+    def __initialise_feature_lists(self):        
         
         self.homogeneity = [[0 for j in xrange(self.levels)] for i in xrange(self.no_images)]
         self.energy = [[0 for j in xrange(self.levels)] for i in xrange(self.no_images)]
@@ -288,7 +362,5 @@ class feature(breast):
         self.dissimilarity = [[0 for j in xrange(self.levels)] for i in xrange(self.no_images)]
         self.correlation = [[0 for j in xrange(self.levels)] for i in xrange(self.no_images)]
         self.entropy = [[0 for j in xrange(self.levels)] for i in xrange(self.no_images)]
-        
-        
         
         
