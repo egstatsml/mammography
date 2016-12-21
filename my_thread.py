@@ -75,7 +75,6 @@ class my_thread(threading.Thread):
     t_lock = threading.Lock()
     exit_flag = False
     error_files = []   #list that will have all of the files that we failed to process
-    cancer_status = []
     scan_no = 0
     cancer_count = 0
     
@@ -156,48 +155,50 @@ class my_thread(threading.Thread):
             start_time = timeit.default_timer()
             my_thread.t_lock.acquire()
             if(not (self.q.empty()) ):
-                file_path = self.data_path + self.q.get_nowait()
+                file_path = self.data_path + my_thread.q.get()
+                self.cancer_status.append(my_thread.q_cancer.get())
+                if(self.cancer_status[-1]):
+                    my_thread.cancer_count += 1
+                    print('cancer count = %d' %my_thread.cancer_count)
+                        
                 #file_path = 'pilot_images/502860.dcm'
                 my_thread.t_lock.release()
                 
-                try:
-                    #now we have the right filename, lets do the processing of it
-                    self.scan_data.initialise(file_path)
-                    self.scan_data.preprocessing()
-                    self.scan_data.get_features()
-                    
-                    
-                    #now that we have the features, we want to append them to the list of features
-                    #The list of features is shared amongst all of the class instances, so
-                    #before we add anything to there, we should lock other threads from adding
-                    #to it
-                    my_thread.t_lock.acquire()
-                    self.cancer_status.append(my_thread.q_cancer.get())
-                    if(self.cancer_status[-1]):
-                        my_thread.cancer_count += 1
-                        
-                    my_thread.t_lock.release()
-                    self.time_process.append(timeit.default_timer() - start_time)
-                    #print('time = %d s' %self.time_process[-1])
-                    self.scan_data.current_image_no += 1   #increment the image index
-                    self.scans_processed += 1              #increment the image counter
-                    my_thread.t_lock.acquire()
-                    my_thread.scan_no += 1
-                    print(my_thread.q.qsize())
-                    my_thread.t_lock.release()                    
-                    
-                    
-                    if(self.training & my_thread.cancer_count > 16):
-                        my_thread.exit_flag = True
-                        
-                    #if we aren't training, but have run out of scans for validation
-                    #we should also exit
-                    elif(my_thread.q.empty()):
-                        my_thread.exit_flag = True
-                    
-                except:
-                    print('Error with current file %s' %(file_path))
-                    my_thread.error_files.append(file_path)
+                #try:
+                #now we have the right filename, lets do the processing of it
+                self.scan_data.initialise(file_path)
+                self.scan_data.preprocessing()
+                self.scan_data.get_features()
+
+
+                #now that we have the features, we want to append them to the list of features
+                #The list of features is shared amongst all of the class instances, so
+                #before we add anything to there, we should lock other threads from adding
+                #to it
+                self.time_process.append(timeit.default_timer() - start_time)
+                #print('time = %d s' %self.time_process[-1])
+                self.scan_data.current_image_no += 1   #increment the image index
+                self.scans_processed += 1              #increment the image counter
+                my_thread.t_lock.acquire()
+                my_thread.scan_no += 1
+                print(my_thread.q.qsize())
+                my_thread.t_lock.release()                    
+
+
+                if(self.training & (my_thread.cancer_count > 18)):
+                    my_thread.exit_flag = True
+
+                #if we aren't training, but have run out of scans for validation
+                #we should also exit
+                elif(my_thread.q.empty()):
+                    my_thread.exit_flag = True
+
+                    #except:
+                #    print('Error with current file %s' %(file_path))
+                #    my_thread.error_files.append(file_path)
+                #    #get rid of the last cancer_status flag we saved, as it is no longer valid since we didn't save the
+                #    #features from the scan
+                #    del self.cancer_status[-1]
                     
                 self.scan_data.cleanup()
                 gc.collect()
@@ -210,3 +211,30 @@ class my_thread(threading.Thread):
         #only the number of images we looked at in this individual thread
         self.scan_data._crop_features(self.scans_processed)
         print('Thread %d is out' %self.t_id)
+
+
+
+
+
+    
+    
+    """
+    reinitialise()
+    
+    Description:
+    Reinitialise the reference variables
+    Need to do when we are moving from training to classifying
+    
+    """
+    
+    def reinitialise_ref(my_thread):
+        
+        my_thread.exit_flag = False
+        my_thread.error_files = []   #list that will have all of the files that we failed to process
+        my_thread.cancer_status = []
+        my_thread.scan_no = 0
+        my_thread.cancer_count = 0
+        
+    
+    
+    

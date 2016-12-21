@@ -5,6 +5,7 @@ import os
 import numpy as np
 import pandas as pd
 import sys
+
 #this allows us to create figures over ssh and save to file
 import matplotlib as mpl
 mpl.use('Agg')
@@ -65,7 +66,7 @@ will change later as use improved features
 
 def create_classifier_arrays(threads, num_scans):
     
-    no_features = 6
+    no_features = 8
     no_packets = 4
     levels = 3
     X = []
@@ -84,8 +85,8 @@ def create_classifier_arrays(threads, num_scans):
             print('thread %d, no %d, level %d' %(t,t_ii,lvl)) 
             #get the features from the current scan in the current thread
             
-            print 'feat size'
-            print np.shape(threads[t].scan_data.homogeneity[t_ii][lvl])
+            #print 'feat size'
+            #print np.shape(threads[t].scan_data.homogeneity[t_ii][lvl])
             
             homogeneity = threads[t].scan_data.homogeneity[t_ii][lvl].reshape(1,-1)
             entropy = threads[t].scan_data.entropy[t_ii][lvl].reshape(1,-1)
@@ -94,12 +95,19 @@ def create_classifier_arrays(threads, num_scans):
             dissimilarity = threads[t].scan_data.dissimilarity[t_ii][lvl].reshape(1,-1)
             correlation = threads[t].scan_data.correlation[t_ii][lvl].reshape(1,-1)
             
+            wave_energy = threads[t].scan_data.wave_energy[t_ii][lvl].reshape(1,-1)
+            wave_entropy = threads[t].scan_data.wave_entropy[t_ii][lvl].reshape(1,-1)
+            wave_kurtosis = threads[t].scan_data.wave_kurtosis[t_ii][lvl].reshape(1,-1)
+            
             X[ii].extend(flatten(homogeneity))
             X[ii].extend(flatten(entropy))
             X[ii].extend(flatten(energy))
             X[ii].extend(flatten(contrast))
             X[ii].extend(flatten(dissimilarity))
             X[ii].extend(flatten(correlation))
+            X[ii].extend(flatten(wave_energy))
+            X[ii].extend(flatten(wave_entropy))
+            #X[ii].extend(flatten(wave_kurtosis))
             
             #X[ii, lvl + lvl*jj*no_features] = homogeneity[0,jj]
             #X[ii, jj*no_features + 1 + kk] = entropy[0,jj]
@@ -137,10 +145,10 @@ def create_classifier_arrays(threads, num_scans):
     #    
     #    print ''
     #    
-    print('Feature array')
-    print np.shape(X)
+    #print('Feature array')
+    #print np.shape(X)
 
-    print Y
+    #print Y
     
     return X, Y[0:X.shape[0]]
 
@@ -246,8 +254,13 @@ X,Y = create_classifier_arrays(threads, descriptor.no_scans)
 #
 #################################################
 
-
 #initialising the threads
+my_thread.exit_flag = False
+my_thread.error_files = []   #list that will have all of the files that we failed to process
+my_thread.cancer_status = []
+my_thread.scan_no = 0
+my_thread.cancer_count = 0
+
 threads = []
 id = 0
 for ii in range(0,num_threads):
@@ -262,21 +275,31 @@ for ii in range(0,num_threads):
 while (not my_thread.exit_flag):
     pass
 
+
 #queue is empty so we are just about ready to finish up
 #set the exit flag to true
 my_thread.exit_flag = True
 #wait until all threads are done
 for t in threads:
     t.join()
-        
     
-    
+  
+
 X_classify,Y_classify = create_classifier_arrays(threads, descriptor.no_scans)
 
 test = clf.predict(X_classify)
+
 #find the accuracy
 print((test == Y_classify))
 for ii in range(0, len(Y_classify)):
     print("%r : %r " %(Y_classify[ii], test[ii]))
+
+
+
+np.save('X', X)
+np.save('Y', Y)
+np.save('X_classify', X_classify)
+np.save('Y_classify', Y_classify)
+
 
 print "Exiting Main Thread"

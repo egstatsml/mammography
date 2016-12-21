@@ -1,9 +1,9 @@
-
 #!/bin/env python
 """
 breast.py
 
 Author: Ethan Goan
+
 Queensland University of Technology
 DREAM Mammography Challenge
 2016
@@ -145,7 +145,7 @@ class breast(object):
         self.remove_label()
         self.remove_artifacts()
         self.breast_boundary()
-        
+        self.cross_entropy_threshold()
         
         
         
@@ -174,19 +174,19 @@ class breast(object):
         if( right_edge > left_edge):
             self.data = np.fliplr(self.data)
             self.original_scan = np.fliplr(self.original_scan)
-
-
-
-
+            
+            
+            
+            
     """
     remove_artifacts()
-
+    
     Description:
     
     Wrapper function that will call other methods to remove artifacts such as labels,
     pectoral muscles
-
-
+    
+    
     """
     
     
@@ -197,15 +197,15 @@ class breast(object):
         if(self.pectoral_muscle_present()):
             self.remove_pectoral_muscle()
             
-    
-    
-    
-    
-    
-    
-    
-    
-    
+            
+            
+            
+            
+            
+            
+            
+            
+            
     """    
     breast.remove_label()
     
@@ -250,20 +250,20 @@ class breast(object):
     
     """
     pectoral_muscle_present()
-
+    
     Description:
     Will see if there is pectoral muscle captured in the scan.
     Most of the time there isnt, but if there is we need to get rid of it.
     
     If the pixel intensities near the top left corner are significantly higher
     than the average intensity, will say that there is pectoral muscle present
-
+    
     @retval boolean to say if there is or isnt pectoral muscle present
-
+    
     """
-
+    
     def pectoral_muscle_present(self):
-
+        
         #find the mean value for just the pixels that arent background
         mean_val = np.mean(self.data[self.data > 0])
         #now will search the top left corner
@@ -272,7 +272,7 @@ class breast(object):
             for x in range(0, 50):
                 if(self.data[y,x] > mean_val):
                     count = count+1
-
+                    
         #if the majority of these pixels read greater than the average, then
         #pectoral muscle is said to be present and we should find it
         if(count >= (100.0*50.0*0.5)):
@@ -291,56 +291,76 @@ class breast(object):
     Description: 
     Will check to see if there is pectoral muscle in the image
     If there is, will set all the pectoral muscle values to zero
-
+    
     Pectoral muscle is found via the Hough Transform
-
+    
     First a global threshold is applied. Anything above a certain value will be replaced with zero
     (as the pectoral muscle will have intensity higher than global average)
     Then a Gaussian blur is applied with large variance followed by a sobel filter
     Another threshold is applied to remove the more high detail components
     The Hough Transform is applied to this image, and the most prominent line will correspond to the 
     pectoral muscle.
-
-
+    
+    
     """
-
+    
     def remove_pectoral_muscle(self):
-
-
+        
+        
         self.pectoral = np.zeros(np.shape(self.data), dtype=bool)        #copy the image and apply the first threshold
         #will remove the components of the pectoral muscle
         thresh = np.copy(self.data[0:self.im_height/2, 0:self.im_width/2])
         #will crop the image first, as the pectoral muscle will never be in the right hand side of the image
         #after the orientation has been corrected
         thresh = thresh[:,0:self.im_width]
-
+        
         #now finding the mean value for all pixels that arent the background
         mean_val = np.mean(thresh[thresh > 0])
         thresh[thresh < mean_val] = 0
         #now apply a blur before edge detection
         thresh = filters.gaussian_filter(thresh,30) 
-
-
+        
         #apply sobel filter
         #replacing with canny filter might make it more suitable for Hough Transform
         edge = sobel(thresh)
-
-
+        
         thresh_val = np.mean(edge[edge > 0]) * 1.5
         #now will remove the lower value components to focus on the
         #more prominent edges
         edge[edge < thresh_val] = 0
+        
+        fig = plt.figure()
+        ax1 = fig.add_subplot(1,2,1)
+        ax1.imshow(self.data)
+        ax2 = fig.add_subplot(1,2,2)
+        ax2.imshow(edge)
+        fig.savefig(os.getcwd() + '/figs/edge_' + self.file_path[-10:-3] + 'png')
+        fig.clf()
+        plt.close()
+        
         
         #apply the Hough transform
         h, theta, d = hough_line(edge)
         #find the most prominent lines in the Hough Transform
         h, theta, d = hough_line_peaks(h, theta, d)
         #use the peak values to create polar form of line describing edge of pectoral muscle
+        #print theta * (180.0/np.pi)
         valid_h = h[(theta < np.pi/8) & (theta > 0 )]
         
-        pectoral_rho = d[h == max(valid_h.min(), valid_h.max(), key=abs)] #will need to account for rho being negative, but shouldnt happen for pectoral muscle case
-        pectoral_theta = theta[d == pectoral_rho]
+        #sometimes there are more than one index found, as the accumulator has returned
+        #from the Hough transform has returned the same maximum value. This is a small bug in the
+        #hough_line_peaks function, as the point is repeated.  Therefore if we get repeated maximum
+        #points, just use the first one, as they are all for the same spot
+        #to make sure we use the first maximum found, just using the where function and taking
+        #the first element found
         
+        index = np.where(np.abs(h) == np.max(valid_h))[0][0]
+        
+            
+        pectoral_rho = d[index] #will need to account for rho being negative, but shouldnt happen for pectoral muscle case
+        pectoral_theta = theta[index]
+        
+        print pectoral_theta
         #now lets get rid of all information to the left of this line
         #as this will be the pectoral muscle
         for x in range(0, np.shape(edge)[1]):
@@ -355,11 +375,13 @@ class breast(object):
                 
         self.pectoral_removed = True
         
-
-
-
-
-
+        
+        
+        
+        
+        
+        
+        
     """
     breast_boundary()
     
@@ -429,7 +451,7 @@ class breast(object):
                     #then it is backgoundnp.sum(np.multiply(component,im)                      
                     #TODO - do something here
                     pass
-                    
+                
                 #now we will see if we are somewhere far to the right, like some stray component
                 #that got included for some reason
                 #will do that by just seeing if any pixel is located in the first quarter
@@ -468,14 +490,28 @@ class breast(object):
         self.data[ self.breast_mask == 0 ] = np.nan
         
         edges = sobel(self.breast_mask.astype(float))
+        gradient = np.gradient(filters.gaussian_filter(self.original_scan, 5))
+        gradient[0][np.abs(edges) == 0 ] = np.nan
+        gradient[1][np.abs(edges) == 0 ] = np.nan
+        
+        gradient_phase = np.arctan2(gradient[1], gradient[0])
+        fig = plt.figure()
+        ax1 = fig.add_subplot(1,1,1)
+        im1 = ax1.imshow(gradient_phase)
+        fig.colorbar(im1)
+        fig.savefig(os.getcwd() + '/figs/' + 'grad_' + self.file_path[-10:-3] + 'png')
+        
+        
+        
         #get just a graph of the boundary
         #y is the y position of the image, and will use as independant variable here
         y,boundary = self.thin_boundary(edges)
         
         #remove any extra skin bits that have made it this far
-        y, boundary = self.remove_skin(boundary, y)
+        y, boundary = self.remove_skin_test(boundary, y)
         
         #now will check to see if we have a point of inflection, caused by some skin included in the scan
+        """
         #finding stationary points in the boundary
         stationary_y, stationary_x =  self.stationary_points(boundary)
         
@@ -486,20 +522,20 @@ class breast(object):
             
         self.boundary = boundary.astype(np.int)
         self.boundary_y = y
-        
+        """
         
         #plt.figure()
         #plt.plot(self.boundary)
         #plt.show()
-    
-    
-    
-    
-    
-    
-    
-    
-    
+        
+        
+        
+        
+        
+        
+        
+        
+        
         
         
         
@@ -540,6 +576,7 @@ class breast(object):
     @retval = two arrays containing the stationary point locations (stationary_x and stationary_y)
     
     """
+    
     
     def stationary_points(self, boundary, sigma = 20):
         
@@ -594,7 +631,6 @@ class breast(object):
         
         temp = filters.gaussian_filter1d(np.asarray(boundary).astype(float) , 5)
         
-        
         dx = np.gradient(temp)
         temp = filters.gaussian_filter1d(dx , 20)
         d2x = np.gradient(temp)
@@ -615,15 +651,15 @@ class breast(object):
             self.data[0:y[0],:] = np.nan
             
             
-            
         elif( np.max(np.abs(d2x[0:self.im_height/4])) > (np.max(np.abs(d2x)) * 0.6) ):
             lim_pos =  np.where( np.abs(d2x) == np.max(np.abs(d2x[0:self.im_height/4])))[0]
             boundary = boundary[lim_pos::]
             y = y[lim_pos::]
             
             
+            
         #now lets check near the bottom of the image for any extra skin underneath
-        if(stationary_y[-1] > self.im_height * (3.0/4.0) ):
+        if(stationary_y[-1] > (self.im_height * (3.0/4.0)) ):
             boundary = boundary[y < stationary_y[-1]]
             y = y[y < stationary_y[-1]]
             self.data[y[-1] + y_orig::,:] = np.nan
@@ -636,14 +672,46 @@ class breast(object):
             self.data[lim_pos + y_orig::,:] = np.nan
             
             
+            
+            
+            
+            #testing use of of median serching
+            med = np.median(self.data[self.breast_mask])
+            #now lets search down the image to see points that are higher than the median of the
+            #entire breast
+                
+            
+            
         return y, boundary
-
-
-
-
-
-
     
+    
+    
+    
+    def remove_skin_test(self, boundary, y):
+        
+        print np.shape(y)
+        print np.shape(self.data)
+        
+        #find the median intensity value for the breast tissue
+        med_val = np.nanmedian(self.data)
+        skin_mask = np.zeros((1, self.data.shape[0]), dtype=np.bool)
+        skin_mask = skin_mask.ravel()
+        
+        y_orig = y[0]
+        y_end = y[-1]
+        
+        for ii in range(0, np.size(y) - 1):
+            skin_mask[ii + y[0]] =  (np.nanmean(self.data[ii, 0:boundary[ii]]) > med_val * 2.5)
+            
+            
+        #now lets go down and remove the skin values
+        self.data[skin_mask, :] = np.nan
+        
+        
+        return y[skin_mask[y_orig]], boundary[skin_mask[y_orig]]
+        
+        
+        
         
     """
     cross_entropy_threshold()
@@ -656,11 +724,11 @@ class breast(object):
     to find the threshold. Minimum cross entropy developed by Li, C. and Lee, C
     Is a wrapper function, the cross entropy (eta)  is calculated using a helper function
     
-
+    
     Also creating a mask of the breast boundary as well. The breast skin has higher intensity, 
     and won't contain any useful information, so wont use the breast skin region for thresholding
-
-
+    
+    
     Reference
     
     @article{Li_1993,
@@ -721,6 +789,18 @@ class breast(object):
         
         #now will use this to create a binary mask of the fibroglandular disk/dense tissue
         self.fibroglandular_mask = (self.data > self.threshold) & (self.data < upper_limit)
+        self.fibroglandular_mask[edge_mask == 1] = False
+        
+        
+        fig = plt.figure()
+        ax1 = fig.add_subplot(1,1,1)
+        ax1.imshow(self.fibroglandular_mask)
+        fig.savefig(os.getcwd() + '/figs/' + 'msk_' + self.file_path[-10:-3] + 'png')
+        fig.clf()
+        plt.close()
+        
+        
+        
         
         
         
@@ -772,6 +852,7 @@ class breast(object):
 
 
     def search_microcalcifications(self):
+        """
         #testing microcalcification detection
         a = np.copy(self.scan_data.data)
         a = pywt.dwt2(a, 'haar')
@@ -806,19 +887,16 @@ class breast(object):
         self.microccalcifications_mask = np.array((np.shape(sig)), dtype=bool)
         self.microcalcifications_mask[sig == 1] = True
         self.microcalcifications_mask[sig != 1] = False        
+        """
         
         
         
-        
-        #fig = plt.figure()
-        #ax1 = fig.add_subplot(1,2,1)
-        #ax1.imshow(self.scan_data.data)
-        #ax2 = fig.add_subplot(1,2,2)
-        #ax2.imshow(sig)
-        #fig.colorbar(ax2)
-        #fig.savefig(os.getcwd() + '/figs/' + file_path[-10:-3] + 'png')
-        #fig.clf()
-        #plt.close()
+        fig = plt.figure()
+        ax1 = fig.add_subplot(1,1,1)
+        ax1.imshow(self.data)
+        fig.savefig(os.getcwd() + '/figs/' + self.file_path[-10:-3] + 'png')
+        fig.clf()
+        plt.close()
         
         a = []
         b = []

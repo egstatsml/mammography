@@ -24,6 +24,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib import cm
 import scipy
+from scipy import stats
 from scipy import signal as signal
 from scipy.ndimage import filters as filters
 from scipy.ndimage import measurements as measurements
@@ -71,6 +72,17 @@ class feature(breast):
         self.contrast = []
         self.dissimilarity = []
         self.correlation = []
+        self.density = []
+        
+        #Wavelet FEATURES
+        self.wave_kurtosis = []
+        self.wave_entropy = []
+        self.wave_energy = []
+        self.wave_contrast = []
+        self.wave_dissimilarity = []
+        self.wave_correlation = []
+        
+        
         
         #FEATURES FROM FIBROGLANDULAR DISK
         self.fibro_homogeneity = []
@@ -175,7 +187,13 @@ class feature(breast):
     def get_features(self, level = 'all'):
         
         #perform the wavelet decomposition
-        self.packets = pywt.WaveletPacket2D(data=self.data.astype(float), wavelet=self.wavelet_type, mode='sym')
+        a = np.copy(self.data)
+
+        a[self.fibroglandular_mask == False ] = np.nan
+        
+
+
+        self.packets = pywt.WaveletPacket2D(data=a, wavelet=self.wavelet_type, mode='sym')
         
         #check that the number of levels isnt to high
         #if it is, lets print something to let them know
@@ -202,7 +220,7 @@ class feature(breast):
         else:
             self._get_features_level(level)
             
-            
+        a = []
             
             
             
@@ -241,6 +259,11 @@ class feature(breast):
             for jj in range(0, np.shape(self.indicies[level])[1]):
                 
                 temp, glcm = self._comatrix(level, ii, jj)
+                mask = np.isfinite(temp)
+                
+                print np.shape(temp)
+                print np.shape(temp[mask])
+                print np.sum(mask == False)
                 #glcm = greycomatrix(temp, [0],[0], levels=256, symmetric=True, normed=True)
                 
                 
@@ -250,6 +273,10 @@ class feature(breast):
                 self.dissimilarity[image_no][level][ii,jj] = greycoprops(glcm, prop='dissimilarity')[0,0]
                 self.correlation[image_no][level][ii,jj] = greycoprops(glcm, prop='correlation')[0,0]
                 self.entropy[image_no][level][ii,jj] = entropy.shannon_entropy(temp)
+                
+                #self.wave_kurtosis[image_no][level][ii,jj] = stats.kurtosis(np.histogram( temp[mask].ravel() ))
+                #self.wave_energy[image_no][level][ii,jj] = np.sum(temp[mask]**2)
+                #self.wave_entropy[image_no][level][ii,jj] = entropy.shannon_entropy(temp[mask])
                 
                 
                 #print('homogeneity = %f ' %self.homogeneity[image_no][level][ii,jj])
@@ -307,7 +334,7 @@ class feature(breast):
         #now lets crop it to get rid of the readings that were interpreted as nan
         glcm = glcm[0:255, 0:255,:,:]        
         
-        return temp, glcm
+        return temp[temp_mask], glcm
         
         
         
@@ -327,7 +354,9 @@ class feature(breast):
         self.correlation = self.correlation[0:num_scans][:][:] 
         self.entropy = self.entropy[0:num_scans][:][:] 
         
-        
+        self.wave_energy = self.wave_energy[0:num_scans][:][:] 
+        self.wave_kurtosis = self.wave_kurtosis[0:num_scans][:][:]
+        self.wave_entropy = self.wave_entropy[0:num_scans][:][:] 
         
         
         
@@ -363,4 +392,10 @@ class feature(breast):
         self.correlation = [[0 for j in xrange(self.levels)] for i in xrange(self.no_images)]
         self.entropy = [[0 for j in xrange(self.levels)] for i in xrange(self.no_images)]
         
-        
+        self.wave_kurtosis = [[0 for j in xrange(self.levels)] for i in xrange(self.no_images)]
+        self.wave_energy = [[0 for j in xrange(self.levels)] for i in xrange(self.no_images)]
+        self.wave_contrast = [[0 for j in xrange(self.levels)] for i in xrange(self.no_images)]
+        self.wave_dissimilarity = [[0 for j in xrange(self.levels)] for i in xrange(self.no_images)]
+        self.wave_correlation = [[0 for j in xrange(self.levels)] for i in xrange(self.no_images)]
+        self.wave_entropy = [[0 for j in xrange(self.levels)] for i in xrange(self.no_images)]
+
