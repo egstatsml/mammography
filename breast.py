@@ -79,6 +79,8 @@ class breast(object):
         self.area = 0
         self.boundary = []
         self.boundary_y= []
+        self.x_pec = []
+        self.y_pec = []
         self.nipple_x = 0
         self.nipple_y = 0
         self.threshold = 0                #threshold for segmenting fibroglandular disk
@@ -137,7 +139,7 @@ class breast(object):
     
     """
     
-        
+    
     def preprocessing(self):
         self.im_width = np.shape(self.data)[1]
         self.im_height = np.shape(self.data)[0]
@@ -227,8 +229,8 @@ class breast(object):
         threshold_val_high = 0.99
         #search from right to left, as that is where the label will be
         
-        
-        x = 0
+        #start at 200, the label is never going to be that far to the left
+        x = 200
         while (x < (self.im_width - 200) ):
             y = 0
             while (y < (self.im_height- 200) ):
@@ -239,15 +241,29 @@ class breast(object):
                 #see if most of the pixels are background, and if there has been no change over mid part of cdf
                 if( (cdf[0] > threshold_val) &( np.abs(cdf[1000] - cdf[100]) < 0.001 )):
                     
-                    self.data[y:y+200,x:x+200] = 0                    
+                    #looks like we may have found the label, but to be sure we will move to the left a little bit to see if the count increases.
+                    #if it does, then wear really near the breast. If it doesn't, then we really have found the breast
+                    #To check if the intensity becomes greater, we will compare median values
+                    
+                    #finding the median value of PDF in current location
+                    med_current = np.median(pdf[0])
+                    #now finding median value of space to left, doing it all in one line, same procedure as done above so I will allow this part
+                    #of my code to be more terse :)
+                    med_left = np.median( np.cumsum( np.histogram(self.data[y:y+200, x-50:x+150], bins=np.arange(0,np.max(self.data)+1), density=True)[0]))
+                    #now lets compare
+                    if(med_current < med_left):
+                        
+                        self.data[y:y+200,x:x+200] = 0                    
+                    
+                    
                     
                 y = y+200
                 x = x+200
                 
-    
-    
-    
-    
+                
+                
+                
+                
     """
     pectoral_muscle_present()
     
@@ -279,6 +295,7 @@ class breast(object):
             self.pectoral_present = True
             return True
         else:
+            self.pectoral_present = False
             return False
         
         
@@ -356,11 +373,13 @@ class breast(object):
         
         index = np.where(np.abs(h) == np.max(valid_h))[0][0]
         
-            
+        
         pectoral_rho = d[index] #will need to account for rho being negative, but shouldnt happen for pectoral muscle case
         pectoral_theta = theta[index]
         
-        print pectoral_theta
+        #creating a list of positional indicies where the pectoral muscle is
+        x_pec = []
+        y_pec = []
         #now lets get rid of all information to the left of this line
         #as this will be the pectoral muscle
         for x in range(0, np.shape(edge)[1]):
@@ -370,9 +389,14 @@ class breast(object):
                 self.data[0:np.floor(y).astype(int), x] = 0
                 #set these locations in the pectoral muscle binary map to true
                 self.pectoral[0:np.floor(y).astype(int), x] = True
+                #save the location indicies
+                x_pec.append(x)
+                y_pec.append(y)
                 
-                
-                
+        #save the positional indicies to the class member variables, but do it as arrays
+        self.x_pec = np.array(x_pec)
+        self.y_pec = np.array(y_pec)
+        
         self.pectoral_removed = True
         
         
@@ -410,17 +434,22 @@ class breast(object):
         
         temp = np.copy(self.data.astype(np.int))
         
+        
         #now do a directional blur to the left
-
-        blur_kernel = np.zeros((3,15), dtype=np.int)
+        
+        blur_kernel = np.zeros((1,15), dtype=np.int)
         kernel_height = np.shape(blur_kernel)[0]
         kernel_width = np.shape(blur_kernel)[1]
-        for ii in range(0,kernel_height):
-            blur_kernel[ii,kernel_width/2:-1] = np.arange(kernel_width/2,0,-1)
-            
-        enhance = signal.fftconvolve(temp, blur_kernel, 'same')
         
-
+        gauss = signal.gaussian(kernel_width * 2, 10, sym=True)
+        gauss = gauss[kernel_width::].reshape(1,kernel_width)
+        
+        #for ii in range(0,kernel_height):
+        #    blur_kernel[ii,kernel_width/2:-1] = np.arange(kernel_width/2,0,-1)
+            
+        #enhance = signal.fftconvolve(temp, gauss, 'same')
+        enhance = filters.gaussian_filter(temp, 5)
+        
         enhance[enhance < 10] = 0
         enhance[enhance > 10] = 1.0
         label_mask, num_labels = measurements.label(enhance)
@@ -449,7 +478,7 @@ class breast(object):
                 #will be very close/equal to zero
                 if( (np.sum(np.multiply(component,self.data))) < (np.sum(component))):
                     #then it is backgoundnp.sum(np.multiply(component,im)                      
-                    #TODO - do something here
+                    #TODO - maybe do something here?
                     pass
                 
                 #now we will see if we are somewhere far to the right, like some stray component
@@ -481,34 +510,31 @@ class breast(object):
                     
                 #if we have passed all the other tests, then we have found the breast
                 else:
-                    self.breast_mask = np.copy(component.astype('uint8'))
+                    self.breast_mask = np.copy(component.astype('int8'))
                     
-        
+                    
         #if we have gone through all of this and still havent found the breast, we should throw an error
         #lets use this breast mask to set all the background elements to zero
-        #MAY WANT TO SET THEM TO NAN AT A LATER STAGE, WILL SEE HOW THAT WOULD WORK
         self.data[ self.breast_mask == 0 ] = np.nan
         
-        edges = sobel(self.breast_mask.astype(float))
-        gradient = np.gradient(filters.gaussian_filter(self.original_scan, 5))
-        gradient[0][np.abs(edges) == 0 ] = np.nan
-        gradient[1][np.abs(edges) == 0 ] = np.nan
-        
-        gradient_phase = np.arctan2(gradient[1], gradient[0])
-        fig = plt.figure()
-        ax1 = fig.add_subplot(1,1,1)
-        im1 = ax1.imshow(gradient_phase)
-        fig.colorbar(im1)
-        fig.savefig(os.getcwd() + '/figs/' + 'grad_' + self.file_path[-10:-3] + 'png')
-        
-        
-        
-        #get just a graph of the boundary
-        #y is the y position of the image, and will use as independant variable here
-        y,boundary = self.thin_boundary(edges)
+        #use the breast mask we have found to locate the true breast boundary
+        self.edge_boundary()
         
         #remove any extra skin bits that have made it this far
-        y, boundary = self.remove_skin_test(boundary, y)
+        y, boundary = self.remove_skin(self.boundary, self.boundary_y)
+        
+        im = np.zeros((np.shape(self.data)))
+        im[y, boundary] = 1
+        #saving a figure so can look at it
+        fig = plt.figure(num=None, figsize=(20, 40), dpi=400)
+        #ax1 = fig.add_subplot(1,1,1)
+        #im1 = ax1.imshow((self.data))
+        #fig.colorbar(im1)
+        ax2 = fig.add_subplot(1,1,1)
+        im2 = ax2.imshow(im)
+        fig.savefig(os.getcwd() + '/figs/' + '1_grad_' + self.file_path[-10:-3] + 'png')
+        
+        
         
         #now will check to see if we have a point of inflection, caused by some skin included in the scan
         """
@@ -519,7 +545,7 @@ class breast(object):
         if(len(stationary_y) > 0):
             self.nipple_x = np.max(stationary_x)
             self.nipple_y = stationary_y[stationary_x == self.nipple_x] + y[0]
-            
+        
         self.boundary = boundary.astype(np.int)
         self.boundary_y = y
         """
@@ -531,10 +557,70 @@ class breast(object):
         
         
         
+    """
+    edge_boundary()
+    
+    Description:
+    
+    Will use the breast mask to find the boundary of the breast
+    Will first apply a sobel filter, and search along all points where the image
+    does not equal zero, as these will be very close to the true edge, also apply a small blur
+    to slightly increase size of initial edge to make sure the true edge will be included
+    These step just reduces the search area
+    
+    Will search along the initial edge, and look at immediate neighbours in the breast mask scan.
+    If an immediate neighbour is part of the background, then we have found an edge pixel
+    
+    Immediate neighbours are those either left, right, down, or up of current pixel
+    
+    """
+    
+    def edge_boundary(self):
         
+        edges = sobel(self.breast_mask)
+        #apply small blur to edge
+        edges = filters.gaussian_filter(edges,0.5) 
         
+        if(self.pectoral_present):
+            #remove edges where the pectoral muscle was
+            edges[self.pectoral] = 0
+            
+            
+            
+        #now find the boundary
+        y_temp,boundary_temp = np.where(edges != 0)
         
+        y = []
+        boundary = []
         
+        im_height = self.breast_mask.shape[0] - 1
+        im_width = self.breast_mask.shape[1] - 1
+        
+        for ii in range(0, np.size(y_temp) -1):
+            
+            #creating a few variables that will be used to account for being at the edge of the image, so we dont search into invalid
+            #indicies
+            x_low = boundary_temp[ii] != 0
+            x_high = boundary_temp[ii] != im_width
+            y_low = y_temp[ii] != 0
+            y_high = y_temp[ii] != im_height
+            
+            
+            #now search up left right and down
+            if( ((self.breast_mask[y_temp[ii] + y_high, boundary_temp[ii]] == 0)  &  (self.breast_mask[y_temp[ii], boundary_temp[ii]] == 1)) | 
+                ((self.breast_mask[y_temp[ii] - y_low, boundary_temp[ii]] == 0) & (self.breast_mask[y_temp[ii], boundary_temp[ii]] == 1)) |
+                ((self.breast_mask[y_temp[ii], boundary_temp[ii] + x_high] == 0) & (self.breast_mask[y_temp[ii], boundary_temp[ii]] == 1)) |
+                ((self.breast_mask[y_temp[ii], boundary_temp[ii] - x_low] == 0) & (self.breast_mask[y_temp[ii], boundary_temp[ii]] == 1)) ):
+                
+                
+                #then this part is on the true boundary
+                y.append(y_temp[ii])
+                boundary.append(boundary_temp[ii])
+                
+                
+        #now save the true boundary location
+        self.boundary = np.array(boundary)
+        self.boundary_y = np.array(y)
         
         
         
@@ -542,7 +628,7 @@ class breast(object):
         
         
     def thin_boundary(self, edges):
-        y_temp, boundary_temp = np.where(np.abs(edges) > 0.01)
+        y_temp, boundary_temp = np.where(np.abs(edges) != 0)
         
         #now will loop through to make sure there is only one boundary location for each boundary position
         #if there are multiple boundary points at the same location, will just take the outermost position
@@ -587,7 +673,7 @@ class breast(object):
         #default high standard deviation (sigma = 10) on blur so it gets rid of high frequencies better
         
         
-        temp = filters.gaussian_filter1d(np.asarray(boundary).astype(float) , sigma)
+        temp = signal.savgol_filter(np.asarray(boundary).astype(float) , 31, 2)
         dx = np.gradient(temp)
         
         #now will find the stationary points. A stationary point will occur when the derivative changes from pos to negative
@@ -595,13 +681,14 @@ class breast(object):
             if( np.sign(dx[ii]) != np.sign(dx[ii+1]) ):
                 stationary_y.append(ii)
                 stationary_x.append(boundary[ii])
+                
         return np.asarray(stationary_y), np.asarray(stationary_x) 
-
-
-
-
-
-
+    
+    
+    
+    
+    
+    
     """
     
     
@@ -629,18 +716,47 @@ class breast(object):
         
         y_orig = y[0]
         
-        temp = filters.gaussian_filter1d(np.asarray(boundary).astype(float) , 5)
+        temp = signal.savgol_filter(np.asarray(boundary).astype(float) , 101, 2)
         
         dx = np.gradient(temp)
-        temp = filters.gaussian_filter1d(dx , 20)
+        temp = signal.savgol_filter(dx , 101, 2)
         d2x = np.gradient(temp)
-        temp = filters.gaussian_filter1d(d2x , 10)
+        temp = signal.savgol_filter(d2x , 101, 2)
         
         #find the stationary points
         stationary_y, stationary_x =  self.stationary_points(boundary)
         #now will see where the stationary points are
         #if they are near the end then probably where we go from skin to
         #breast
+        
+        inflection = []
+        for ii in range(0, np.size(d2x) -1):
+            if np.sign(d2x[ii]) != np.sign(d2x[ii + 1]):
+                inflection.append(ii)
+                
+                
+            
+        #now using inflection point to see if we can remove the extra skin
+        if (len(inflection) > 0):
+            if (boundary[inflection[-2]] > (2.0 / 3.0) * self.data.shape[0]):
+                self.data[y[inflection[-2]]::, 0:boundary[inflection[-2]] ] == np.nan
+        
+        #if np.size(stationary_x) > 0:
+        #    if (y[stationary_y[-2]] > (2.0 / 3.0) * self.data.shape[0]):
+        #        self.data[y[stationary_y[-2]]::, 0:stationary_x[-2]] = np.nan
+        
+        
+        
+        im = np.zeros(self.data.shape)
+        im[y, boundary] = 1
+        self.line_follow(im)
+        
+        
+        
+        
+        
+        
+        """
         
         
         #check near top of image
@@ -680,13 +796,122 @@ class breast(object):
             #now lets search down the image to see points that are higher than the median of the
             #entire breast
                 
-            
+        """
             
         return y, boundary
     
     
+    """
+    line_follow()
+
+    Line following based on Hough transform approach
+
+
+
+
+    """
     
-    
+    def line_follow(self, line_im):
+        
+        
+        #define the window size
+        w = 40
+        
+        #now will begin following the line
+        y,x = np.where(line_im == 1)
+        y = y[0]
+        x = x[0]
+        
+        tau = []
+        line_x = []
+        line_y = []
+        
+        i = np.arange(0,w)
+        
+        height = line_im.shape[0]
+        #boolean to say we are at the start
+        start = True
+        x_prev = 0
+        y_prev = 0
+        
+        temp = np.zeros((line_im.shape[0] + w, line_im.shape[1] + w))
+        temp[w/2:-(w/2), w/2:-(w/2)] = line_im
+        line_im = temp
+        while( (x > 0) & (y < height + w) ):
+            
+            line_x.append(x)
+            line_y.append(y)
+            #create window of line
+            window = line_im[y:y+w,x:x+w]
+            #apply the Hough transform
+            h, theta, d = hough_line(window)
+            #index = np.where(h == np.max(h))
+            #print index
+            #if (np.shape(index[0]) >1)| 
+            #print np.shape(h)
+            h, theta, d = hough_line_peaks(h, theta, d)
+            #direction will be the highest peak
+            #subtract pi/2 to get the angle of the line, not it's normal
+            tau.append(theta[0] - np.pi/2.0)
+            
+            #find the midpoint inside the line we just drew
+            y_new = np.round(d[0] / np.sin(theta[0]) - (np.cos(theta[0]) / np.sin(theta[0])) * i)
+            valid_y = (y_new >= 0) & (y_new < w)
+            
+            #now finding the mid_point
+            mid = np.where(np.cumsum(valid_y) >= np.sum(valid_y)/2)[0]
+            mid = mid[0]
+            #print y_new
+            x_mid = i[mid]
+            y_mid = y_new[mid]
+            
+            #suffix and prefix
+            # l = start of line (left)
+            # r = finish of line (right)
+            
+            x_l = i[valid_y[0]]
+            y_l = i[valid_y[0]]            
+            x_r = i[valid_y[-1]]
+            y_r = i[valid_y[-1]]            
+            
+            #see if the start or end of the line is closest to the previous point
+            l_dist = np.sqrt( np.power(x_l - x_prev,2) + np.power(y_l - y_prev,2) )
+            r_dist = np.sqrt( np.power(x_r - x_prev,2) + np.power(y_r - y_prev,2) )
+            
+            x_prev = x
+            y_prev = y
+            
+            line_y.extend(y + y_new[valid_y])
+            line_x.extend(x + i[valid_y])
+            
+            if(r_dist > l_dist):
+                #then move to the right    
+                x = x + x_mid
+                y = y + y_mid
+                print 2
+            else:
+                #then move to the left
+                x = x - x_mid
+                y = y - y_mid
+                
+            #print x_mid
+            #print y_mid
+            
+            
+        im = np.zeros((np.shape(self.data)))
+        im[line_y, line_x] = 1
+        #saving a figure so can look at it
+        fig = plt.figure(num=None, figsize=(20, 40), dpi=400)
+        #ax1 = fig.add_subplot(1,1,1)
+        #im1 = ax1.imshow((self.data))
+        #fig.colorbar(im1)
+        ax2 = fig.add_subplot(1,1,1)
+        im2 = ax2.imshow(im)
+        fig.savefig(os.getcwd() + '/figs/' + 'line_' + self.file_path[-10:-3] + 'png')
+        
+        
+        
+        
     def remove_skin_test(self, boundary, y):
         
         print np.shape(y)

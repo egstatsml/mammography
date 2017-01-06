@@ -169,7 +169,7 @@ sys.stdout = logger()
 descriptor = spreadsheet(training=True, run_synapse = False)
 threads = []
 id = 0
-num_threads = multiprocessing.cpu_count() - 2
+num_threads = multiprocessing.cpu_count() - 4
 print num_threads
 
 # Create new threads
