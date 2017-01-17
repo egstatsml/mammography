@@ -163,7 +163,7 @@ class my_thread(threading.Thread):
                         
                 #file_path = 'pilot_images/502860.dcm'
                 my_thread.t_lock.release()
-                
+
                 #try:
                 #now we have the right filename, lets do the processing of it
                 self.scan_data.initialise(file_path)
@@ -179,11 +179,12 @@ class my_thread(threading.Thread):
                 #print('time = %d s' %self.time_process[-1])
                 self.scan_data.current_image_no += 1   #increment the image index
                 self.scans_processed += 1              #increment the image counter
+                lock_time = timeit.default_timer()
                 my_thread.t_lock.acquire()
                 my_thread.scan_no += 1
                 print(my_thread.q.qsize())
                 my_thread.t_lock.release()                    
-                
+                print(timeit.default_timer() - lock_time)                
                 
                 if(self.training & (my_thread.cancer_count > 18)):
                     my_thread.exit_flag = True

@@ -345,7 +345,7 @@ class breast(object):
         #now will remove the lower value components to focus on the
         #more prominent edges
         edge[edge < thresh_val] = 0
-        
+        """
         fig = plt.figure()
         ax1 = fig.add_subplot(1,2,1)
         ax1.imshow(self.data)
@@ -354,7 +354,7 @@ class breast(object):
         fig.savefig(os.getcwd() + '/figs/edge_' + self.file_path[-10:-3] + 'png')
         fig.clf()
         plt.close()
-        
+        """
         
         #apply the Hough transform
         h, theta, d = hough_line(edge)
@@ -522,7 +522,7 @@ class breast(object):
         #now trace the boundary so we can create a parametric model of the breast boundary
         self.trace_boundary()
         
-        
+        """
         im = np.zeros((np.shape(self.data)))
         im[self.boundary_y, self.boundary] = 1
         #saving a figure so can look at it
@@ -535,7 +535,7 @@ class breast(object):
         fig.savefig(os.getcwd() + '/figs/' + '1_grad_' + self.file_path[-10:-3] + 'png')
         fig.clf()
         plt.close()
-        
+        """
         
         
         
@@ -678,7 +678,7 @@ class breast(object):
                 break
                 
             count += 1
-        
+        """
         test = np.zeros(im.shape)
         test[l_y, l_x] = 1
         fig = plt.figure(num=None, figsize=(80, 50), dpi=800)
@@ -694,7 +694,7 @@ class breast(object):
         fig.savefig(os.getcwd() + '/figs/' + 'test_' + self.file_path[-10:-3] + 'png')
         fig.clf()
         plt.close()
-        
+        """
         
         
         
@@ -806,6 +806,7 @@ class breast(object):
             y_v = y_v.astype(int)            
             
             if(first):
+                """
                 test = np.zeros(window.shape)
                 test[np.round(y_v),x_v] = 1
                 fig = plt.figure(num=None)
@@ -819,7 +820,7 @@ class breast(object):
                 plt.close()
                 
                 first = False
-         
+                """
             x_prev = x
             y_prev = y
             
@@ -831,7 +832,7 @@ class breast(object):
             #print x_mid
             #print y_mid
             
-            
+        """
         im = np.zeros((np.shape(self.data)))
         im[line_y, line_x] = 1
         #saving a figure so can look at it
@@ -846,7 +847,7 @@ class breast(object):
         fig.savefig(os.getcwd() + '/figs/' + 'line_' + self.file_path[-10:-3] + 'png')
         fig.clf()
         plt.close()
-        
+        """
         
         
         
@@ -931,14 +932,14 @@ class breast(object):
         self.fibroglandular_mask = (self.data > self.threshold) & (self.data < upper_limit)
         self.fibroglandular_mask[edge_mask == 1] = False
         
-        
+        """
         fig = plt.figure()
         ax1 = fig.add_subplot(1,1,1)
         ax1.imshow(self.fibroglandular_mask)
         fig.savefig(os.getcwd() + '/figs/' + 'msk_' + self.file_path[-10:-3] + 'png')
         fig.clf()
         plt.close()
-        
+        """
         
         
         
@@ -1030,14 +1031,14 @@ class breast(object):
         """
         
         
-        
+        """
         fig = plt.figure()
         ax1 = fig.add_subplot(1,1,1)
         ax1.imshow(self.data)
         fig.savefig(os.getcwd() + '/figs/' + self.file_path[-10:-3] + 'png')
         fig.clf()
         plt.close()
-        
+        """
         a = []
         b = []
         c = []
