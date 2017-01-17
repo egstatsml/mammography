@@ -261,12 +261,6 @@ class feature(breast):
                 temp, glcm = self._comatrix(level, ii, jj)
                 mask = np.isfinite(temp)
                 
-                print np.shape(temp)
-                print np.shape(temp[mask])
-                print np.sum(mask == False)
-                #glcm = greycomatrix(temp, [0],[0], levels=256, symmetric=True, normed=True)
-                
-                
                 self.homogeneity[image_no][level][ii,jj] = greycoprops(glcm, prop='homogeneity')[0,0]
                 self.energy[image_no][level][ii,jj] = greycoprops(glcm, prop='energy')[0,0]
                 self.contrast[image_no][level][ii,jj] = greycoprops(glcm, prop='contrast')[0,0]

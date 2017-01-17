@@ -169,8 +169,8 @@ class my_thread(threading.Thread):
                 self.scan_data.initialise(file_path)
                 self.scan_data.preprocessing()
                 self.scan_data.get_features()
-
-
+                
+                
                 #now that we have the features, we want to append them to the list of features
                 #The list of features is shared amongst all of the class instances, so
                 #before we add anything to there, we should lock other threads from adding
@@ -183,16 +183,16 @@ class my_thread(threading.Thread):
                 my_thread.scan_no += 1
                 print(my_thread.q.qsize())
                 my_thread.t_lock.release()                    
-
-
+                
+                
                 if(self.training & (my_thread.cancer_count > 18)):
                     my_thread.exit_flag = True
-
+                    
                 #if we aren't training, but have run out of scans for validation
                 #we should also exit
                 elif(my_thread.q.empty()):
                     my_thread.exit_flag = True
-
+                    
                     #except:
                 #    print('Error with current file %s' %(file_path))
                 #    my_thread.error_files.append(file_path)
