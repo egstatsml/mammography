@@ -36,7 +36,7 @@ from scipy.ndimage import filters as filters
 from scipy.ndimage import measurements as measurements
 from skimage.transform import (hough_line, hough_line_peaks,
                                probabilistic_hough_line)
-
+import gc
 
 from skimage import feature
 from skimage.filters import roberts, sobel, scharr, prewitt
@@ -44,6 +44,7 @@ from skimage.feature import corner_harris, corner_subpix, corner_peaks
 from scipy import ndimage as ndi
 
 import pywt
+from boundary import trace_boundary
 
 
 
@@ -519,8 +520,13 @@ class breast(object):
         
         #use the breast mask we have found to locate the true breast boundary
         self.edge_boundary()
-        #now trace the boundary so we can create a parametric model of the breast boundary
+        #now trace the boundary so we can create a parametric model of the breast boundary    
         self.trace_boundary()
+        #for when I move the code to Cython
+        #self.boundary_y, self.boundary = trace_boundary(im)
+        
+        #now lets remove any extra bits of skin if we find them
+        self.remove_skin()
         
         """
         im = np.zeros((np.shape(self.data)))
@@ -556,6 +562,9 @@ class breast(object):
     
     Immediate neighbours are those either left, right, down, or up of current pixel
     
+    NOTE:
+    This code is suuuper slow, so will move it to Cython soon.
+    
     """
     
     def edge_boundary(self):
@@ -571,7 +580,10 @@ class breast(object):
             
         #now find the boundary
         y_temp,boundary_temp = np.where(edges != 0)
+        y_temp = y_temp.astype('uint16')
+        boundary_temp = boundary_temp.astype('uint16')
         
+        #creating arrays to store the found boundary
         y = []
         boundary = []
         
@@ -579,11 +591,13 @@ class breast(object):
         im_width = self.breast_mask.shape[1] - 1
         
         #list for the search locations
-        search_x = [-1, 1, 0, 0]
-        search_y = [0, 0, -1, 1]
+        
+        search_x = np.array([-1, 1, 0, 0])
+        search_y = np.array([0, 0, -1, 1])
         
         y_lim = np.shape(self.data)[0]        
         x_lim = np.shape(self.data)[1]
+        
         for ii in range(0, np.size(y_temp) -1):
             
             #creating a few variables that will be used to account for being at the edge of the image, so we dont search into invalid
@@ -602,8 +616,8 @@ class breast(object):
                     if(self.breast_mask[y_temp[ii], boundary_temp[ii]] == 1) & (self.breast_mask[y_temp[ii] + search_y[jj] , boundary_temp[ii] + search_x[jj]] == 0):
                         
                         #then this part is on the true boundary
-                        y.append(y_temp[ii])
-                        boundary.append(boundary_temp[ii])
+                        y.append( y_temp[ii] )
+                        boundary.append( boundary_temp[ii] )
                         
                         
         #now save the true boundary location
@@ -615,13 +629,12 @@ class breast(object):
         
         
         
-    
-    
+        
     def trace_boundary(self):
         
         im = np.zeros(self.data.shape, dtype=np.int)
         im[self.boundary_y,self.boundary] = 1
-        
+                
         #will remove pixels at the border, as these will sometimes give weird errors
         im[0:10,:] = 0
         im[-1:-11,:] = 0
@@ -656,7 +669,7 @@ class breast(object):
                         if(first):
                             x += x_s[ii]
                             y += y_s[ii]
-                            print('first')
+
                             first = False
                             found = True
                             break
@@ -674,11 +687,17 @@ class breast(object):
                 #print x
                 #print y
             if(found == False):
-                print 'done searching'
+
                 break
                 
             count += 1
-        """
+            
+        #now re-write the breast boundary in the class
+        self.boundary = np.array(l_x)
+        self.boundary_y = np.array(l_y)
+        
+        
+        
         test = np.zeros(im.shape)
         test[l_y, l_x] = 1
         fig = plt.figure(num=None, figsize=(80, 50), dpi=800)
@@ -694,16 +713,143 @@ class breast(object):
         fig.savefig(os.getcwd() + '/figs/' + 'test_' + self.file_path[-10:-3] + 'png')
         fig.clf()
         plt.close()
+        
+        
+        
+    """
+    remove_skin()
+    
+    Description:
+    
+    Function uses the breast boundary to locate any extra skin in the image.
+    
+    Extra skin is found through a point of inflection in the boundary
+    Use these points of inflection to decide which parts of the breast to get rid of
+    
+    """
+        
+        
+    def remove_skin(self):
+        
+        #first lets smooth the boundary
+        print np.shape(self.boundary)
+        x = signal.savgol_filter(self.boundary, 81, 3)
+        
+        #now lets take derivative
+        dx = np.gradient(x)
+        #lets find the second derivative, but first lets smooth it again
+        temp = signal.savgol_filter(dx, 31, 2)
+        d2x = np.gradient(temp)        
+        d2x = signal.savgol_filter(d2x, 31, 2)
+        
+        #now want to find point of inflection in  breast boundary
+        #which is where the second derivative will equal zero
+        #use the stationary_points function to find any of these
+        inflec_y, inflec_x = self.stationary_points(d2x)
+        
+        #finding peaks in second derivative
+        #first filter out small  values
+        d2x[np.abs(d2x) < np.mean(np.abs(d2x)) * 5] = 0
+        
+        peaks = np.array( signal.find_peaks_cwt(d2x, np.arange(25,40)))
+        #now filter out peaks until we get the one pertaining to any extra skin
+        
+        #sometimes get peaks in the middle caused by the nipple in the scan
+        #can get rid of these peaks by checking the value of the breast boundary
+        #at these locations.
+        #if the value of the breast boundary close to the maximim at this point,
+        #then is most likely due to the nipple
+        
+        #if we actually found any peaks
+        if(peaks.size > 0):
+            #get rid of peaks near the nipple
+            peaks = peaks[self.boundary[peaks] < np.max(self.boundary) * 0.85]
+            #remove the extra bit of skin
+            #see if there are twwo bits of skin we need to remove
+            skin_locs = []
+            #if we do have parts to remove
+            if(peaks.size):
+                if(peaks.size >=2):
+                    #add the top bit of skin
+                    skin_locs.extend(np.arange(0,peaks[0]))
+                
+                #now add the bottom bit
+                skin_locs.extend(np.arange(peaks[-1],len(self.boundary)))
+                
+                #now remove parts of skin from these points
+                for ii in skin_locs:
+                    self.data[self.boundary_y[ii], 0:(self.boundary[ii] + 2)] = np.nan
+
+        """
+        #Code just for making pretty plots to check it is all working :)
+        
+        fig = plt.figure()
+        ax1 = fig.add_subplot(1,1,1)
+        #im1 = ax1.plot(dx, 'b')
+        im1 = ax1.scatter(self.boundary_y[peaks], d2x[peaks], label='Peaks')
+        im2 = ax1.plot(self.boundary_y, np.divide(self.boundary.astype(float), np.max(self.boundary.astype(float))) * np.max(d2x), 'r', label='Scaled Breast Boundary')
+        im3 = ax1.plot(self.boundary_y, d2x, 'm', label='Second Derivative')
+        #fig.colorbar(im1)
+        plt.title('Breast Boundary and Second Derivative')
+        plt.legend()
+        fig.savefig(os.getcwd() + '/figs/' + 'deriv_' + self.file_path[-10:-3] + 'png')
+        fig.clf()
+        plt.close()
+        
+        
+        fig = plt.figure()
+        ax1 = fig.add_subplot(1,1,1)
+        im1 = ax1.imshow(self.data)
+        plt.title('Preprocessed Mammogram')
+        fig.savefig(os.getcwd() + '/figs/' + 'pre_' + self.file_path[-10:-3] + 'png')
+        fig.clf()
+        plt.close()
         """
         
         
+        
+        
+        
+        
+    """
+    stationary_points()
+    
+    Description:
+    
+    Function will find stationary points in a 1D array
+    
+    @param data = input signal
+    
+    @retval = two arrays containing the stationary point locations (stationary_x and stationary_y)
+    
+    """
+
+    def stationary_points(self, dx):
+        
+        stationary_y = []
+        stationary_x = []
+        #now lets first apply a low pass filter/Gaussian blur to remove any high frequency
+        #noise that would mess with the derivative
+        #default high standard deviation (sigma = 10) on blur so it gets rid of high frequencies better
+        
+        
+        #temp = filters.gaussian_filter1d(np.asarray(boundary).astype(float) , sigma)
+        #dx = np.gradient(temp)
+        
+        #now will find the stationary points. A stationary point will occur when the derivative changes from pos to negative
+        for ii in range(0,np.shape(dx)[0] - 1):
+            if( np.sign(dx[ii]) != np.sign(dx[ii+1]) ):
+                stationary_y.append(ii)
+                stationary_x.append(dx[ii])
+                
+        return np.asarray(stationary_y), np.asarray(stationary_x)
+            
+            
         
     """
     line_follow_hough()
     
     Line following based on Hough transform approach
-    
-    
     
     
     """
