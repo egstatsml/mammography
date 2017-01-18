@@ -779,7 +779,7 @@ class breast(object):
                 #now remove parts of skin from these points
                 for ii in skin_locs:
                     self.data[self.boundary_y[ii], 0:(self.boundary[ii] + 2)] = np.nan
-
+                    
         """
         #Code just for making pretty plots to check it is all working :)
         
