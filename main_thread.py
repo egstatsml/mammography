@@ -32,9 +32,9 @@ from scipy import ndimage as ndi
 import threading
 import Queue
 import timeit
-import multiprocessing
-from my_thread import my_thread
-
+from multiprocessing import Process, Lock, Queue, cpu_count
+from my_thread import my_thread, shared, my_manager
+from multiprocessing.managers import BaseManager
 #import my classes
 from breast import breast
 from feature_extract import feature
@@ -68,7 +68,7 @@ def create_classifier_arrays(threads, num_scans):
     
     no_features = 8
     no_packets = 4
-    levels = 3
+    levels = 2
     X = []
     #X = np.zeros((num_scans, no_features * no_packets * levels))
     Y = np.zeros((num_scans,1))
@@ -86,19 +86,21 @@ def create_classifier_arrays(threads, num_scans):
             #get the features from the current scan in the current thread
             
             #print 'feat size'
-            #print np.shape(threads[t].scan_data.homogeneity[t_ii][lvl])
+            print np.shape(threads[t].scan_data.homogeneity[t_ii][lvl])
             
-            homogeneity = threads[t].scan_data.homogeneity[t_ii][lvl].reshape(1,-1)
-            entropy = threads[t].scan_data.entropy[t_ii][lvl].reshape(1,-1)
-            energy = threads[t].scan_data.energy[t_ii][lvl].reshape(1,-1)
-            contrast = threads[t].scan_data.contrast[t_ii][lvl].reshape(1,-1)
-            dissimilarity = threads[t].scan_data.dissimilarity[t_ii][lvl].reshape(1,-1)
-            correlation = threads[t].scan_data.correlation[t_ii][lvl].reshape(1,-1)
             
-            wave_energy = threads[t].scan_data.wave_energy[t_ii][lvl].reshape(1,-1)
-            wave_entropy = threads[t].scan_data.wave_entropy[t_ii][lvl].reshape(1,-1)
-            wave_kurtosis = threads[t].scan_data.wave_kurtosis[t_ii][lvl].reshape(1,-1)
+            homogeneity = threads[t].scan_data.homogeneity[t_ii][lvl]
+            entropy = threads[t].scan_data.entropy[t_ii][lvl]
+            energy = threads[t].scan_data.energy[t_ii][lvl]
+            contrast = threads[t].scan_data.contrast[t_ii][lvl]
+            dissimilarity = threads[t].scan_data.dissimilarity[t_ii][lvl]
+            correlation = threads[t].scan_data.correlation[t_ii][lvl]
             
+            wave_energy = threads[t].scan_data.wave_energy[t_ii][lvl]
+            wave_entropy = threads[t].scan_data.wave_entropy[t_ii][lvl]
+            wave_kurtosis = threads[t].scan_data.wave_kurtosis[t_ii][lvl]
+
+            print homogeneity
             X[ii].extend(flatten(homogeneity))
             X[ii].extend(flatten(entropy))
             X[ii].extend(flatten(energy))
@@ -169,35 +171,45 @@ sys.stdout = logger()
 descriptor = spreadsheet(training=True, run_synapse = False)
 threads = []
 id = 0
-num_threads = multiprocessing.cpu_count() - 2
-print num_threads
+num_threads = cpu_count() - 2
+print num_threads    
 
+#my_manager.register('shared',shared)
+
+
+man = my_manager()
+man.start()
+shared = man.shared()
+
+
+#setting up the queue for all of the threads, which contains the filenames
+for ii in range(0, descriptor.no_scans):
+    shared.t_lock_acquire()
+    shared.q_put(descriptor.filenames[ii])
+    shared.q_cancer_put(descriptor.cancer_list[ii])
+    shared.t_lock_release()
+    
+    
 # Create new threads
 for ii in range(0,num_threads):
-    thread = my_thread(id, descriptor.no_scans)
+    thread = my_thread(id, descriptor.no_scans, shared)
     thread.start()
     threads.append(thread)
     id += 1
     
     
     
-    
-#setting up the queue for all of the threads, which contains the filenames
-for ii in range(0, descriptor.no_scans):
-    my_thread.t_lock.acquire()
-    my_thread.q.put(descriptor.filenames[ii])
-    my_thread.q_cancer.put(descriptor.cancer_list[ii])
-    my_thread.t_lock.release()
-    
-    
 #now some code to make sure it all runs until its done
 #keep this main thread open until all is done
-while (not my_thread.exit_flag):
+while (not shared.get_exit_status()):
+    #a = threading.activeCount() 
+    #if(a != 15):
+    #print a
     pass
 
 #queue is empty so we are just about ready to finish up
 #set the exit flag to true
-my_thread.exit_flag = True
+
 #wait until all threads are done
 for t in threads:
     t.join()
@@ -210,7 +222,7 @@ for t in threads:
 #lets save the features we found, and the file ID's of any that
 #created any errors so I can have a look later
 #will just convert the list of error files to a pandas database to look at later
-error_database = pd.DataFrame(my_thread.error_files)
+error_database = pd.DataFrame(shared.get_error_files())
 #will save the erroneous files as csv
 error_database.to_csv('error_files.csv')
 

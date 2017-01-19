@@ -220,8 +220,6 @@ class feature(breast):
         else:
             self._get_features_level(level)
             
-        a = []
-            
             
             
             

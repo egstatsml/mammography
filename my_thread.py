@@ -3,6 +3,8 @@ import threading
 import timeit
 import Queue
 import gc
+from multiprocessing import Process, Lock, Queue
+from multiprocessing.managers import BaseManager
 
 import os
 #import psutil
@@ -64,20 +66,99 @@ the instances. Doing this just wraps everything a lot nicer.
 """
 
 
-class my_thread(threading.Thread):    
-    
+class shared(object):
     #some reference variables that will be shared by all of the individual thread objects
     #whenever any of these reference variables are accessed, the thread lock should be applied,
     #to ensure multiple threads arent accessing the same memory at the same time
     
-    q = Queue.Queue(1000)        #queue that will contain the filenames of the scans
-    q_cancer = Queue.Queue(1000) #queue that will contain the cancer status of the scans
-    t_lock = threading.Lock()
+    q = Queue(1000)        #queue that will contain the filenames of the scans
+    q_cancer = Queue(1000) #queue that will contain the cancer status of the scans
+    t_lock = Lock()
     exit_flag = False
     error_files = []   #list that will have all of the files that we failed to process
     scan_no = 0
     cancer_count = 0
     
+    def q_get(self):
+        return self.q.get()
+    
+    def q_cancer_get(self):
+        return self.q_cancer.get()
+        
+    def q_put(self, arg):
+        self.q.put(arg)
+        
+    def q_cancer_put(self, arg):
+        self.q_cancer.put(arg)
+        
+    def q_empty(self):
+        return self.q.empty()
+    
+    def q_size(self):
+        return self.q.qsize()
+    
+    def t_lock_acquire(self):
+        self.t_lock.acquire()
+        
+    def t_lock_release(self):
+        self.t_lock.release()
+        
+    def set_scan_no(self, scan_no):
+        self.scan_no = scan_no
+        
+    def get_scan_no(self, scan_no):
+        return self.scan_no
+    
+    def error_files_put(self, erf):
+        self.error_files.append(erf)
+        
+    def get_exit_status(self):
+        return self.exit_flag
+    
+    def set_exit_status(self, status):
+        self.exit_flag = status
+        
+    def inc_cancer_count(self):
+        self.cancer_count += 1
+        
+    def get_cancer_count(self):
+        return self.cancer_count
+    
+    def inc_scan_count(self):
+        self.scan_no += 1
+        
+    def get_scan_count(self):
+        return self.cancer_count
+    
+    def get_error_files(self):
+        return self.error_files
+    
+    def add_error_file(self, f):
+        self.error_files.append(f)
+    
+class my_manager(BaseManager):
+    pass
+
+my_manager.register('shared', shared)
+
+
+
+
+
+class my_thread(Process):    
+    
+    #some reference variables that will be shared by all of the individual thread objects
+    #whenever any of these reference variables are accessed, the thread lock should be applied,
+    #to ensure multiple threads arent accessing the same memory at the same time
+    """
+    q = Queue(1000)        #queue that will contain the filenames of the scans
+    q_cancer = Queue(1000) #queue that will contain the cancer status of the scans
+    t_lock = Lock()
+    exit_flag = False
+    error_files = []   #list that will have all of the files that we failed to process
+    scan_no = 0
+    cancer_count = 0
+    """
     """
     __init__()
     
@@ -91,11 +172,12 @@ class my_thread(threading.Thread):
     
     """
     
-    def __init__(self, thread_id, no_images_total, data_path = './pilot_images/', training = True):
-        threading.Thread.__init__(self)
-        
+    def __init__(self, thread_id, no_images_total, manager, data_path = './pilot_images/', training = True):
+        Process.__init__(self)
+        print thread_id
+        self.manager = manager
         self.t_id = thread_id
-        self.scan_data = feature(levels = 3, wavelet_type = 'haar', no_images = no_images_total ) #the object that will contain all of the data
+        self.scan_data = feature(levels = 2, wavelet_type = 'haar', no_images = no_images_total ) #the object that will contain all of the data
         self.scan_data.current_image_no = 0    #initialise to the zeroth mammogram
         self.data_path = data_path
         self.time_process = []   #a list containing the time required to perform preprocessing
@@ -116,7 +198,6 @@ class my_thread(threading.Thread):
     def run(self):
         #just run the process function
         self.process()
-        
         
         
         
@@ -148,63 +229,64 @@ class my_thread(threading.Thread):
     def process(self):
         
         #while there is still names on the list, continue to loop through
-        #while the queue is not empty        
-        while not my_thread.exit_flag:
+        #while the queue is not empty
+        while( not self.manager.get_exit_status()):
             #lock the threads so only one is accessing the queue at a time
             #start the preprocessing timer
             start_time = timeit.default_timer()
-            my_thread.t_lock.acquire()
-            if(not (self.q.empty()) ):
-                file_path = self.data_path + my_thread.q.get()
-                self.cancer_status.append(my_thread.q_cancer.get())
+            self.manager.t_lock_acquire()
+            if(not (self.manager.q_empty()) ):
+                file_path = self.data_path + self.manager.q_get()
+                self.cancer_status.append(self.manager.q_cancer_get())
                 if(self.cancer_status[-1]):
-                    my_thread.cancer_count += 1
-                    print('cancer count = %d' %my_thread.cancer_count)
+                    self.manager.inc_cancer_count()
+                    print('cancer count = %d' %self.manager.get_cancer_count())
+                    
+                #if the queue is now empty, we should wrap up and
+                #get ready to exit
+                if(self.manager.q_empty()):
+                    print 'here'
+                    self.manager.set_exit_status(True)
                         
+                    
                 #file_path = 'pilot_images/502860.dcm'
-                my_thread.t_lock.release()
+                self.manager.t_lock_release()
+                print('Queue size = %d' %self.manager.q_size())
+                try:
+                    #now we have the right filename, lets do the processing of it
+                    self.scan_data.initialise(file_path)
+                    self.scan_data.preprocessing()
+                    self.scan_data.get_features()
 
-                #try:
-                #now we have the right filename, lets do the processing of it
-                self.scan_data.initialise(file_path)
-                self.scan_data.preprocessing()
-                self.scan_data.get_features()
-                
-                
-                #now that we have the features, we want to append them to the list of features
-                #The list of features is shared amongst all of the class instances, so
-                #before we add anything to there, we should lock other threads from adding
-                #to it
-                self.time_process.append(timeit.default_timer() - start_time)
-                #print('time = %d s' %self.time_process[-1])
-                self.scan_data.current_image_no += 1   #increment the image index
-                self.scans_processed += 1              #increment the image counter
-                lock_time = timeit.default_timer()
-                my_thread.t_lock.acquire()
-                my_thread.scan_no += 1
-                print(my_thread.q.qsize())
-                my_thread.t_lock.release()                    
-                print(timeit.default_timer() - lock_time)                
-                
-                if(self.training & (my_thread.cancer_count > 18)):
-                    my_thread.exit_flag = True
-                    
-                #if we aren't training, but have run out of scans for validation
-                #we should also exit
-                elif(my_thread.q.empty()):
-                    my_thread.exit_flag = True
-                    
-                    #except:
-                #    print('Error with current file %s' %(file_path))
-                #    my_thread.error_files.append(file_path)
-                #    #get rid of the last cancer_status flag we saved, as it is no longer valid since we didn't save the
-                #    #features from the scan
-                #    del self.cancer_status[-1]
+
+                    #now that we have the features, we want to append them to the list of features
+                    #The list of features is shared amongst all of the class instances, so
+                    #before we add anything to there, we should lock other threads from adding
+                    #to it
+                    self.time_process.append(timeit.default_timer() - start_time)
+                    #print('time = %d s' %self.time_process[-1])
+                    self.scan_data.current_image_no += 1   #increment the image index
+                    self.scans_processed += 1              #increment the image counter
+                    lock_time = timeit.default_timer()
+                    self.manager.t_lock_acquire()
+                    self.manager.inc_scan_count()
+                    self.manager.t_lock_release()                    
+                    print self.manager.q_size()
+
+                    #if we aren't training, but have run out of scans for validation
+                    #we should also exit
+
+                except:
+                    print('Error with current file %s' %(file_path))
+                    self.manager.add_error_file(file_path)
+                    #get rid of the last cancer_status flag we saved, as it is no longer valid since we didn't save the
+                    #features from the scan
+                    del self.cancer_status[-1]
                     
                 self.scan_data.cleanup()
-                gc.collect()
+                #gc.collect()
             else:
-                my_thread.t_lock.release()
+                self.manager.t_lock_release()                    
                 
                 
         #there is nothing left on the queue, so we are ready to exit

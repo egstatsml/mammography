@@ -44,7 +44,7 @@ from skimage.feature import corner_harris, corner_subpix, corner_peaks
 from scipy import ndimage as ndi
 
 import pywt
-from boundary import trace_boundary
+from boundary import trace_boundary, edge_boundary
 
 
 
@@ -325,7 +325,7 @@ class breast(object):
     def remove_pectoral_muscle(self):
         
         
-        self.pectoral = np.zeros(np.shape(self.data), dtype=bool)        #copy the image and apply the first threshold
+        self.pectoral_mask = np.zeros(np.shape(self.data), dtype=bool)        #copy the image and apply the first threshold
         #will remove the components of the pectoral muscle
         thresh = np.copy(self.data[0:self.im_height/2, 0:self.im_width/2])
         #will crop the image first, as the pectoral muscle will never be in the right hand side of the image
@@ -389,7 +389,7 @@ class breast(object):
                 #are in range set all pixels to the left of this x value to zero
                 self.data[0:np.floor(y).astype(int), x] = 0
                 #set these locations in the pectoral muscle binary map to true
-                self.pectoral[0:np.floor(y).astype(int), x] = True
+                self.pectoral_mask[0:np.floor(y).astype(int), x] = True
                 #save the location indicies
                 x_pec.append(x)
                 y_pec.append(y)
@@ -519,14 +519,16 @@ class breast(object):
         self.data[ self.breast_mask == 0 ] = np.nan
         
         #use the breast mask we have found to locate the true breast boundary
+        
+        #self.boundary_y, self.boundary_x = edge_boundary(self.breast_mask, self.pectoral_mask, self.pectoral_present)
         self.edge_boundary()
         #now trace the boundary so we can create a parametric model of the breast boundary    
-        self.trace_boundary()
+        #self.trace_boundary()
         #for when I move the code to Cython
         #self.boundary_y, self.boundary = trace_boundary(im)
         
         #now lets remove any extra bits of skin if we find them
-        self.remove_skin()
+        #self.remove_skin()
         
         """
         im = np.zeros((np.shape(self.data)))
@@ -575,13 +577,13 @@ class breast(object):
         
         if(self.pectoral_present):
             #remove edges where the pectoral muscle was
-            edges[self.pectoral] = 0
+            edges[self.pectoral_mask] = 0
             
             
         #now find the boundary
         y_temp,boundary_temp = np.where(edges != 0)
-        y_temp = y_temp.astype('uint16')
-        boundary_temp = boundary_temp.astype('uint16')
+        #y_temp = y_temp.astype('uint16')
+        #boundary_temp = boundary_temp.astype('uint16')
         
         #creating arrays to store the found boundary
         y = []
@@ -611,10 +613,18 @@ class breast(object):
             #now search up, left, right, and down
             for jj in range(0, len(search_x)):
                 #first just check that we are in a valid search range
-                if((y_temp[ii] + search_y[jj]) >= 0) & ((y_temp[ii] + search_y[jj]) < y_lim) & ((boundary_temp[ii] + search_x[jj]) >= 0) &  ((boundary_temp[ii] + search_x[jj]) < x_lim):
+
+                #if((y_temp[ii] + search_y[jj]) >= 0) & ((y_temp[ii] + search_y[jj]) < y_lim) & ((boundary_temp[ii] + search_x[jj]) >= 0) &  ((boundary_temp[ii] + search_x[jj]) < x_lim):
                     #then we are in valid searching areas, so lets say hello to our neighbour
-                    if(self.breast_mask[y_temp[ii], boundary_temp[ii]] == 1) & (self.breast_mask[y_temp[ii] + search_y[jj] , boundary_temp[ii] + search_x[jj]] == 0):
-                        
+                 
+                #if(self.breast_mask[y_temp[ii], boundary_temp[ii]] == 1) & (self.breast_mask[y_temp[ii] + search_y[jj] , boundary_temp[ii] + search_x[jj]] == 0):
+                if((y_temp[ii] -1) >= 0) & ((y_temp[ii] + 1) < y_lim) & ((boundary_temp[ii] - 1) >= 0) &  ((boundary_temp[ii] + 1) < x_lim):
+                    #then we are in valid searching areas, so lets say hello to our neighbour
+                    #search left, righ, down and up
+                    if(self.breast_mask[y_temp[ii], boundary_temp[ii]] == 1) & ((self.breast_mask[y_temp[ii], boundary_temp[ii] - 1] == 0) | (self.breast_mask[y_temp[ii], boundary_temp[ii] + 1] == 0) | (self.breast_mask[y_temp[ii] -1, boundary_temp[ii]] == 0) | (self.breast_mask[y_temp[ii], boundary_temp[ii] + 1] == 0)):
+
+
+                
                         #then this part is on the true boundary
                         y.append( y_temp[ii] )
                         boundary.append( boundary_temp[ii] )
