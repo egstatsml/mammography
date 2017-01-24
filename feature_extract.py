@@ -47,9 +47,6 @@ from breast import breast
 
 
 
-
-
-
 class feature(breast):
 
     def __init__(self, file_path = None, wavelet_type = 'haar', levels = 3, benign_scans = True, no_images = 1):

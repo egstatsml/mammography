@@ -36,6 +36,8 @@ from scipy.ndimage import filters as filters
 from scipy.ndimage import measurements as measurements
 from skimage.transform import (hough_line, hough_line_peaks,
                                probabilistic_hough_line)
+
+from skimage.segmentation import active_contour
 import gc
 
 from skimage import feature
@@ -149,7 +151,7 @@ class breast(object):
         self.remove_artifacts()
         self.breast_boundary()
         self.cross_entropy_threshold()
-        
+        self.fibro_contour()
         
         
     """
@@ -523,12 +525,10 @@ class breast(object):
         #self.boundary_y, self.boundary_x = edge_boundary(self.breast_mask, self.pectoral_mask, self.pectoral_present)
         self.edge_boundary()
         #now trace the boundary so we can create a parametric model of the breast boundary    
-        #self.trace_boundary()
-        #for when I move the code to Cython
-        #self.boundary_y, self.boundary = trace_boundary(im)
+        self.trace_boundary()
         
         #now lets remove any extra bits of skin if we find them
-        #self.remove_skin()
+        self.remove_skin()
         
         """
         im = np.zeros((np.shape(self.data)))
@@ -593,7 +593,6 @@ class breast(object):
         im_width = self.breast_mask.shape[1] - 1
         
         #list for the search locations
-        
         search_x = np.array([-1, 1, 0, 0])
         search_y = np.array([0, 0, -1, 1])
         
@@ -613,18 +612,10 @@ class breast(object):
             #now search up, left, right, and down
             for jj in range(0, len(search_x)):
                 #first just check that we are in a valid search range
-
-                #if((y_temp[ii] + search_y[jj]) >= 0) & ((y_temp[ii] + search_y[jj]) < y_lim) & ((boundary_temp[ii] + search_x[jj]) >= 0) &  ((boundary_temp[ii] + search_x[jj]) < x_lim):
+                if((y_temp[ii] + search_y[jj]) >= 0) & ((y_temp[ii] + search_y[jj]) < y_lim) & ((boundary_temp[ii] + search_x[jj]) >= 0) &  ((boundary_temp[ii] + search_x[jj]) < x_lim):
                     #then we are in valid searching areas, so lets say hello to our neighbour
-                 
-                #if(self.breast_mask[y_temp[ii], boundary_temp[ii]] == 1) & (self.breast_mask[y_temp[ii] + search_y[jj] , boundary_temp[ii] + search_x[jj]] == 0):
-                if((y_temp[ii] -1) >= 0) & ((y_temp[ii] + 1) < y_lim) & ((boundary_temp[ii] - 1) >= 0) &  ((boundary_temp[ii] + 1) < x_lim):
-                    #then we are in valid searching areas, so lets say hello to our neighbour
-                    #search left, righ, down and up
-                    if(self.breast_mask[y_temp[ii], boundary_temp[ii]] == 1) & ((self.breast_mask[y_temp[ii], boundary_temp[ii] - 1] == 0) | (self.breast_mask[y_temp[ii], boundary_temp[ii] + 1] == 0) | (self.breast_mask[y_temp[ii] -1, boundary_temp[ii]] == 0) | (self.breast_mask[y_temp[ii], boundary_temp[ii] + 1] == 0)):
-
-
-                
+                    if(self.breast_mask[y_temp[ii], boundary_temp[ii]] == 1) & (self.breast_mask[y_temp[ii] + search_y[jj] , boundary_temp[ii] + search_x[jj]] == 0):                        
+                        
                         #then this part is on the true boundary
                         y.append( y_temp[ii] )
                         boundary.append( boundary_temp[ii] )
@@ -679,7 +670,7 @@ class breast(object):
                         if(first):
                             x += x_s[ii]
                             y += y_s[ii]
-
+                            
                             first = False
                             found = True
                             break
@@ -700,12 +691,7 @@ class breast(object):
 
                 break
                 
-            count += 1
-            
-        #now re-write the breast boundary in the class
-        self.boundary = np.array(l_x)
-        self.boundary_y = np.array(l_y)
-        
+            count += 1        
         
         
         test = np.zeros(im.shape)
@@ -717,14 +703,26 @@ class breast(object):
         test[self.boundary_y, self.boundary] = 1
         ax1 = fig.add_subplot(1,2,2)
         im1 = ax1.imshow(test)
-        
-        
         #fig.colorbar(im1)
         fig.savefig(os.getcwd() + '/figs/' + 'test_' + self.file_path[-10:-3] + 'png')
         fig.clf()
         plt.close()
+
+        #now re-write the breast boundary in the class
+        self.boundary = np.array(l_x)
+        self.boundary_y = np.array(l_y)
+
         
+
+
+
+
+
         
+
+        
+
+
         
     """
     remove_skin()
@@ -743,14 +741,27 @@ class breast(object):
         
         #first lets smooth the boundary
         print np.shape(self.boundary)
-        x = signal.savgol_filter(self.boundary, 81, 3)
+        x = signal.savgol_filter(self.boundary, 151, 3)
         
         #now lets take derivative
         dx = np.gradient(x)
         #lets find the second derivative, but first lets smooth it again
-        temp = signal.savgol_filter(dx, 31, 2)
+        temp = signal.savgol_filter(dx, 101, 2)
         d2x = np.gradient(temp)        
-        d2x = signal.savgol_filter(d2x, 31, 2)
+        #d2x = signal.savgol_filter(d2x, 151, 2)
+        
+        y = signal.savgol_filter(self.boundary_y, 81, 3)
+        
+        #now lets take derivative
+        dy = np.gradient(y)
+        #lets find the second derivative, but first lets smooth it again
+        temp = signal.savgol_filter(dy, 31, 2)
+        d2y = np.gradient(temp)        
+        d2y = signal.savgol_filter(d2y, 31, 2)
+        
+        curvature = np.subtract(np.multiply(dx, d2y), np.multiply(dy, d2x))
+        curvature = signal.savgol_filter(curvature, 51, 2)
+        
         
         #now want to find point of inflection in  breast boundary
         #which is where the second derivative will equal zero
@@ -761,9 +772,11 @@ class breast(object):
         #first filter out small  values
         d2x[np.abs(d2x) < np.mean(np.abs(d2x)) * 5] = 0
         
-        peaks = np.array( signal.find_peaks_cwt(d2x, np.arange(25,40)))
+        #peaks = np.array( signal.find_peaks_cwt(d2x, np.arange(20,101)))
+        peaks = self.find_peaks(d2x)
+        print 'peaks'
+        print peaks
         #now filter out peaks until we get the one pertaining to any extra skin
-        
         #sometimes get peaks in the middle caused by the nipple in the scan
         #can get rid of these peaks by checking the value of the breast boundary
         #at these locations.
@@ -773,7 +786,7 @@ class breast(object):
         #if we actually found any peaks
         if(peaks.size > 0):
             #get rid of peaks near the nipple
-            peaks = peaks[self.boundary[peaks] < np.max(self.boundary) * 0.85]
+            #peaks = peaks[self.boundary[peaks] < np.max(self.boundary) * 0.85]
             #remove the extra bit of skin
             #see if there are twwo bits of skin we need to remove
             skin_locs = []
@@ -790,18 +803,15 @@ class breast(object):
                 for ii in skin_locs:
                     self.data[self.boundary_y[ii], 0:(self.boundary[ii] + 2)] = np.nan
                     
-        """
+                    
         #Code just for making pretty plots to check it is all working :)
-        
         fig = plt.figure()
         ax1 = fig.add_subplot(1,1,1)
-        #im1 = ax1.plot(dx, 'b')
-        im1 = ax1.scatter(self.boundary_y[peaks], d2x[peaks], label='Peaks')
-        im2 = ax1.plot(self.boundary_y, np.divide(self.boundary.astype(float), np.max(self.boundary.astype(float))) * np.max(d2x), 'r', label='Scaled Breast Boundary')
-        im3 = ax1.plot(self.boundary_y, d2x, 'm', label='Second Derivative')
-        #fig.colorbar(im1)
-        plt.title('Breast Boundary and Second Derivative')
-        plt.legend()
+        im1 = ax1.plot(self.boundary_y, d2x, 'b')
+        im2 = ax1.scatter(self.boundary_y[peaks], d2x[peaks], label='Peaks')
+        im3 = ax1.plot(self.boundary_y, np.divide(self.boundary.astype(float), np.max(self.boundary.astype(float))) * np.max(d2x), 'r', label='Scaled Breast Boundary')
+        plt.title('Breast Boundary and Second Derivative')        
+        
         fig.savefig(os.getcwd() + '/figs/' + 'deriv_' + self.file_path[-10:-3] + 'png')
         fig.clf()
         plt.close()
@@ -814,9 +824,13 @@ class breast(object):
         fig.savefig(os.getcwd() + '/figs/' + 'pre_' + self.file_path[-10:-3] + 'png')
         fig.clf()
         plt.close()
-        """
         
         
+        
+    def find_peaks(self, data):
+        d = np.gradient(data)
+        peaks = np.where(abs(d) > np.max(np.abs(d)) * 0.75)
+        return peaks[0]
         
         
         
@@ -1137,17 +1151,33 @@ class breast(object):
         eta = np.sum( np.multiply(mu_1_num, np.divide(np.log(mu_1_range), mu_1))) + np.sum( np.multiply(mu_2_num, np.divide(np.log(mu_2_range), mu_2)))
         
         return eta                                  
-
-
-
-
-
-
-
-
-
-
-
+    
+    
+    
+    
+    
+    
+    
+    def fibro_contour(self):
+        
+        #use threshold of fibroglandular mask
+        im = filters.gaussian_filter(self.data, 10)
+        fig = plt.figure()
+        ax1 = fig.add_subplot(1,1,1)
+        ax1.imshow(im)
+        fig.savefig(os.getcwd() + '/figs/' + 'blur_' + self.file_path[-10:-3] + 'png')
+        fig.clf()
+        plt.close()
+        
+        
+        #snake = active_contour(filters.gaussian_filter(self.data, 4), in
+        
+        
+        
+        
+        
+        
+        
     def search_microcalcifications(self):
         """
         #testing microcalcification detection
