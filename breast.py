@@ -44,7 +44,7 @@ from skimage.feature import corner_harris, corner_subpix, corner_peaks
 from scipy import ndimage as ndi
 
 import pywt
-from boundary import trace_boundary
+#from boundary import trace_boundary
 
 
 
@@ -86,6 +86,7 @@ class breast(object):
         self.nipple_y = 0
         self.threshold = 0                #threshold for segmenting fibroglandular disk
         self.file_path = []
+        self.plot = True                 #variable that is used during debugging to decide if we plot stuff
         if(file_path != None):
             self.initialise(file_path)
             
@@ -346,16 +347,17 @@ class breast(object):
         #now will remove the lower value components to focus on the
         #more prominent edges
         edge[edge < thresh_val] = 0
-        """
-        fig = plt.figure()
-        ax1 = fig.add_subplot(1,2,1)
-        ax1.imshow(self.data)
-        ax2 = fig.add_subplot(1,2,2)
-        ax2.imshow(edge)
-        fig.savefig(os.getcwd() + '/figs/edge_' + self.file_path[-10:-3] + 'png')
-        fig.clf()
-        plt.close()
-        """
+        
+        if(self.plot):
+            fig = plt.figure()
+            ax1 = fig.add_subplot(1,2,1)
+            ax1.imshow(self.data)
+            ax2 = fig.add_subplot(1,2,2)
+            ax2.imshow(edge)
+            fig.savefig(os.getcwd() + '/figs/edge_' + self.file_path[-10:-3] + 'png')
+            fig.clf()
+            plt.close()
+        
         
         #apply the Hough transform
         h, theta, d = hough_line(edge)
@@ -526,22 +528,21 @@ class breast(object):
         #self.boundary_y, self.boundary = trace_boundary(im)
         
         #now lets remove any extra bits of skin if we find them
-        self.remove_skin()
+        #self.remove_skin()
         
-        """
-        im = np.zeros((np.shape(self.data)))
-        im[self.boundary_y, self.boundary] = 1
-        #saving a figure so can look at it
-        fig = plt.figure(num=None, figsize=(20, 40), dpi=400)
-        #ax1 = fig.add_subplot(1,1,1)
-        #im1 = ax1.imshow((self.data))
-        #fig.colorbar(im1)
-        ax2 = fig.add_subplot(1,1,1)
-        im2 = ax2.imshow(im)
-        fig.savefig(os.getcwd() + '/figs/' + '1_grad_' + self.file_path[-10:-3] + 'png')
-        fig.clf()
-        plt.close()
-        """
+        if(self.plot):
+            im = np.zeros((np.shape(self.data)))
+            im[self.boundary_y, self.boundary] = 1
+            #saving a figure so can look at it
+            fig = plt.figure(num=None, figsize=(20, 40), dpi=400)
+            #ax1 = fig.add_subplot(1,1,1)
+            #im1 = ax1.imshow((self.data))
+            #fig.colorbar(im1)
+            ax2 = fig.add_subplot(1,1,1)
+            im2 = ax2.imshow(im)
+            fig.savefig(os.getcwd() + '/figs/' + '1_grad_' + self.file_path[-10:-3] + 'png')
+            fig.clf()
+            plt.close()
         
         
         
@@ -697,23 +698,20 @@ class breast(object):
         self.boundary_y = np.array(l_y)
         
         
-        
-        test = np.zeros(im.shape)
-        test[l_y, l_x] = 1
-        fig = plt.figure(num=None, figsize=(80, 50), dpi=800)
-        ax1 = fig.add_subplot(1,2,1)
-        im1 = ax1.imshow(test)
-        test = np.zeros(im.shape)
-        test[self.boundary_y, self.boundary] = 1
-        ax1 = fig.add_subplot(1,2,2)
-        im1 = ax1.imshow(test)
-        
-        
-        #fig.colorbar(im1)
-        fig.savefig(os.getcwd() + '/figs/' + 'test_' + self.file_path[-10:-3] + 'png')
-        fig.clf()
-        plt.close()
-        
+        if(self.plot):
+            test = np.zeros(im.shape)
+            test[l_y, l_x] = 1
+            fig = plt.figure(num=None, figsize=(80, 50), dpi=800)
+            ax1 = fig.add_subplot(1,2,1)
+            im1 = ax1.imshow(test)
+            test = np.zeros(im.shape)
+            test[self.boundary_y, self.boundary] = 1
+            ax1 = fig.add_subplot(1,2,2)
+            im1 = ax1.imshow(test)
+            #fig.colorbar(im1) 
+            fig.savefig(os.getcwd() + '/figs/' + 'test_' + self.file_path[-10:-3] + 'png')
+            fig.clf()
+            plt.close()
         
         
     """
@@ -780,31 +778,31 @@ class breast(object):
                 for ii in skin_locs:
                     self.data[self.boundary_y[ii], 0:(self.boundary[ii] + 2)] = np.nan
 
-        """
+
         #Code just for making pretty plots to check it is all working :)
-        
-        fig = plt.figure()
-        ax1 = fig.add_subplot(1,1,1)
-        #im1 = ax1.plot(dx, 'b')
-        im1 = ax1.scatter(self.boundary_y[peaks], d2x[peaks], label='Peaks')
-        im2 = ax1.plot(self.boundary_y, np.divide(self.boundary.astype(float), np.max(self.boundary.astype(float))) * np.max(d2x), 'r', label='Scaled Breast Boundary')
-        im3 = ax1.plot(self.boundary_y, d2x, 'm', label='Second Derivative')
-        #fig.colorbar(im1)
-        plt.title('Breast Boundary and Second Derivative')
-        plt.legend()
-        fig.savefig(os.getcwd() + '/figs/' + 'deriv_' + self.file_path[-10:-3] + 'png')
-        fig.clf()
-        plt.close()
-        
-        
-        fig = plt.figure()
-        ax1 = fig.add_subplot(1,1,1)
-        im1 = ax1.imshow(self.data)
-        plt.title('Preprocessed Mammogram')
-        fig.savefig(os.getcwd() + '/figs/' + 'pre_' + self.file_path[-10:-3] + 'png')
-        fig.clf()
-        plt.close()
-        """
+        if(self.plot):
+            fig = plt.figure()
+            ax1 = fig.add_subplot(1,1,1)
+            #im1 = ax1.plot(dx, 'b')
+            im1 = ax1.scatter(self.boundary_y[peaks], d2x[peaks], label='Peaks')
+            im2 = ax1.plot(self.boundary_y, np.divide(self.boundary.astype(float), np.max(self.boundary.astype(float))) * np.max(d2x), 'r', label='Scaled Breast Boundary')
+            im3 = ax1.plot(self.boundary_y, d2x, 'm', label='Second Derivative')
+            #fig.colorbar(im1)
+            plt.title('Breast Boundary and Second Derivative')
+            plt.legend()
+            fig.savefig(os.getcwd() + '/figs/' + 'deriv_' + self.file_path[-10:-3] + 'png')
+            fig.clf()
+            plt.close()
+
+
+            fig = plt.figure()
+            ax1 = fig.add_subplot(1,1,1)
+            im1 = ax1.imshow(self.data)
+            plt.title('Preprocessed Mammogram')
+            fig.savefig(os.getcwd() + '/figs/' + 'pre_' + self.file_path[-10:-3] + 'png')
+            fig.clf()
+            plt.close()
+
         
         
         
@@ -1078,14 +1076,13 @@ class breast(object):
         self.fibroglandular_mask = (self.data > self.threshold) & (self.data < upper_limit)
         self.fibroglandular_mask[edge_mask == 1] = False
         
-        """
-        fig = plt.figure()
-        ax1 = fig.add_subplot(1,1,1)
-        ax1.imshow(self.fibroglandular_mask)
-        fig.savefig(os.getcwd() + '/figs/' + 'msk_' + self.file_path[-10:-3] + 'png')
-        fig.clf()
-        plt.close()
-        """
+        if(self.plot):
+            fig = plt.figure()
+            ax1 = fig.add_subplot(1,1,1)
+            ax1.imshow(self.fibroglandular_mask)
+            fig.savefig(os.getcwd() + '/figs/' + 'msk_' + self.file_path[-10:-3] + 'png')
+            fig.clf()
+            plt.close()
         
         
         
@@ -1177,20 +1174,11 @@ class breast(object):
         """
         
         
-        """
-        fig = plt.figure()
-        ax1 = fig.add_subplot(1,1,1)
-        ax1.imshow(self.data)
-        fig.savefig(os.getcwd() + '/figs/' + self.file_path[-10:-3] + 'png')
-        fig.clf()
-        plt.close()
-        """
-        a = []
-        b = []
-        c = []
-        sig = []
-        ax1 = []
-        ax2 = []
-        
-        
-        
+        if(self.plot):
+            fig = plt.figure()
+            ax1 = fig.add_subplot(1,1,1)
+            ax1.imshow(self.data)
+            fig.savefig(os.getcwd() + '/figs/' + self.file_path[-10:-3] + 'png')
+            fig.clf()
+            plt.close()
+            

@@ -167,6 +167,41 @@ def create_classifier_arrays(threads, num_scans):
 
 
 
+def get_performance(test, Y_classify):
+    test_b = np.copy(test).astype(bool)
+    Y_classify_b = np.copy(Y_classify).astype(bool)
+    
+    acc = accuracy(test_b, Y_classify_b)
+    sens = sensitivity(test_b, Y_classify_b)
+    spec = specificity(test_b, Y_classify_b)
+    return acc, sens, spec
+
+
+
+def accuracy(test, Y_classify):
+    num  = np.sum(test == Y_classify)
+    den = np.size(test)
+    return np.divide(num, den)
+
+
+def sensitivity(test, Y_classify):
+    num  = np.sum(test & Y_classify)
+    den = num + np.sum(test & (not Y_classify))
+    return np.divide(num, den)
+
+def specificity(test, Y_classify):
+    num  = np.sum((not test) & (not Y_classify))
+    den = num + np.sum((not test) & Y_classify)
+    return np.divide(num, den)
+
+
+
+
+
+
+
+
+
 #####################################################
 #
 #                Main Loop of Program
@@ -181,7 +216,7 @@ sys.stdout = logger()
 descriptor = spreadsheet(training=True, run_synapse = False)
 threads = []
 id = 0
-num_threads = cpu_count() - 2
+num_threads = cpu_count() - 4
 print num_threads    
 
 #my_manager.register('shared',shared)
@@ -329,7 +364,7 @@ print((test == Y_classify))
 for ii in range(0, len(Y_classify)):
     print("%r : %r " %(Y_classify[ii], test[ii]))
 
-
+acc, sens, spec = get_performance(test, Y_classify)
 
 np.save('X', X)
 np.save('Y', Y)
