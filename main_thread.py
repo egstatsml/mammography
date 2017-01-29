@@ -5,6 +5,7 @@ import os
 import numpy as np
 import pandas as pd
 import sys
+import getopt
 
 #this allows us to create figures over ssh and save to file
 import matplotlib as mpl
@@ -28,7 +29,7 @@ from skimage.util import img_as_ubyte
 from skimage.feature import corner_harris, corner_subpix, corner_peaks
 from scipy import ndimage as ndi
 
-
+from itertools import chain
 import threading
 import Queue
 import timeit
@@ -40,119 +41,31 @@ from breast import breast
 from feature_extract import feature
 from read_files import spreadsheet
 from log import logger
+from arguments import arguments
 
-from itertools import chain
 
 def flatten(x):
     "Flatten one level of nesting"
     return chain.from_iterable(x)
 
 
-
-"""
-create_classifier()
-
-Description:
-just a helper function to put the features in a flat array
-will change later as use improved features
-
-@param threads = list of all threads that contains the features from each scan it processed
-@param num_scans = the number of scans that were processed
-
-@retval feature array and class label arrays to be used for SVM classifier
-
-"""
-
-
-def create_classifier_arrays(threads, num_scans):
+def create_classifier_arrays(shared):
     
-    no_features = 8
-    no_packets = 4
-    levels = 2
-    X = []
-    #X = np.zeros((num_scans, no_features * no_packets * levels))
-    Y = np.zeros((num_scans,1))
+    #How do we want to split it
+    val = 250
     
-    ii = 0   #scan number index for all the scans
-    t = 0    #this is the thread index. Once we have looked at all of the scans in the current
-             #thread, will move on to the next one
-    t_ii = 0 #scan index for the current thread
+    #convert the list of features and class discriptors into arrays
+    X = np.array(shared.get_feature_array())
+    Y = np.array(shared.get_class_array())
+    print (X.shape)
     
-    while (ii < num_scans) & (t < len(threads)):    
-        X.append([])
-        prev_no_feats = 0   #this will tell us the previous number of features available
-        for lvl in range(0, levels):
-            print('thread %d, no %d, level %d' %(t,t_ii,lvl)) 
-            #get the features from the current scan in the current thread
-            
-            #print 'feat size'
-            print np.shape(threads[t].scan_data.homogeneity[t_ii][lvl])
-            
-            
-            homogeneity = threads[t].scan_data.homogeneity[t_ii][lvl]
-            entropy = threads[t].scan_data.entropy[t_ii][lvl]
-            energy = threads[t].scan_data.energy[t_ii][lvl]
-            contrast = threads[t].scan_data.contrast[t_ii][lvl]
-            dissimilarity = threads[t].scan_data.dissimilarity[t_ii][lvl]
-            correlation = threads[t].scan_data.correlation[t_ii][lvl]
-            
-            wave_energy = threads[t].scan_data.wave_energy[t_ii][lvl]
-            wave_entropy = threads[t].scan_data.wave_entropy[t_ii][lvl]
-            wave_kurtosis = threads[t].scan_data.wave_kurtosis[t_ii][lvl]
-
-            print homogeneity
-            X[ii].extend(flatten(homogeneity))
-            X[ii].extend(flatten(entropy))
-            X[ii].extend(flatten(energy))
-            X[ii].extend(flatten(contrast))
-            X[ii].extend(flatten(dissimilarity))
-            X[ii].extend(flatten(correlation))
-            X[ii].extend(flatten(wave_energy))
-            X[ii].extend(flatten(wave_entropy))
-            #X[ii].extend(flatten(wave_kurtosis))
-            
-            #X[ii, lvl + lvl*jj*no_features] = homogeneity[0,jj]
-            #X[ii, jj*no_features + 1 + kk] = entropy[0,jj]
-            #X[ii, jj*no_features + 2*feat_len] = energy[0,jj]
-            #X[ii, jj*no_features + 3*feat_len] = contrast[0,jj]
-            #X[ii, jj*no_features + 4*feat_len] = dissimilarity[0,jj]
-            #X[ii, jj*no_features + 5*feat_len] = correlation[0,jj]
-            
-            
-        #set the cancer statues for this scan
-        Y[ii,0] = threads[t].cancer_status[t_ii]    
-        ii += 1
-        
-        t_ii += 1
-        #see if it is time to move on to the next thread
-        if(t_ii == threads[t].scans_processed):
-            #increment the thread index
-            t += 1
-            #set the scan index for the thread back to zero(the firt scan in the new thread)
-            t_ii = 0
-            
-    #make Y a 1-d array so the SVM classifier can handle it properly
-    #and also set it to a 1/0 binary array instead of True/False boolean array
+    X_t = X[0:-val,:]
+    Y_t = Y[0:-val]
     
-    Y[Y == True] = 1
-    Y[Y == False] = 0
-    Y = np.ravel(Y)
-    #have to convert 2d list for X to an array first
-    X = np.array(X)
-    #print np.shape(X)
-    #print('Feature array')
-    #for ii in range(0, X.shape[0]):
-    #    print 'Row %d' %ii
-    #    print X[ii,:]
-    #    
-    #    print ''
-    #    
-    #print('Feature array')
-    #print np.shape(X)
-
-    #print Y
+    X_val = X[-val::,:]
+    Y_val = Y[-val::]
     
-    return X, Y[0:X.shape[0]]
+    return X_t, Y_t, X_val, Y_val
 
 
 
@@ -165,8 +78,8 @@ def create_classifier_arrays(threads, num_scans):
 
 #start the program timer
 program_start = timeit.default_timer()
-
-sys.stdout = logger()
+command_line_args = arguments(sys.argv[1::])
+sys.stdout = logger(arguments.log_path)
 
 descriptor = spreadsheet(training=True, run_synapse = False)
 threads = []
@@ -230,13 +143,29 @@ error_database.to_csv('error_files.csv')
 #will just use the features from the approximation wavelet decomps
 
 
-X,Y = create_classifier_arrays(threads, descriptor.no_scans)
+X, Y, X_v, Y_v = create_classifier_arrays(shared)
 clf = svm.SVC()
 clf.fit(X,Y)
 
 #now will save the model, then can have a look how it all performed a try it out
 joblib.dump(clf,'filename.pkl')
 
+test = clf.predict(X_v)
+
+#find the accuracy
+print((test == Y_v))
+for ii in range(0, Y_v.size):
+    print("%r : %r " %(Y_v[ii], test[ii]))
+    
+    
+    
+np.save('X', X)
+np.save('Y', Y)
+np.save('X_val', X_v)
+np.save('Y_val', Y_v)
+
+
+"""
 print('---- TIME INFORMATION ----')
 #lets print the time info for each thread
 print('Time for each thread to process a single scan')
@@ -255,63 +184,7 @@ run_secs = (run_total_sec - run_hours * 3600 -  run_mins * 60)
 
 
 print('Run Time for %d scans = %hours %d minutes and %f seconds' %(descriptor.no_scans, run_hours, run_mins, run_secs))
-
-X,Y = create_classifier_arrays(threads, descriptor.no_scans)
-
-
-
-#################################################
-# 
-#                Validation
-#
-#################################################
-
-#initialising the threads
-my_thread.exit_flag = False
-my_thread.error_files = []   #list that will have all of the files that we failed to process
-my_thread.cancer_status = []
-my_thread.scan_no = 0
-my_thread.cancer_count = 0
-
-threads = []
-id = 0
-for ii in range(0,num_threads):
-    thread = my_thread(id, descriptor.no_scans, training=False)
-    thread.start()
-    threads.append(thread)
-    id += 1
-    
-    
-#now some code to make sure it all runs until its done
-#keep this main thread open until all is done
-while (not my_thread.exit_flag):
-    pass
-
-
-#queue is empty so we are just about ready to finish up
-#set the exit flag to true
-my_thread.exit_flag = True
-#wait until all threads are done
-for t in threads:
-    t.join()
-    
-  
-
-X_classify,Y_classify = create_classifier_arrays(threads, descriptor.no_scans)
-
-test = clf.predict(X_classify)
-
-#find the accuracy
-print((test == Y_classify))
-for ii in range(0, len(Y_classify)):
-    print("%r : %r " %(Y_classify[ii], test[ii]))
-
-
-
-np.save('X', X)
-np.save('Y', Y)
-np.save('X_classify', X_classify)
-np.save('Y_classify', Y_classify)
+""" 
 
 
 print "Exiting Main Thread"

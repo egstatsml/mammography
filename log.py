@@ -3,9 +3,10 @@ import sys
 
 
 class logger(object):
-    def __init__(self):
+    def __init__(self, log_path):
         self.terminal = sys.stdout
-        self.log = open("log.txt", "wb")
+        file_path = log_path + 'log.txt'
+        self.log = open(file_path, "wb")
         
     def write(self, message):
         self.terminal.write(message)

@@ -40,6 +40,8 @@ class spreadsheet(object):
                          to suit synapse servers if we are
     
     """
+    
+    
     def __init__(self, directory = './', training = True, run_synapse = False):
         
         #if we are running on synapse, change the file paths a bit
