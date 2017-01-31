@@ -104,8 +104,7 @@ class feature(breast):
         self.benign_scans = benign_scans
         self.no_images = no_images
         self.current_image_no = -1     #this will increment as we load in every individual scan
-        
-        
+                
         
         self.__initialise_feature_lists()
         if(file_path != None):
@@ -158,13 +157,16 @@ class feature(breast):
     
     
     def find_indicies(self):
+
         
-        for ii in range(self.levels, 0, -1):
+        for ii in range(1,self.levels):
+            
             #just getting the indecies and putting them in a square array
             temp = [self.packets.node.path for self.packets.node in self.packets.get_level(ii)]
             temp = np.asarray(temp)
             self.indicies.append( temp.reshape( [np.sqrt(np.shape(temp)), np.sqrt(np.shape(temp))] ))
             
+            print self.indicies
             
             
             

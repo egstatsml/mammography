@@ -698,12 +698,8 @@ class breast(object):
                         else:
                             pass
                         
-                        
-                        
-                #print x
-                #print y
+            #if we haven'f found another part of the boundary, lets finish up
             if(found == False):
-                print 'breaking the loooooop'
                 break
                 
             #count += 1        

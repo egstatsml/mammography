@@ -79,7 +79,7 @@ def create_classifier_arrays(shared):
 #start the program timer
 program_start = timeit.default_timer()
 command_line_args = arguments(sys.argv[1::])
-sys.stdout = logger(arguments.log_path)
+sys.stdout = logger(command_line_args.log_path)
 
 descriptor = spreadsheet(training=True, run_synapse = False)
 threads = []

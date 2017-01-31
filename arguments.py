@@ -18,27 +18,25 @@ Created a class that will handle and store input from command line arguments.
 
 
 """
+"""
+__init__()
 
-class arguments(object):
-    
-    
-    """
-    __init__()
-    
-    Description:
-    Initialise member variables.
-    Option is givin to parse the command line arguments from the init function,
-    if the commands are givin as part of the input.
-    If they arent supplied, the argv variable in the function will default to False
-    and therefore wont parse the arguments
-    
-    @param argv = If supplied should contain a list of the arguments supplied from the command line
-                  Otherwise will retain default value of False, and the user can manually parse
-                  the arguments at a later stage by calling the parse_command_line function
-    
-    """
-    
-    
+Description:
+Initialise member variables.
+Option is givin to parse the command line arguments from the init function,
+if the commands are givin as part of the input.
+If they arent supplied, the argv variable in the function will default to False
+and therefore wont parse the arguments
+
+@param argv = If supplied should contain a list of the arguments supplied from the command line
+              Otherwise will retain default value of False, and the user can manually parse
+              the arguments at a later stage by calling the parse_command_line function
+
+"""
+
+
+
+class arguments(object):    
     
     def __init__(self, argv = False):
         
@@ -82,7 +80,7 @@ class arguments(object):
         
         try:
             
-            opts,args = getopt.getopt(argv, "htp:i:s:l:")
+            opts,args = getopt.getopt(argv, "htpm:i:s:l:")
             
         except getopt.GetoptError as err:
             print(str(err))
@@ -96,7 +94,7 @@ class arguments(object):
         print opts
         for opt, arg in opts:
             print opt
-            if((opt == 'i') | (opt == '-s') | (opt == '-l') | (opt == '-m')):
+            if((opt == '-i') | (opt == '-s') | (opt == '-l') | (opt == '-m')):
                 count = count + 1
                 
         #if count doesn't equal the length of required arguments, then not all required arguments
@@ -127,6 +125,7 @@ class arguments(object):
                 
             elif opt == '-l':
                 self.log_path = str(arg)
+                print self.log_path
                 
             elif opt == '-m':
                 self.metadata_path = str(arg)
