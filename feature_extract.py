@@ -130,9 +130,9 @@ class feature(breast):
     
     
     
-    def initialise(self, file_path):
+    def initialise(self, file_path, preprocessing):
         #call the breast initialise function first
-        breast.initialise(self, file_path)
+        breast.initialise(self, file_path, preprocessing)
         #increment the image number
         #self.current_image_no = self.current_image_no + 1
         #do the wavelet packet decomposition
@@ -157,16 +157,15 @@ class feature(breast):
     
     
     def find_indicies(self):
-
         
-        for ii in range(1,self.levels):
+        
+        for ii in range(1,self.levels + 1):
             
             #just getting the indecies and putting them in a square array
             temp = [self.packets.node.path for self.packets.node in self.packets.get_level(ii)]
             temp = np.asarray(temp)
             self.indicies.append( temp.reshape( [np.sqrt(np.shape(temp)), np.sqrt(np.shape(temp))] ))
             
-            print self.indicies
             
             
             
@@ -190,11 +189,9 @@ class feature(breast):
         
         #perform the wavelet decomposition
         a = np.copy(self.data)
-
-        a[self.fibroglandular_mask == False ] = np.nan
         
-
-
+        a[self.fibroglandular_mask == False ] = np.nan        
+        
         self.packets = pywt.WaveletPacket2D(data=a, wavelet=self.wavelet_type, mode='sym')
         
         #check that the number of levels isnt to high
@@ -210,8 +207,6 @@ class feature(breast):
         #now lets put the indicies for each level in a nice format that is pleseant to index
         #indicies will be a list of numpy arrays for each level
         self.find_indicies()
-        
-        
         
         if(level == 'all'):
             for ii in range(0, self.levels):
@@ -346,8 +341,7 @@ class feature(breast):
         self.contrast = self.contrast[0:num_scans][:][:] 
         self.dissimilarity = self.dissimilarity[0:num_scans][:][:] 
         self.correlation = self.correlation[0:num_scans][:][:] 
-        self.entropy = self.entropy[0:num_scans][:][:] 
-        
+        self.entropy = self.entropy[0:num_scans][:][:]         
         self.wave_energy = self.wave_energy[0:num_scans][:][:] 
         self.wave_kurtosis = self.wave_kurtosis[0:num_scans][:][:]
         self.wave_entropy = self.wave_entropy[0:num_scans][:][:] 

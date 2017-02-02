@@ -41,12 +41,13 @@ class arguments(object):
     def __init__(self, argv = False):
         
         self.training = False
+        self.validation = False
         self.preprocessing = False
         self.input_path = []
         self.save_path = []
         self.log_path = []
         self.metadata_path = []
-        
+        self.validation = 0
         
         
         if(argv != False):
@@ -73,14 +74,16 @@ class arguments(object):
            Images.
       -l = Log Directory: Where should we save the log file to track our progress.
       -m = Metadata patha: where the metadata csv file is
-    
+      -v = Validation. If we are validating the data, we want to train on a portion and
+           validate the set on another portion. The number of scans used for validating will be
+           supplied along with this flag
     """
     
     def parse_command_line(self, argv):
         
         try:
             
-            opts,args = getopt.getopt(argv, "htpm:i:s:l:")
+            opts,args = getopt.getopt(argv, "htpm:i:s:l:v:")
             
         except getopt.GetoptError as err:
             print(str(err))
@@ -130,7 +133,8 @@ class arguments(object):
             elif opt == '-m':
                 self.metadata_path = str(arg)
                 
-                
+            elif opt == '-v':
+                self.validation = int(arg)
                 
                 
     """
@@ -142,5 +146,5 @@ class arguments(object):
     """
     def usage(self):
         
-        print("Argument Flags: \n -h = Help: print help message \n -t = Train: if we are training the model. If this flag is not specified, the system will not train. \n -p = Preprocessing: if we are preprocessing the data. If this flag is not supplied the system will assume the data in the input path has already been preprocessed. Note if this argument is supplied, then a save path must be specified to save the preprocessed scans. This is done with the -s variable and is described below. \n -i = Input directory = where we will be reading the data from \n Eg. if we are preprocessing, read data from the initial folder. \n If not, will want to specify folder where scans have already been preprocessed. \n -s = Save Directory: If we are preprocessing, where should we save the preprocessed Images. \n -l = Log Directory: Where should we save the log file to track our progress. -m = Metadata directory: Where the metadata csv file is stored \n \n --------------------------------------- \n Required Arguments: \n -i, -s, -l \n If these arguments are not supplied, along with a correct path for each argument, the program will not run, and you will see this message :) \n \n Example - run on Synapse Server: \n sudo python main_thread.py -p -t -i /trainingData -s /preprocessedData -l /modelState -m /metadata \n \n Example - Run on Dimitri's Machine \n sudo python main_thread.py -p -t -i /media/dperrin/ -s /media/dperrin/preprocessedData/ -l ./ -m ./")
+        print("Argument Flags: \n -h = Help: print help message \n -t = Train: if we are training the model. If this flag is not specified, the system will not train. \n -p = Preprocessing: if we are preprocessing the data. If this flag is not supplied the system will assume the data in the input path has already been preprocessed. Note if this argument is supplied, then a save path must be specified to save the preprocessed scans. This is done with the -s variable and is described below. \n -i = Input directory = where we will be reading the data from \n Eg. if we are preprocessing, read data from the initial folder. \n If not, will want to specify folder where scans have already been preprocessed. \n -s = Save Directory: If we are preprocessing, where should we save the preprocessed Images. \n -l = Log Directory: Where should we save the log file to track our progress. -m = Metadata directory: Where the metadata csv file is stored \n \n --------------------------------------- \n Required Arguments: \n -i, -s, -l \n If these arguments are not supplied, along with a correct path for each argument, the program will not run, and you will see this message :) \n \n Example - run on Synapse Server: \n sudo python main_thread.py -p -t -i /trainingData -s /preprocessedData -l /modelState -m /metadata \n \n Example - Run on Dimitri's Machine \n sudo python main_thread.py -p -t -i /media/dperrin/ -s /media/dperrin/preprocessedData/ -l ./ -m ./ -v 100")
 

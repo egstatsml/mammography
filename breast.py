@@ -103,16 +103,29 @@ class breast(object):
     in the scan is correct (ie. breast is on the left)
     
     @param file_path = string containing the location of the file you want to read in
+    @param preprocessing = boolean to say if we are preprocessing the input data
+                           If we are, we will be reading in an image in dicom format
+                           if not will be a numpy array
     
     """
-    def initialise(self, file_path):
+    def initialise(self, file_path, preprocessing = True):
         self.file_path = file_path
-        file = dicom.read_file('/media/dperrin/' +  file_path[1::])
-        self.data = np.fromstring(file.PixelData,dtype=np.int16).reshape((file.Rows,file.Columns))
-        self.original_scan = np.copy(self.data)
-        #convert the data to floating point now
-        self.data = self.data.astype(float)
-        self.check_orientation()
+        #if we are preprocessing, read in the DICOM formatted image
+        print preprocessing
+        if(preprocessing):
+            file = dicom.read_file(file_path)
+            self.data = np.fromstring(file.PixelData,dtype=np.int16).reshape((file.Rows,file.Columns))
+            self.original_scan = np.copy(self.data)
+            #convert the data to floating point now
+            self.data = self.data.astype(float)
+            self.check_orientation()
+        else:
+            #we have already done the preprocessing, so can just load in the numpy array
+            self.data = np.load(self.file_path).astype(float)
+            #when saving the data, we set all Nan's to -1.
+            #now we are going to use the preprocessed data, lets set them back Nan
+            self.data[self.data == -1] = np.nan
+        
         
         
         

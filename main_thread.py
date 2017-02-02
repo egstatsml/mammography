@@ -49,11 +49,13 @@ def flatten(x):
     return chain.from_iterable(x)
 
 
-def create_classifier_arrays(shared):
-    
+def create_classifier_arrays(shared, validation):
     #How do we want to split it
-    val = 250
-    
+    if(validation):
+        val = validation
+    else:
+        val = 1
+        
     #convert the list of features and class discriptors into arrays
     X = np.array(shared.get_feature_array())
     Y = np.array(shared.get_class_array())
@@ -81,7 +83,7 @@ program_start = timeit.default_timer()
 command_line_args = arguments(sys.argv[1::])
 sys.stdout = logger(command_line_args.log_path)
 
-descriptor = spreadsheet(training=True, run_synapse = False)
+descriptor = spreadsheet(command_line_args)
 threads = []
 id = 0
 num_threads = cpu_count() - 2
@@ -99,13 +101,15 @@ shared = man.shared()
 for ii in range(0, descriptor.no_scans):
     shared.t_lock_acquire()
     shared.q_put(descriptor.filenames[ii])
-    shared.q_cancer_put(descriptor.cancer_list[ii])
+    #if we are training, add the descriptor for cancer status
+    if(command_line_args.training):
+        shared.q_cancer_put(descriptor.cancer_list[ii])
     shared.t_lock_release()
     
     
 # Create new threads
 for ii in range(0,num_threads):
-    thread = my_thread(id, descriptor.no_scans, shared)
+    thread = my_thread(id, descriptor.no_scans, shared, command_line_args)
     thread.start()
     threads.append(thread)
     id += 1
@@ -143,8 +147,8 @@ error_database.to_csv('error_files.csv')
 #will just use the features from the approximation wavelet decomps
 
 
-X, Y, X_v, Y_v = create_classifier_arrays(shared)
-clf = svm.SVC()
+X, Y, X_v, Y_v = create_classifier_arrays(shared, command_line_args.validation)
+clf = svm.SVC(kernel='rbf')
 clf.fit(X,Y)
 
 #now will save the model, then can have a look how it all performed a try it out
@@ -153,16 +157,17 @@ joblib.dump(clf,'filename.pkl')
 test = clf.predict(X_v)
 
 #find the accuracy
-print((test == Y_v))
-for ii in range(0, Y_v.size):
-    print("%r : %r " %(Y_v[ii], test[ii]))
+if(command_line_args.validation):
+    print((test == Y_v))
+    for ii in range(0, Y_v.size):
+        print("%r : %r " %(Y_v[ii], test[ii]))
     
     
-    
-np.save('X', X)
-np.save('Y', Y)
-np.save('X_val', X_v)
-np.save('Y_val', Y_v)
+#save this data
+np.save(command_line_args.log_path + '/X', X)
+np.save(command_line_args.log_path + '/Y', Y)
+np.save(command_line_args.log_path + '/X_val', X_v)
+np.save(command_line_args.log_path + '/Y_val', Y_v)
 
 
 """

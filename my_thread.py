@@ -233,24 +233,27 @@ class my_thread(Process):
     
     @param thread_id = integer to identify individual thread s
     @param num_images_total = the number of images about to be processed in TOTAL
-    @param data_path = the path to the scans, will vary depending on which machine we are on
-    @param training = boolean to say if we are training or if we are doing the validation process
+    @param command_line_args = arguments object that holds the arguments parsed from 
+           the command line. These areguments decide whether we are training, preprocessing etc.
     
     """
     
-    def __init__(self, thread_id, no_images_total, manager, data_path = './pilot_images/', training = True):
+    def __init__(self, thread_id, no_images_total, manager, command_line_args):
         Process.__init__(self)
         print thread_id
         self.manager = manager
         self.t_id = thread_id
-        self.scan_data = feature(levels = 2, wavelet_type = 'haar', no_images = no_images_total ) #the object that will contain all of the data
+        self.scan_data = feature(levels = 3, wavelet_type = 'haar', no_images = no_images_total ) #the object that will contain all of the data
         self.scan_data.current_image_no = 0    #initialise to the zeroth mammogram
-        self.data_path = data_path
+        self.data_path = command_line_args.input_path
         self.time_process = []   #a list containing the time required to perform preprocessing
                                  #on each scan, will use this to find average of all times
         self.scans_processed = 0
         self.cancer_status = []
-        self.training = training
+        self.training = command_line_args.training
+        self.preprocessing = command_line_args.preprocessing
+        self.validation = command_line_args.validation
+        self.save_path = command_line_args.save_path
         
     """
     run()
@@ -313,19 +316,22 @@ class my_thread(Process):
                 if(self.manager.q_empty()):
                     print 'here'
                     self.manager.set_exit_status(True)
-                        
-                #if(self.manager.get_cancer_count() >= 2):
-                #    self.manager.set_exit_status(True)
                     
                     
-                #file_path = 'pilot_images/502860.dcm'
                 self.manager.t_lock_release()
                 print('Queue size = %d' %self.manager.q_size())
                 #try:
                 #now we have the right filename, lets do the processing of it
-                self.scan_data.initialise(file_path)
-                self.scan_data.preprocessing()
-                self.scan_data.get_features()
+                #if we are doing the preprocessing, we will need to read the file in correctly
+                self.scan_data.initialise(file_path, self.preprocessing)
+
+                #Check if we need to run the preprocessing steps
+                if(self.preprocessing):
+                    self.scan_data.preprocessing()
+                    self.save_preprocessed()
+                #check if we need to perform feature extraction for training or classification
+                if(self.training | self.validation):    
+                    self.scan_data.get_features()
 
 
                 #now that we have the features, we want to append them to the list of features
@@ -342,19 +348,19 @@ class my_thread(Process):
                 self.manager.t_lock_release()                    
                 print self.manager.q_size()
 
-                #if we aren't training, but have run out of scans for validation
-                #we should also exit
-
+                    
                 #except:
                 #    print('Error with current file %s' %(file_path))
                 #    self.manager.add_error_file(file_path)
-                #    #get rid of the last cancer_status flag we saved, as it is no longer valid since we didn't save the
-                #    #features from the scan
+                    #get rid of the last cancer_status flag we saved, as it is no longer valid since we didn't save the
+                    #features from the scan
                 #    del self.cancer_status[-1]
                     
                 self.scan_data.cleanup()
-                #gc.collect()
+                gc.collect()
+                
             else:
+                #we should just release the lock on the processes
                 self.manager.t_lock_release()                    
                 
                 
@@ -370,6 +376,45 @@ class my_thread(Process):
     def flatten(self, x):
         "Flatten one level of nesting"
         return chain.from_iterable(x)
+    
+    
+    
+    """
+    save_preprocessed()
+    
+    Description:
+    After a file has been preprocessed, will write it to file so we don't have to do 
+    it again. 
+    Before saving to file, we will convert all of the Nans to -1. This allows us to save the data
+    as a 16-bit integer instead of 32-64 bit float.
+    
+    Using half the amount of disk space == Awesomeness
+    
+    Will just have to convert it when loading before performing feature extraction
+    
+    """
+    
+    def save_preprocessed(self):
+        
+        file_path = self.save_path +  self.scan_data.file_path[-10:-4]
+        print file_path
+        #copy the scan data
+        temp = np.copy(self.scan_data.data)
+        #set all Nan's to -1
+        temp[np.isnan(temp)] = -1
+        temp = temp.astype(np.int16)
+        
+        #now save the data
+        np.save(file_path, temp)
+    
+    
+    
+    
+    
+    
+    
+    
+    
     
     
     
@@ -404,8 +449,7 @@ class my_thread(Process):
     Description:
     Am done with selection and aquisition of features. 
     Will add the features from this thread to the manager
-    
-    
+        
     """
     
     
