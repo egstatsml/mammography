@@ -362,19 +362,11 @@ class breast(object):
         #now will remove the lower value components to focus on the
         #more prominent edges
         edge[edge < thresh_val] = 0
-
-        if(self.plot):
-            fig = plt.figure()
-            ax1 = fig.add_subplot(1,2,1)
-            ax1.imshow(self.data)
-            ax2 = fig.add_subplot(1,2,2)
-            ax2.imshow(edge)
-            fig.savefig(os.getcwd() + '/figs/edge_' + self.file_path[-10:-3] + 'png')
-            fig.clf()
-            plt.close()
         
         #apply the Hough transform
         h, theta, d = hough_line(edge)
+        #using this variable for plotting for vres report
+        h_full = np.copy(h)
         #find the most prominent lines in the Hough Transform
         h, theta, d = hough_line_peaks(h, theta, d)
         #use the peak values to create polar form of line describing edge of pectoral muscle
@@ -416,12 +408,55 @@ class breast(object):
         self.pectoral_removed = True
         
         
+        #plotting figure for VRES report
         
-        
-        
-        
-        
-        
+        if(self.plot):
+            fig = plt.figure()
+            plt.axis('off')
+            ax2 = fig.add_subplot(1,1,1)
+            ax2.imshow(h_full, cmap='gray')
+            fig.savefig(os.getcwd() + '/figs/edge_' + self.file_path[-10:-4] +'t.'  + 'png', box_inches='tight')
+            fig.clf()
+            ax2 = fig.add_subplot(1,1,1)
+            ax2.imshow(self.original_scan, cmap='gray')
+            plt.axis('off')
+            fig.savefig(os.getcwd() + '/figs/edge_' + self.file_path[-10:-4] +'a.'  + 'png', box_inches='tight')
+            fig.clf()
+            ax2 = fig.add_subplot(1,1,1)
+            ax2.imshow(edge)
+            plt.axis('off')
+            fig.savefig(os.getcwd() + '/figs/edge_' + self.file_path[-10:-4] +'b.' + 'png',bbox_inches='tight')
+            fig.clf()
+            ax2 = fig.add_subplot(1,1,1)
+            ax2.imshow(edge)
+            fig.clf()
+            ax2 = fig.add_subplot(1,1,1)
+            ax2.imshow(h_full, aspect='auto')
+            plt.axis('off')
+            fig.savefig(os.getcwd() + '/figs/edge_' + self.file_path[-10:-4] +'c.' + 'png',bbox_inches='tight')
+            fig.clf()
+            ax2 = fig.add_subplot(1,1,1)
+            ax2.imshow(edge)
+            
+            fig.clf()
+            ax2 = fig.add_subplot(1,1,1)
+            ax2.imshow(self.data, cmap='gray')
+            plt.axis('off')
+            fig.savefig(os.getcwd() + '/figs/edge_' + self.file_path[-10:-4] +'d.' + 'png',bbox_inches='tight')
+            fig.clf()
+            ax2 = fig.add_subplot(1,1,1)
+            ax2.imshow(edge)
+            
+            fig.clf()
+            plt.close()
+            
+            
+            
+            
+            
+            
+            
+            
     """
     breast_boundary()
     
@@ -543,7 +578,7 @@ class breast(object):
         #self.boundary_y, self.boundary = trace_boundary(im)
         
         #now lets remove any extra bits of skin if we find them
-        #self.remove_skin()
+        self.remove_skin()
         
         if(self.plot):
             im = np.zeros((np.shape(self.data)))
@@ -558,10 +593,10 @@ class breast(object):
             fig.savefig(os.getcwd() + '/figs/' + '1_grad_' + self.file_path[-10:-3] + 'png')
             fig.clf()
             plt.close() 
-
-        
-        
-        
+            
+            
+            
+            
         
     """
     edge_boundary()
@@ -588,7 +623,7 @@ class breast(object):
         
         edges = sobel(self.breast_mask)
         #apply small blur to edge
-        edges = filters.gaussian_filter(edges,0.5) 
+        edges = filters.gaussian_filter(edges,3) 
         
         if(self.pectoral_present):
             #remove edges where the pectoral muscle was
@@ -628,23 +663,14 @@ class breast(object):
             #now search up, left, right, and down
             for jj in range(0, len(search_x)):
                 #first just check that we are in a valid search range
-
                 if((y_temp[ii] + search_y[jj]) >= 0) & ((y_temp[ii] + search_y[jj]) < y_lim) & ((boundary_temp[ii] + search_x[jj]) >= 0) &  ((boundary_temp[ii] + search_x[jj]) < x_lim):
                     #then we are in valid searching areas, so lets say hello to our neighbour
-                 
                     if(self.breast_mask[y_temp[ii], boundary_temp[ii]] == 1) & (self.breast_mask[y_temp[ii] + search_y[jj] , boundary_temp[ii] + search_x[jj]] == 0):
-                        """
-                        if((y_temp[ii] -1) >= 0) & ((y_temp[ii] + 1) < y_lim) & ((boundary_temp[ii] - 1) >= 0) &  ((boundary_temp[ii] + 1) < x_lim):
-                    #then we are in valid searching areas, so lets say hello to our neighbour
-                    #search left, righ, down and up
-                    if(self.breast_mask[y_temp[ii], boundary_temp[ii]] == 1) & ((self.breast_mask[y_temp[ii], boundary_temp[ii] - 1] == 0) | (self.breast_mask[y_temp[ii], boundary_temp[ii] + 1] == 0) | (self.breast_mask[y_temp[ii] -1, boundary_temp[ii]] == 0) | (self.breast_mask[y_temp[ii], boundary_temp[ii] + 1] == 0)):
-                        """
-                        
                         
                         #then this part is on the true boundary
                         y.append( y_temp[ii] )
                         boundary.append( boundary_temp[ii] )
-                        
+                        break
                         
         #now save the true boundary location
         self.boundary = np.array(boundary)
@@ -690,17 +716,18 @@ class breast(object):
                 if((x + x_s[ii]) >= 0) & ((x + x_s[ii]) < im.shape[1]) & ((y + y_s[ii]) >= 0) & ((y + y_s[ii]) < im.shape[0]):
                     #if the pixel we have found is on the boundary
                     if(im[y + y_s[ii], x + x_s[ii]] == 1):
+                        print count
                         #if it is the first pass through, we will add this point
                         if(first):
-                            x += x_s[ii]
-                            y += y_s[ii]
+                            x = x + x_s[ii]
+                            y = y + y_s[ii]
                             
                             first = False
                             found = True
                             break
                         
                         #otherwise check we havent already found this point
-                        elif((l_x[-2] != x + x_s[ii]) & (l_y[-2] != y + y_s[ii])):
+                        elif((l_x[-2] != (x + x_s[ii])) | (l_y[-2] != (y + y_s[ii]))):
                             x = x + x_s[ii]
                             y = y + y_s[ii]
                             found = True
@@ -713,8 +740,8 @@ class breast(object):
             if(found == False):
                 break
                 
-            #count += 1        
-        
+            count += 1        
+            
         if(self.plot):
             test = np.zeros(im.shape)
             test[l_y, l_x] = 1
@@ -724,9 +751,9 @@ class breast(object):
             test = np.zeros(im.shape)
             test[self.boundary_y, self.boundary] = 1
             ax1 = fig.add_subplot(1,2,2)
-            im1 = ax1.imshow(test)
-
-
+            im1 = ax1.imshow(im)
+            
+            
             #fig.colorbar(im1)
             fig.savefig(os.getcwd() + '/figs/' + 'test_' + self.file_path[-10:-3] + 'png')
             fig.clf()
@@ -736,7 +763,7 @@ class breast(object):
         #now re-write the breast boundary member variables
         self.boundary = np.array(l_x)
         self.boundary_y = np.array(l_y)
-
+        
             
             
         
@@ -756,6 +783,7 @@ class breast(object):
     def remove_skin(self):
         
         #first lets smooth the boundary
+        print (self.boundary)
         print(np.shape(self.boundary))
         x = signal.savgol_filter(self.boundary, 81, 3)
         
@@ -823,8 +851,8 @@ class breast(object):
             im3 = ax1.plot(self.boundary_y, d2x, 'm', label='Second Derivative')
             #fig.colorbar(im1)
             plt.title('Breast Boundary and Second Derivative')
-            #plt.legend()
-            fig.savefig(os.getcwd() + '/figs/' + 'deriv_' + self.file_path[-10:-3] + 'png')
+            plt.legend()
+            fig.savefig(os.getcwd() + '/figs/' + 'deriv_' + self.file_path[-10:-3] + 'png', bbox_inches='tight')
             fig.clf()
             plt.close()
 
@@ -832,16 +860,23 @@ class breast(object):
             fig = plt.figure()
             ax1 = fig.add_subplot(1,1,1)
             im1 = ax1.imshow(self.data)
-            plt.title('Preprocessed Mammogram')
-            fig.savefig(os.getcwd() + '/figs/' + 'pre_' + self.file_path[-10:-3] + 'png')
+            fig.savefig(os.getcwd() + '/figs/' + 'pre_' + self.file_path[-10:-3] + 'png', bbox_inches='tight')
+            fig.clf()
+            
+            fig = plt.figure()
+            ax1 = fig.add_subplot(1,1,1)
+            im1 = ax1.imshow(self.breast_mask)
+            fig.savefig(os.getcwd() + '/figs/' + 'msk_' + self.file_path[-10:-3] + 'png', bbox_inches='tight')
+            
             fig.clf()
             plt.close()
-
-        
-        
-        
-        
-        
+            
+            
+            
+            
+            
+            
+            
         
     """
     stationary_points()

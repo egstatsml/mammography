@@ -44,7 +44,7 @@ class spreadsheet(object):
         
         self.metadata = pd.read_csv(command_line_args.metadata_path + '/exams_metadata.tsv', sep='\t')
         if(command_line_args.training):
-            self.crosswalk = pd.read_csv(command_line_args.metadata_path + '/images_crosswalk', sep='\t')        
+            self.crosswalk = pd.read_csv(command_line_args.metadata_path + '/images_crosswalk.tsv', sep='\t')        
             self.training_path = command_line_args.input_path
         else:
             self.crosswalk = []
