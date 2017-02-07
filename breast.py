@@ -650,15 +650,7 @@ class breast(object):
         y_lim = np.shape(self.data)[0]        
         x_lim = np.shape(self.data)[1]
         
-        for ii in range(0, np.size(y_temp) -1):
-            
-            #creating a few variables that will be used to account for being at the edge of the image, so we dont search into invalid
-            #indicies
-            x_low = boundary_temp[ii] != 0
-            x_high = boundary_temp[ii] != im_width
-            y_low = y_temp[ii] != 0
-            y_high = y_temp[ii] != im_height
-            
+        for ii in range(0, np.size(y_temp) -1):            
             
             #now search up, left, right, and down
             for jj in range(0, len(search_x)):
@@ -716,7 +708,6 @@ class breast(object):
                 if((x + x_s[ii]) >= 0) & ((x + x_s[ii]) < im.shape[1]) & ((y + y_s[ii]) >= 0) & ((y + y_s[ii]) < im.shape[0]):
                     #if the pixel we have found is on the boundary
                     if(im[y + y_s[ii], x + x_s[ii]] == 1):
-                        print count
                         #if it is the first pass through, we will add this point
                         if(first):
                             x = x + x_s[ii]
@@ -727,7 +718,7 @@ class breast(object):
                             break
                         
                         #otherwise check we havent already found this point
-                        elif((l_x[-2] != (x + x_s[ii])) | (l_y[-2] != (y + y_s[ii]))):
+                        if(not self.search_prev(l_y,l_x,y + y_s[ii], x + x_s[ii], count)):
                             x = x + x_s[ii]
                             y = y + y_s[ii]
                             found = True
@@ -740,8 +731,7 @@ class breast(object):
             if(found == False):
                 break
                 
-            count += 1        
-            
+            count += 1
         if(self.plot):
             test = np.zeros(im.shape)
             test[l_y, l_x] = 1
@@ -765,7 +755,23 @@ class breast(object):
         self.boundary_y = np.array(l_y)
         
             
-            
+        
+        
+    def search_prev(self,l_y,l_x, y, x, count):
+        recently_found = False
+        if(count < 10):
+            lim = len(l_y) + 1
+        else:
+            lim = 10
+        for jj in range(1,lim):
+            if(l_y[-jj] == y) & (l_x[-jj] == x):
+                recently_found = True
+                break
+        
+        return recently_found
+        
+        
+        
         
     """
     remove_skin()
@@ -784,6 +790,7 @@ class breast(object):
         
         #first lets smooth the boundary
         print (self.boundary)
+        print (self.boundary_y)
         print(np.shape(self.boundary))
         x = signal.savgol_filter(self.boundary, 81, 3)
         
