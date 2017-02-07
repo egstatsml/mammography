@@ -349,15 +349,15 @@ class my_thread(Process):
                     print(self.manager.q_size())
 
 
-                    except:
-                        print('Error with current file %s' %(file_path))
-                        self.manager.add_error_file(file_path)
-                        #get rid of the last cancer_status flag we saved, as it is no longer valid since we didn't save the
-                        #features from the scan
-                        del self.cancer_status[-1]
+                except:
+                    print('Error with current file %s' %(file_path))
+                    self.manager.add_error_file(file_path)
+                    #get rid of the last cancer_status flag we saved, as it is no longer valid since we didn't save the
+                    #features from the scan
+                    del self.cancer_status[-1]
                     
-                    self.scan_data.cleanup()
-                    gc.collect()
+                self.scan_data.cleanup()
+                gc.collect()
                     
             else:
                 #we should just release the lock on the processes
