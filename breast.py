@@ -44,7 +44,9 @@ from skimage.feature import corner_harris, corner_subpix, corner_peaks
 from scipy import ndimage as ndi
 
 import pywt
-#from boundary import trace_boundary
+######
+#for when I port this to Cython
+#from boundary import trace_boundary, edge_boundary
 
 
 
@@ -86,7 +88,7 @@ class breast(object):
         self.nipple_y = 0
         self.threshold = 0                #threshold for segmenting fibroglandular disk
         self.file_path = []
-        self.plot = True                 #variable that is used during debugging to decide if we plot stuff
+        self.plot = True                  #boolean for plotting figures when debugging
         if(file_path != None):
             self.initialise(file_path)
             
@@ -103,16 +105,29 @@ class breast(object):
     in the scan is correct (ie. breast is on the left)
     
     @param file_path = string containing the location of the file you want to read in
+    @param preprocessing = boolean to say if we are preprocessing the input data
+                           If we are, we will be reading in an image in dicom format
+                           if not will be a numpy array
     
     """
-    def initialise(self, file_path):
+    def initialise(self, file_path, preprocessing = True):
         self.file_path = file_path
-        file = dicom.read_file('/media/dperrin/' +  file_path[1::])
-        self.data = np.fromstring(file.PixelData,dtype=np.int16).reshape((file.Rows,file.Columns))
-        self.original_scan = np.copy(self.data)
-        #convert the data to floating point now
-        self.data = self.data.astype(float)
-        self.check_orientation()
+        #if we are preprocessing, read in the DICOM formatted image
+        print(preprocessing)
+        if(preprocessing):
+            file = dicom.read_file(file_path)
+            self.data = np.fromstring(file.PixelData,dtype=np.int16).reshape((file.Rows,file.Columns))
+            self.original_scan = np.copy(self.data)
+            #convert the data to floating point now
+            self.data = self.data.astype(float)
+            self.check_orientation()
+        else:
+            #we have already done the preprocessing, so can just load in the numpy array
+            self.data = np.load(self.file_path).astype(float)
+            #when saving the data, we set all Nan's to -1.
+            #now we are going to use the preprocessed data, lets set them back Nan
+            self.data[self.data == -1] = np.nan
+        
         
         
         
@@ -326,7 +341,7 @@ class breast(object):
     def remove_pectoral_muscle(self):
         
         
-        self.pectoral = np.zeros(np.shape(self.data), dtype=bool)        #copy the image and apply the first threshold
+        self.pectoral_mask = np.zeros(np.shape(self.data), dtype=bool)        #copy the image and apply the first threshold
         #will remove the components of the pectoral muscle
         thresh = np.copy(self.data[0:self.im_height/2, 0:self.im_width/2])
         #will crop the image first, as the pectoral muscle will never be in the right hand side of the image
@@ -347,7 +362,7 @@ class breast(object):
         #now will remove the lower value components to focus on the
         #more prominent edges
         edge[edge < thresh_val] = 0
-        
+
         if(self.plot):
             fig = plt.figure()
             ax1 = fig.add_subplot(1,2,1)
@@ -358,13 +373,11 @@ class breast(object):
             fig.clf()
             plt.close()
         
-        
         #apply the Hough transform
         h, theta, d = hough_line(edge)
         #find the most prominent lines in the Hough Transform
         h, theta, d = hough_line_peaks(h, theta, d)
         #use the peak values to create polar form of line describing edge of pectoral muscle
-        #print theta * (180.0/np.pi)
         valid_h = h[(theta < np.pi/8) & (theta > 0 )]
         
         #sometimes there are more than one index found, as the accumulator has returned
@@ -391,7 +404,7 @@ class breast(object):
                 #are in range set all pixels to the left of this x value to zero
                 self.data[0:np.floor(y).astype(int), x] = 0
                 #set these locations in the pectoral muscle binary map to true
-                self.pectoral[0:np.floor(y).astype(int), x] = True
+                self.pectoral_mask[0:np.floor(y).astype(int), x] = True
                 #save the location indicies
                 x_pec.append(x)
                 y_pec.append(y)
@@ -521,6 +534,8 @@ class breast(object):
         self.data[ self.breast_mask == 0 ] = np.nan
         
         #use the breast mask we have found to locate the true breast boundary
+        
+        #self.boundary_y, self.boundary_x = edge_boundary(self.breast_mask, self.pectoral_mask, self.pectoral_present)
         self.edge_boundary()
         #now trace the boundary so we can create a parametric model of the breast boundary    
         self.trace_boundary()
@@ -542,7 +557,8 @@ class breast(object):
             im2 = ax2.imshow(im)
             fig.savefig(os.getcwd() + '/figs/' + '1_grad_' + self.file_path[-10:-3] + 'png')
             fig.clf()
-            plt.close()
+            plt.close() 
+
         
         
         
@@ -576,13 +592,13 @@ class breast(object):
         
         if(self.pectoral_present):
             #remove edges where the pectoral muscle was
-            edges[self.pectoral] = 0
+            edges[self.pectoral_mask] = 0
             
             
         #now find the boundary
         y_temp,boundary_temp = np.where(edges != 0)
-        y_temp = y_temp.astype('uint16')
-        boundary_temp = boundary_temp.astype('uint16')
+        #y_temp = y_temp.astype('uint16')
+        #boundary_temp = boundary_temp.astype('uint16')
         
         #creating arrays to store the found boundary
         y = []
@@ -612,9 +628,18 @@ class breast(object):
             #now search up, left, right, and down
             for jj in range(0, len(search_x)):
                 #first just check that we are in a valid search range
+
                 if((y_temp[ii] + search_y[jj]) >= 0) & ((y_temp[ii] + search_y[jj]) < y_lim) & ((boundary_temp[ii] + search_x[jj]) >= 0) &  ((boundary_temp[ii] + search_x[jj]) < x_lim):
                     #then we are in valid searching areas, so lets say hello to our neighbour
+                 
                     if(self.breast_mask[y_temp[ii], boundary_temp[ii]] == 1) & (self.breast_mask[y_temp[ii] + search_y[jj] , boundary_temp[ii] + search_x[jj]] == 0):
+                        """
+                        if((y_temp[ii] -1) >= 0) & ((y_temp[ii] + 1) < y_lim) & ((boundary_temp[ii] - 1) >= 0) &  ((boundary_temp[ii] + 1) < x_lim):
+                    #then we are in valid searching areas, so lets say hello to our neighbour
+                    #search left, righ, down and up
+                    if(self.breast_mask[y_temp[ii], boundary_temp[ii]] == 1) & ((self.breast_mask[y_temp[ii], boundary_temp[ii] - 1] == 0) | (self.breast_mask[y_temp[ii], boundary_temp[ii] + 1] == 0) | (self.breast_mask[y_temp[ii] -1, boundary_temp[ii]] == 0) | (self.breast_mask[y_temp[ii], boundary_temp[ii] + 1] == 0)):
+                        """
+                        
                         
                         #then this part is on the true boundary
                         y.append( y_temp[ii] )
@@ -635,7 +660,7 @@ class breast(object):
         
         im = np.zeros(self.data.shape, dtype=np.int)
         im[self.boundary_y,self.boundary] = 1
-                
+        
         #will remove pixels at the border, as these will sometimes give weird errors
         im[0:10,:] = 0
         im[-1:-11,:] = 0
@@ -653,50 +678,42 @@ class breast(object):
         
         x_s = np.array([0, 0, -1, 1, -1, 1, -1, 1], dtype=np.int)
         y_s = np.array([-1, 1, 0, 0, -1, -1, 1, 1], dtype=np.int)
+        
         count = 0
         
-        while((x >= 0) & (y >= 0) & (y < im.shape[0])):
+        while((x >= 0) & (y >= 0) & (y < im.shape[0]) & (count < 15000)):
             l_y.append(y)
             l_x.append(x)
-            found = False            
-            for ii in range(0,len(y_s)):
+            found = False
+            for ii in range(0,y_s.size):
                 #first check that the indicies we will be using are valid
                 if((x + x_s[ii]) >= 0) & ((x + x_s[ii]) < im.shape[1]) & ((y + y_s[ii]) >= 0) & ((y + y_s[ii]) < im.shape[0]):
-                    #print ii
-                    #found[ii] = (im[y + y_s[ii], x + x_s[ii]] == 1)
                     #if the pixel we have found is on the boundary
                     if(im[y + y_s[ii], x + x_s[ii]] == 1):
                         #if it is the first pass through, we will add this point
                         if(first):
                             x += x_s[ii]
                             y += y_s[ii]
-
+                            
                             first = False
                             found = True
                             break
                         
                         #otherwise check we havent already found this point
-                        elif((l_x[-2] != x + x_s[ii]) | (l_y[-2] != y + y_s[ii])):
+                        elif((l_x[-2] != x + x_s[ii]) & (l_y[-2] != y + y_s[ii])):
                             x = x + x_s[ii]
                             y = y + y_s[ii]
                             found = True
-                            #print np.max(l_x)
                             break
                         
                         else:
                             pass
-                #print x
-                #print y
+                        
+            #if we haven'f found another part of the boundary, lets finish up
             if(found == False):
-
                 break
                 
-            count += 1
-            
-        #now re-write the breast boundary in the class
-        self.boundary = np.array(l_x)
-        self.boundary_y = np.array(l_y)
-        
+            #count += 1        
         
         if(self.plot):
             test = np.zeros(im.shape)
@@ -708,11 +725,20 @@ class breast(object):
             test[self.boundary_y, self.boundary] = 1
             ax1 = fig.add_subplot(1,2,2)
             im1 = ax1.imshow(test)
-            #fig.colorbar(im1) 
+
+
+            #fig.colorbar(im1)
             fig.savefig(os.getcwd() + '/figs/' + 'test_' + self.file_path[-10:-3] + 'png')
             fig.clf()
             plt.close()
-        
+            
+            
+        #now re-write the breast boundary member variables
+        self.boundary = np.array(l_x)
+        self.boundary_y = np.array(l_y)
+
+            
+            
         
     """
     remove_skin()
@@ -730,7 +756,7 @@ class breast(object):
     def remove_skin(self):
         
         #first lets smooth the boundary
-        print np.shape(self.boundary)
+        print(np.shape(self.boundary))
         x = signal.savgol_filter(self.boundary, 81, 3)
         
         #now lets take derivative
@@ -758,38 +784,46 @@ class breast(object):
         #if the value of the breast boundary close to the maximim at this point,
         #then is most likely due to the nipple
         
+        """
         #if we actually found any peaks
         if(peaks.size > 0):
             #get rid of peaks near the nipple
             peaks = peaks[self.boundary[peaks] < np.max(self.boundary) * 0.85]
             #remove the extra bit of skin
             #see if there are twwo bits of skin we need to remove
-            skin_locs = []
             #if we do have parts to remove
             if(peaks.size):
                 if(peaks.size >=2):
-                    #add the top bit of skin
-                    skin_locs.extend(np.arange(0,peaks[0]))
+                    
+                    #first lets check we are actually near the top of the image
+                    #we will say it is at the top if it is in the top third of the
+                    #image
+                    if(self.boundary_y[peaks[0]] <= self.data.shape[0] * (1.0/3.0)):
+                        #remove the top bit of skin
+                        for ii in range(0, peaks[0]):
+                            self.data[self.boundary_y[ii],0:self.boundary[ii] + 2] = np.nan
+                        
+                #now do the bottom section
+                #similarly, we will check that this is in the bottom third of the image
+                if(self.boundary_y[peaks[-1]] >= self.data.shape[0] * (2.0/3.0)):
+                    for ii in range(peaks[-1], self.boundary.size):
+                        self.data[self.boundary_y[ii],0:self.boundary[ii] + 2] = np.nan
+                    
                 
-                #now add the bottom bit
-                skin_locs.extend(np.arange(peaks[-1],len(self.boundary)))
                 
-                #now remove parts of skin from these points
-                for ii in skin_locs:
-                    self.data[self.boundary_y[ii], 0:(self.boundary[ii] + 2)] = np.nan
-
-
+        """
         #Code just for making pretty plots to check it is all working :)
         if(self.plot):
             fig = plt.figure()
             ax1 = fig.add_subplot(1,1,1)
             #im1 = ax1.plot(dx, 'b')
-            im1 = ax1.scatter(self.boundary_y[peaks], d2x[peaks], label='Peaks')
+            if(peaks.size > 0):
+                im1 = ax1.scatter(self.boundary_y[peaks], d2x[peaks], label='Peaks')
             im2 = ax1.plot(self.boundary_y, np.divide(self.boundary.astype(float), np.max(self.boundary.astype(float))) * np.max(d2x), 'r', label='Scaled Breast Boundary')
             im3 = ax1.plot(self.boundary_y, d2x, 'm', label='Second Derivative')
             #fig.colorbar(im1)
             plt.title('Breast Boundary and Second Derivative')
-            plt.legend()
+            #plt.legend()
             fig.savefig(os.getcwd() + '/figs/' + 'deriv_' + self.file_path[-10:-3] + 'png')
             fig.clf()
             plt.close()
@@ -898,12 +932,6 @@ class breast(object):
             
             
             
-            #find the maximum in hough space
-            #print np.shape(h)
-            #print np.shape(theta)
-            #print np.shape(d)
-            #print index
-            
             d = d[index]
             theta = theta[index]
             
@@ -916,7 +944,7 @@ class breast(object):
             y_new = np.round(d / np.sin(theta) - (np.cos(theta) / np.sin(theta)) * i)
             valid = (y_new >= 0) & (y_new < w)
             if(np.sum(valid) < 1):
-                print y_new
+                print(y_new)
                 break
             
             #print(y_new)
@@ -925,7 +953,6 @@ class breast(object):
             #now finding the mid_point
             mid = np.where(np.cumsum(valid) >= np.sum(valid)/2)[0]
             mid = mid[0]
-            #print y_new
             x_mid = i[mid]
             y_mid = y_new[mid]
             #suffix and prefix
@@ -933,8 +960,6 @@ class breast(object):
             # r = finish of line (right)
             y_v = np.array(y_new[valid])
             x_v = np.array(i[valid])
-            #print y_v
-            #print x_v
             
             x_l = x_v[0]
             y_l = y_v[0]
@@ -973,8 +998,6 @@ class breast(object):
             
             x += h_dist * np.abs((x_r - x_l)/2)
             y += v_dist * np.abs((y_r - y_l)/2)
-            #print x_mid
-            #print y_mid
             
         """
         im = np.zeros((np.shape(self.data)))
@@ -1076,13 +1099,14 @@ class breast(object):
         self.fibroglandular_mask = (self.data > self.threshold) & (self.data < upper_limit)
         self.fibroglandular_mask[edge_mask == 1] = False
         
-        if(self.plot):
-            fig = plt.figure()
-            ax1 = fig.add_subplot(1,1,1)
-            ax1.imshow(self.fibroglandular_mask)
-            fig.savefig(os.getcwd() + '/figs/' + 'msk_' + self.file_path[-10:-3] + 'png')
-            fig.clf()
-            plt.close()
+        """
+        fig = plt.figure()
+        ax1 = fig.add_subplot(1,1,1)
+        ax1.imshow(self.fibroglandular_mask)
+        fig.savefig(os.getcwd() + '/figs/' + 'msk_' + self.file_path[-10:-3] + 'png')
+        fig.clf()
+        plt.close()
+        """
         
         
         
@@ -1174,11 +1198,20 @@ class breast(object):
         """
         
         
-        if(self.plot):
-            fig = plt.figure()
-            ax1 = fig.add_subplot(1,1,1)
-            ax1.imshow(self.data)
-            fig.savefig(os.getcwd() + '/figs/' + self.file_path[-10:-3] + 'png')
-            fig.clf()
-            plt.close()
-            
+        """
+        fig = plt.figure()
+        ax1 = fig.add_subplot(1,1,1)
+        ax1.imshow(self.data)
+        fig.savefig(os.getcwd() + '/figs/' + self.file_path[-10:-3] + 'png')
+        fig.clf()
+        plt.close()
+        """
+        a = []
+        b = []
+        c = []
+        sig = []
+        ax1 = []
+        ax2 = []
+        
+        
+        

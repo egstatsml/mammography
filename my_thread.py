@@ -1,7 +1,6 @@
 #!/usr/bin/python
 import threading
 import timeit
-import Queue
 import gc
 from multiprocessing import Process, Lock, Queue
 from multiprocessing.managers import BaseManager
@@ -34,7 +33,7 @@ from skimage.filters import roberts, sobel, scharr, prewitt, threshold_otsu, ran
 from skimage.util import img_as_ubyte
 from skimage.feature import corner_harris, corner_subpix, corner_peaks
 from scipy import ndimage as ndi
-
+from itertools import chain
 #import my classes
 from breast import breast
 from feature_extract import feature
@@ -42,8 +41,8 @@ from read_files import spreadsheet
 
 
 #for tracking memory
-from pympler.tracker import SummaryTracker
-from pympler.asizeof import asizeof
+#from pympler.tracker import SummaryTracker
+#from pympler.asizeof import asizeof
 
 
 
@@ -78,13 +77,23 @@ class shared(object):
     error_files = []   #list that will have all of the files that we failed to process
     scan_no = 0
     cancer_count = 0
+    feature_array = []
+    class_array = []
+    
+    ##########################################
+    #
+    #List of helper functions that are used to
+    #access the data in the manager
+    #
+    ##########################################
+    
     
     def q_get(self):
         return self.q.get()
     
     def q_cancer_get(self):
         return self.q_cancer.get()
-    
+        
     def q_put(self, arg):
         self.q.put(arg)
         
@@ -106,7 +115,7 @@ class shared(object):
     def set_scan_no(self, scan_no):
         self.scan_no = scan_no
         
-    def get_scan_count(self):
+    def get_scan_no(self, scan_no):
         return self.scan_no
     
     def error_files_put(self, erf):
@@ -121,22 +130,77 @@ class shared(object):
     def inc_cancer_count(self):
         self.cancer_count += 1
         
-    def set_cancer_count(self, cancer_count):
-        self.cancer_count = cancer_count
-        
-        
     def get_cancer_count(self):
         return self.cancer_count
     
     def inc_scan_count(self):
         self.scan_no += 1
         
+    def get_scan_count(self):
+        return self.cancer_count
+    
     def get_error_files(self):
         return self.error_files
     
     def add_error_file(self, f):
         self.error_files.append(f)
+        
+    def first_features_added(self):
+        return (len(self.feature_array) == 0)
     
+    
+    def set_feature_array(self, feature_array):
+        self.feature_array = feature_array
+        
+    def set_class_array(self, class_array):
+        self.class_array = class_array
+        
+    def append_feature_array(self, feature_array):
+        self.feature_array.append(feature_array)
+        
+    def append_class_array(self, class_array):
+        self.class_array.append(class_array)
+        
+        
+    def get_feature_array(self):
+        return self.feature_array
+        
+    def get_class_array(self):
+        return self.class_array
+    
+    
+    """
+    add_features()
+    
+    Description: 
+    This function will add all of the features from scans processed
+    in a single thread/process and add them to the list in the manager
+    
+    @params
+    X = N x M array containing the features from the scans processed in the thread
+        N = number of scans processed
+        M = Number of features per scan
+    
+    Y = 1D array containing status of each of training scans
+    """
+    def add_features(self,X, Y):
+        
+        #if this is the first set of features to be added, we should just initially
+        #set the features in the manager to equal X and Y.
+        #Otherwise, use extend on the list. Just a nicer way of doing it so we
+        #don't have to keep track of indicies and sizes
+        if(self.first_features_added()):
+            self.feature_array = X
+            self.class_array = Y
+            
+        else:
+            print(' adding extra features')
+            print(np.shape(self.feature_array))
+            #print self.feature_array
+            self.feature_array.extend(X)
+            self.class_array.extend(Y)
+
+
 class my_manager(BaseManager):
     pass
 
@@ -144,139 +208,8 @@ my_manager.register('shared', shared)
 
 
 
-class feature_manager(BaseManager):
-    pass
 
 
-
-
-
-class feature_data(object):
-    
-    def __init__(self):
-        
-        #number of scans this process went through
-        self.scans_processed = 0
-        self.cancer_status = []
-        
-        
-        #GLOBAL FEATURES
-        self.homogeneity = []
-        self.entropy = []
-        self.energy = []
-        self.contrast = []
-        self.dissimilarity = []
-        self.correlation = []
-        self.density = []
-        
-        #Wavelet FEATURES
-        self.wave_kurtosis = []
-        self.wave_entropy = []
-        self.wave_energy = []
-        self.wave_contrast = []
-        self.wave_dissimilarity = []
-        self.wave_correlation = []
-        
-        #FEATURES FROM FIBROGLANDULAR DISK
-        self.fibro_homogeneity = []
-        self.fibro_entropy = []
-        self.fibro_energy = []
-        self.fibro_contrast = []
-        self.fibro_dissimilarity = []
-        self.fibro_correlation = []
-        
-        #FEATURES FROM MICROCALCIFICATIONS
-        self.micro_homogeneity = []
-        self.micro_entropy = []
-        self.micro_energy = []
-        self.micro_contrast = []
-        self.micro_dissimilarity = []
-        self.micro_correlation = []
-        
-        
-    def set_scans_processed(self, no_scans):
-        self.scans_processed = no_scans        
-        
-    def set_cancer_status(self, cancer_status):
-        self.cancer_status = cancer_status        
-        
-        
-    def set_homogeneity(self, homogeneity):
-        self.homogeneity = homogeneity
-
-    def set_entropy(self, entropy):
-        self.entropy = entropy
-        
-    def set_energy(self, energy):
-        self.energy = energy
-        
-    def set_contrast(self, contrast):
-        self.contrast = contrast
-        
-    def set_dissimilarity(self, dissimilarity):
-        self.dissimilarity = dissimilarity
-        
-    def set_correlation(self, correlation):
-        self.correlation = correlation
-        
-    def set_density(self, density):
-        self.density = density            
-        
-        
-    def set_wave_entropy(self, entropy):
-        self.wave_entropy = entropy
-        
-    def set_wave_energy(self, energy):
-        self.energy = energy
-        
-        
-        
-    def get_scans_processed(self):
-        return self.scans_processed
-    
-    def get_cancer_status_individual(self, index):
-        return self.cancer_status[index]
-    
-    def get_cancer_status(self):
-        return self.cancer_status
-    
-    
-    def get_homogeneity(self):
-        return self.homogeneity
-    
-    def get_entropy(self):
-        return self.entropy
-    
-    def get_energy(self):
-        return self.energy
-    
-    def get_contrast(self):
-        return self.contrast
-    
-    def get_dissimilarity(self):
-        return self.dissimilarity
-
-    def get_correlation(self):
-        return self.correlation
-
-    def get_density(self):
-        return self.density
-    
-    def get_wave_entropy(self):
-        return self.wave_entropy
-        
-    def get_wave_energy(self):
-        return self.wave_energy
-        
-        
-feature_manager.register('feature_data', feature_data)        
-        
-        
-        
-        
-        
-        
-        
 class my_thread(Process):    
     
     #some reference variables that will be shared by all of the individual thread objects
@@ -299,25 +232,27 @@ class my_thread(Process):
     
     @param thread_id = integer to identify individual thread s
     @param num_images_total = the number of images about to be processed in TOTAL
-    @param data_path = the path to the scans, will vary depending on which machine we are on
-    @param training = boolean to say if we are training or if we are doing the validation process
+    @param command_line_args = arguments object that holds the arguments parsed from 
+           the command line. These areguments decide whether we are training, preprocessing etc.
     
     """
     
-    def __init__(self, thread_id, no_images_total, manager, feature_manager, data_path = './pilot_images/', training = True):
+    def __init__(self, thread_id, no_images_total, manager, command_line_args):
         Process.__init__(self)
-        print thread_id
+        print(thread_id)
         self.manager = manager
-        self.feature_manager = feature_manager
         self.t_id = thread_id
         self.scan_data = feature(levels = 3, wavelet_type = 'haar', no_images = no_images_total ) #the object that will contain all of the data
         self.scan_data.current_image_no = 0    #initialise to the zeroth mammogram
-        self.data_path = data_path
+        self.data_path = command_line_args.input_path
         self.time_process = []   #a list containing the time required to perform preprocessing
                                  #on each scan, will use this to find average of all times
         self.scans_processed = 0
         self.cancer_status = []
-        self.training = training
+        self.training = command_line_args.training
+        self.preprocessing = command_line_args.preprocessing
+        self.validation = command_line_args.validation
+        self.save_path = command_line_args.save_path
         
     """
     run()
@@ -364,7 +299,6 @@ class my_thread(Process):
         #while there is still names on the list, continue to loop through
         #while the queue is not empty
         while( not self.manager.get_exit_status()):
-            print 'in'
             #lock the threads so only one is accessing the queue at a time
             #start the preprocessing timer
             start_time = timeit.default_timer()
@@ -379,22 +313,25 @@ class my_thread(Process):
                 #if the queue is now empty, we should wrap up and
                 #get ready to exit
                 if(self.manager.q_empty()):
-                    print 'here'
+                    print(' Queue is Empty')
                     self.manager.set_exit_status(True)
-                    
-                if(self.manager.get_cancer_count() > 10):
-                    self.manager.set_exit_status(True)
+                        
                     
                     
-                #file_path = 'pilot_images/502860.dcm'
                 self.manager.t_lock_release()
-                #print('Queue size = %d' %self.manager.q_size())
-
+                print('Queue size = %d' %self.manager.q_size())
                 try:
                     #now we have the right filename, lets do the processing of it
-                    self.scan_data.initialise(file_path)
-                    self.scan_data.preprocessing()
-                    self.scan_data.get_features()
+                    #if we are doing the preprocessing, we will need to read the file in correctly
+                    self.scan_data.initialise(file_path, self.preprocessing)
+
+                    #Check if we need to run the preprocessing steps
+                    if(self.preprocessing):
+                        self.scan_data.preprocessing()
+                        self.save_preprocessed()
+                    #check if we need to perform feature extraction for training or classification
+                    if(self.training | self.validation):    
+                        self.scan_data.get_features()
 
 
                     #now that we have the features, we want to append them to the list of features
@@ -409,23 +346,21 @@ class my_thread(Process):
                     self.manager.t_lock_acquire()
                     self.manager.inc_scan_count()
                     self.manager.t_lock_release()                    
-                    print self.manager.q_size()
+                    print(self.manager.q_size())
 
 
-                    #get ready to exit
-                    #if we aren't training, but have run out of scans for validation
-                    #we should also exit
-
-                except:
-                    print('Error with current file %s' %(file_path))
-                    self.manager.add_error_file(file_path)
-                    #get rid of the last cancer_status flag we saved, as it is no longer valid since we didn't save the
-                    #features from the scan
-                    del self.cancer_status[-1]
-
-                self.scan_data.cleanup()
-                gc.collect()
+                    except:
+                        print('Error with current file %s' %(file_path))
+                        self.manager.add_error_file(file_path)
+                        #get rid of the last cancer_status flag we saved, as it is no longer valid since we didn't save the
+                        #features from the scan
+                        del self.cancer_status[-1]
+                    
+                    self.scan_data.cleanup()
+                    gc.collect()
+                    
             else:
+                #we should just release the lock on the processes
                 self.manager.t_lock_release()                    
                 
                 
@@ -433,24 +368,59 @@ class my_thread(Process):
         #before we exit though, we just need to crop the feature arrays to include
         #only the number of images we looked at in this individual thread
         self.scan_data._crop_features(self.scans_processed)
-        #now will copy the features we found into the memory manager (feature_data)
-        #so they can be used by the main process
-        self._copy_features_manager()
-        
+        self.add_features()
         print('Thread %d is out' %self.t_id)
         
         
         
-    def _copy_features_manager(self):
-        self.feature_manager.set_scans_processed(self.scans_processed)
-        self.feature_manager.set_cancer_status(self.cancer_status)
-        self.feature_manager.set_correlation((self.scan_data.correlation))
-        self.feature_manager.set_homogeneity((self.scan_data.homogeneity))
-        self.feature_manager.set_energy((self.scan_data.energy))
-        self.feature_manager.set_entropy((self.scan_data.entropy))
-        self.feature_manager.set_contrast((self.scan_data.contrast))
-        self.feature_manager.set_dissimilarity((self.scan_data.dissimilarity))
+    def flatten(self, x):
+        "Flatten one level of nesting"
+        return chain.from_iterable(x)
+    
+    
+    
+    """
+    save_preprocessed()
+    
+    Description:
+    After a file has been preprocessed, will write it to file so we don't have to do 
+    it again. 
+    Before saving to file, we will convert all of the Nans to -1. This allows us to save the data
+    as a 16-bit integer instead of 32-64 bit float.
+    
+    Using half the amount of disk space == Awesomeness
+    
+    Will just have to convert it when loading before performing feature extraction
+    
+    """
+    
+    def save_preprocessed(self):
         
+        file_path = self.save_path +  self.scan_data.file_path[-10:-4]
+        print(file_path)
+        #copy the scan data
+        temp = np.copy(self.scan_data.data)
+        #set all Nan's to -1
+        temp[np.isnan(temp)] = -1
+        temp = temp.astype(np.int16)
+        
+        #now save the data
+        np.save(file_path, temp)
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
         
     """
     reinitialise()
@@ -469,6 +439,62 @@ class my_thread(Process):
         my_thread.scan_no = 0
         my_thread.cancer_count = 0
         
+        
+        
+        
+        
+    """
+    add_features()
+    
+    Description:
+    Am done with selection and aquisition of features. 
+    Will add the features from this thread to the manager
+        
+    """
     
     
     
+    def add_features(self):
+        
+        X = []
+        Y = []
+        for t_ii in range(0, self.scans_processed):
+            X.append([])
+            for lvl in range(self.scan_data.levels):
+            
+                homogeneity = self.scan_data.homogeneity[t_ii][lvl]
+                entropy = self.scan_data.entropy[t_ii][lvl]
+                energy = self.scan_data.energy[t_ii][lvl]
+                contrast = self.scan_data.contrast[t_ii][lvl]
+                dissimilarity = self.scan_data.dissimilarity[t_ii][lvl]
+                correlation = self.scan_data.correlation[t_ii][lvl]
+                
+                #wave_energy = self.scan_data.wave_energy[t_ii][lvl]
+                #wave_entropy = self.scan_data.wave_entropy[t_ii][lvl]
+                #wave_kurtosis = self.scan_data.wave_kurtosis[t_ii][lvl]
+                
+                X[t_ii].extend(self.flatten(homogeneity))
+                X[t_ii].extend(self.flatten(entropy))
+                X[t_ii].extend(self.flatten(energy))
+                X[t_ii].extend(self.flatten(contrast))
+                X[t_ii].extend(self.flatten(dissimilarity))
+                X[t_ii].extend(self.flatten(correlation))
+                #X[t_ii].extend(flatten(wave_energy))
+                #X[t_ii].extend(flatten(wave_entropy))
+                #X[t_ii].extend(flatten(wave_kurtosis))
+                
+                #X[ii, lvl + lvl*jj*no_features] = homogeneity[0,jj]
+                #X[ii, jj*no_features + 1 + kk] = entropy[0,jj]
+                #X[ii, jj*no_features + 2*feat_len] = energy[0,jj]
+                #X[ii, jj*no_features + 3*feat_len] = contrast[0,jj]
+                #X[ii, jj*no_features + 4*feat_len] = dissimilarity[0,jj]
+                #X[ii, jj*no_features + 5*feat_len] = correlation[0,jj]
+                
+                
+            #set the cancer statues for this scan
+            Y.append(self.cancer_status[t_ii])
+        #now add the features from this list to to conplete list in the manager
+        self.manager.t_lock_acquire()
+        self.manager.add_features(X, Y)
+        self.manager.t_lock_release()
+        

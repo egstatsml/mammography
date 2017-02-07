@@ -34,44 +34,37 @@ class spreadsheet(object):
     Description:
     
     
-    @param benign_files = boolean to tell us if we want benign or malignant scans
-    @param run_synapse = boolean to let us know is we are running on synapse server or
-                         just testing on my computer. Will change the paths for accessing the data
-                         to suit synapse servers if we are
+    @param command_line_args = arguments object that holds the path and boolean values determined
+                               from the command line 
+    
     
     """
-    def __init__(self, directory = './', training = True, run_synapse = False):
+    
+    def __init__(self, command_line_args):
         
-        #if we are running on synapse, change the file paths a bit
-        self.run_synapse = run_synapse
-        if(run_synapse == True):
-            print(run_synapse)
-            self.metadata = pd.read_csv('/exams_metadata_pilot.tsv', sep='\t')
-            self.crosswalk = pd.read_csv('/images_crosswalk_pilot.tsv', sep='\t')        
-            self.training_path = '/trainingData/'
-            #else everything is in the source directory so dont worry
+        self.metadata = pd.read_csv(command_line_args.metadata_path + '/exams_metadata.tsv', sep='\t')
+        if(command_line_args.training):
+            self.crosswalk = pd.read_csv(command_line_args.metadata_path + '/images_crosswalk', sep='\t')        
+            self.training_path = command_line_args.input_path
         else:
-            self.metadata = pd.read_excel( directory + 'exams_metadata_pilot.xlsx')
-            self.crosswalk = pd.read_excel( directory + 'images_crosswalk_pilot.xlsx')        
-            self.training_path = '/media/dperrin/pilot_images/'
+            self.crosswalk = []
+            self.training_path = []
+            
             
         #now setting the member variables
-        self.run_synapse = run_synapse  #save whether we are running on the synapse servers
         self.total_no_exams = self.metadata.shape[0] - 1
-        self.no_images = self.crosswalk.shape[0] - 1
-        self.run_synapse = run_synapse
         self.cancer = False     #cancer status of the current scan
         self.cancer_list = []   #list of cancer status for all of the scans
         self.filenames = [] #list that contains all of the filenames
         self.file_pos = 0   #the location of the current file we are looking for
         
         #lets load in all of the files
-        if(training):
-            self.get_training_scans()
-        else:
-            print('Have only implemented training so far')
-            
+        if(command_line_args.training):
+            self.get_training_scans(command_line_args.input_path)
+        elif(command_line_args.validation):
+            self.get_validation_scans(command_line_args.input_path)
         self.no_scans = len(self.filenames)
+        
         
     """
     get_training_data()
@@ -82,11 +75,15 @@ class spreadsheet(object):
     
     """
     
-    def get_training_scans(self):
+    def get_training_scans(self, directory):
         
         #call the get_all_scans function and tell it to look in the training data
-        self.get_all_scans('training')
+        self.get_all_scans('training', directory)
         
+        
+    def get_validation_scans(self, directory):
+        #call the get_all_scans function and tell it to look in the validation data
+        self.get_all_scans('validation', directory)
         
         
     """
@@ -97,20 +94,19 @@ class spreadsheet(object):
     Will use member variable self.run_synapse to see if we are running on local machine or on synapse server
     
     
-    @param directory = string to say where we are looking for the data
+    @param data_type = string to say where we are looking for the data
                  'training' = look in the training directory
-                 'classifying' = look in the classifying directory
+                 'validation' = look in the classifying directory
     """
     
-    def get_all_scans(self, directory):
+    def get_all_scans(self, data_type, directory):
         
+        #now lets load in all of the filenames
+        for (data_dir, dirnames, filenames) in os.walk(directory):
+            self.filenames.extend(filenames)
+            break
         
-        if(directory == 'training'):
-            #now lets load in all of the filenames
-            for (data_dir, dirnames, filenames) in os.walk(self.training_path):
-                self.filenames.extend(filenames)
-                break
-            
+        if(data_type == 'training'):
             #now will add the cancer status of these files
             for ii in range(0, len(self.filenames)):
                 self.next_scan()
@@ -119,13 +115,10 @@ class spreadsheet(object):
             #after done adding the cancer status, will set reset the file position back to the start (0)
             self.file_pos = 0
             
-        else:
-            print('have only implemented training this far')
-                
-                
-                
-                
-                
+            
+            
+            
+            
     """
     next_scan()
     
@@ -158,14 +151,16 @@ class spreadsheet(object):
     
     def check_cancer(self, filename):
         
-        #if we arent on the synapse server, will need to add the .gz suffix, which is used on
-        #the metadata and crosswalks spreadsheets
-        if(self.run_synapse == False):
-            filename = filename + '.gz'
-            
-        temp = (self.crosswalk['filename'] == filename)
-        crosswalk_data = self.crosswalk.loc[temp,:]        
-
+        #will get rid of any file extentsion suffixies
+        #will be either .npy or .dcm, wither way both are 4 chars long
+        filename = filename[0:-4]
+        list_all_files = list(self.crosswalk['filename'])
+        file_loc = []
+        for ii in range(0,len(list_all_files)): 
+            file_loc.append(filename in list_all_files[ii])
+        temp = (filename in list(self.crosswalk['filename']))
+        crosswalk_data = self.crosswalk.loc[file_loc,:]     
+        
         #now use the helper function to actually check for cancer
         self._check_cancer(crosswalk_data)
 
