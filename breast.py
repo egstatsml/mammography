@@ -44,7 +44,9 @@ from skimage.feature import corner_harris, corner_subpix, corner_peaks
 from scipy import ndimage as ndi
 
 import pywt
-from boundary import trace_boundary, edge_boundary
+######
+#for when I port this to Cython
+#from boundary import trace_boundary, edge_boundary
 
 
 

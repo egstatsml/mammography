@@ -31,7 +31,6 @@ from scipy import ndimage as ndi
 
 from itertools import chain
 import threading
-import Queue
 import timeit
 from multiprocessing import Process, Lock, Queue, cpu_count
 from my_thread import my_thread, shared, my_manager
@@ -80,7 +79,7 @@ def create_classifier_arrays(shared, validation):
 #start the program timer
 program_start = timeit.default_timer()
 command_line_args = arguments(sys.argv[1::])
-sys.stdout = logger(command_line_args.log_path)
+#sys.stdout = logger(command_line_args.log_path)
 
 descriptor = spreadsheet(command_line_args)
 threads = []

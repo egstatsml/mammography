@@ -1,7 +1,6 @@
 #!/usr/bin/python
 import threading
 import timeit
-import Queue
 import gc
 from multiprocessing import Process, Lock, Queue
 from multiprocessing.managers import BaseManager
@@ -42,8 +41,8 @@ from read_files import spreadsheet
 
 
 #for tracking memory
-from pympler.tracker import SummaryTracker
-from pympler.asizeof import asizeof
+#from pympler.tracker import SummaryTracker
+#from pympler.asizeof import asizeof
 
 
 
@@ -320,45 +319,45 @@ class my_thread(Process):
                     
                 self.manager.t_lock_release()
                 print('Queue size = %d' %self.manager.q_size())
-                #try:
-                #now we have the right filename, lets do the processing of it
-                #if we are doing the preprocessing, we will need to read the file in correctly
-                self.scan_data.initialise(file_path, self.preprocessing)
+                try:
+                    #now we have the right filename, lets do the processing of it
+                    #if we are doing the preprocessing, we will need to read the file in correctly
+                    self.scan_data.initialise(file_path, self.preprocessing)
 
-                #Check if we need to run the preprocessing steps
-                if(self.preprocessing):
-                    self.scan_data.preprocessing()
-                    self.save_preprocessed()
-                #check if we need to perform feature extraction for training or classification
-                if(self.training | self.validation):    
-                    self.scan_data.get_features()
+                    #Check if we need to run the preprocessing steps
+                    if(self.preprocessing):
+                        self.scan_data.preprocessing()
+                        self.save_preprocessed()
+                    #check if we need to perform feature extraction for training or classification
+                    if(self.training | self.validation):    
+                        self.scan_data.get_features()
 
 
-                #now that we have the features, we want to append them to the list of features
-                #The list of features is shared amongst all of the class instances, so
-                #before we add anything to there, we should lock other threads from adding
-                #to it
-                self.time_process.append(timeit.default_timer() - start_time)
-                #print('time = %d s' %self.time_process[-1])
-                self.scan_data.current_image_no += 1   #increment the image index
-                self.scans_processed += 1              #increment the image counter
-                lock_time = timeit.default_timer()
-                self.manager.t_lock_acquire()
-                self.manager.inc_scan_count()
-                self.manager.t_lock_release()                    
-                print(self.manager.q_size())
+                    #now that we have the features, we want to append them to the list of features
+                    #The list of features is shared amongst all of the class instances, so
+                    #before we add anything to there, we should lock other threads from adding
+                    #to it
+                    self.time_process.append(timeit.default_timer() - start_time)
+                    #print('time = %d s' %self.time_process[-1])
+                    self.scan_data.current_image_no += 1   #increment the image index
+                    self.scans_processed += 1              #increment the image counter
+                    lock_time = timeit.default_timer()
+                    self.manager.t_lock_acquire()
+                    self.manager.inc_scan_count()
+                    self.manager.t_lock_release()                    
+                    print(self.manager.q_size())
 
+
+                    except:
+                        print('Error with current file %s' %(file_path))
+                        self.manager.add_error_file(file_path)
+                        #get rid of the last cancer_status flag we saved, as it is no longer valid since we didn't save the
+                        #features from the scan
+                        del self.cancer_status[-1]
                     
-                #except:
-                #    print('Error with current file %s' %(file_path))
-                #    self.manager.add_error_file(file_path)
-                    #get rid of the last cancer_status flag we saved, as it is no longer valid since we didn't save the
-                    #features from the scan
-                #    del self.cancer_status[-1]
+                    self.scan_data.cleanup()
+                    gc.collect()
                     
-                self.scan_data.cleanup()
-                gc.collect()
-                
             else:
                 #we should just release the lock on the processes
                 self.manager.t_lock_release()                    

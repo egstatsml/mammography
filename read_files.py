@@ -42,9 +42,9 @@ class spreadsheet(object):
     
     def __init__(self, command_line_args):
         
-        self.metadata = pd.read_csv(command_line_args.metadata_path + '/exams_metadata_pilot.tsv', sep='\t')
+        self.metadata = pd.read_csv(command_line_args.metadata_path + '/exams_metadata.tsv', sep='\t')
         if(command_line_args.training):
-            self.crosswalk = pd.read_csv(command_line_args.metadata_path + '/images_crosswalk_pilot.tsv', sep='\t')        
+            self.crosswalk = pd.read_csv(command_line_args.metadata_path + '/images_crosswalk', sep='\t')        
             self.training_path = command_line_args.input_path
         else:
             self.crosswalk = []
@@ -53,7 +53,6 @@ class spreadsheet(object):
             
         #now setting the member variables
         self.total_no_exams = self.metadata.shape[0] - 1
-        self.no_images = self.crosswalk.shape[0] - 1
         self.cancer = False     #cancer status of the current scan
         self.cancer_list = []   #list of cancer status for all of the scans
         self.filenames = [] #list that contains all of the filenames
@@ -62,9 +61,8 @@ class spreadsheet(object):
         #lets load in all of the files
         if(command_line_args.training):
             self.get_training_scans(command_line_args.input_path)
-        else:
+        elif(command_line_args.validation):
             self.get_validation_scans(command_line_args.input_path)
-            
         self.no_scans = len(self.filenames)
         
         
@@ -83,7 +81,7 @@ class spreadsheet(object):
         self.get_all_scans('training', directory)
         
         
-    def get_validation_scans(self):
+    def get_validation_scans(self, directory):
         #call the get_all_scans function and tell it to look in the validation data
         self.get_all_scans('validation', directory)
         

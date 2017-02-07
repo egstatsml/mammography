@@ -372,6 +372,12 @@ class feature(breast):
     
     
     def __initialise_feature_lists(self):        
+
+        #for python 2.7 and 3 compatability for range and xrange
+        try:
+            xrange
+        except NameError:
+            xrange = range
         
         self.homogeneity = [[0 for j in xrange(self.levels)] for i in xrange(self.no_images)]
         self.energy = [[0 for j in xrange(self.levels)] for i in xrange(self.no_images)]
