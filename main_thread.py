@@ -59,7 +59,6 @@ def create_classifier_arrays(shared, validation):
     #convert the list of features and class discriptors into arrays
     X = np.array(shared.get_feature_array())
     Y = np.array(shared.get_class_array())
-    print (X.shape)
     
     X_t = X[0:-val,:]
     Y_t = Y[0:-val]
@@ -87,7 +86,7 @@ descriptor = spreadsheet(command_line_args)
 threads = []
 id = 0
 num_threads = cpu_count() - 2
-print num_threads    
+print( num_threads )
 
 #my_manager.register('shared',shared)
 
@@ -119,9 +118,6 @@ for ii in range(0,num_threads):
 #now some code to make sure it all runs until its done
 #keep this main thread open until all is done
 while (not shared.get_exit_status()):
-    #a = threading.activeCount() 
-    #if(a != 15):
-    #print a
     pass
 
 #queue is empty so we are just about ready to finish up
@@ -192,4 +188,4 @@ print('Run Time for %d scans = %hours %d minutes and %f seconds' %(descriptor.no
 """ 
 
 
-print "Exiting Main Thread"
+print("Exiting Main Thread")

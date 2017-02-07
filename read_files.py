@@ -160,7 +160,6 @@ class spreadsheet(object):
         file_loc = []
         for ii in range(0,len(list_all_files)): 
             file_loc.append(filename in list_all_files[ii])
-        #print list(self.crosswalk['filename'])
         temp = (filename in list(self.crosswalk['filename']))
         crosswalk_data = self.crosswalk.loc[file_loc,:]     
         

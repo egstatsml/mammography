@@ -195,8 +195,8 @@ class shared(object):
             self.class_array = Y
             
         else:
-            print ' adding extra features'
-            print np.shape(self.feature_array)
+            print(' adding extra features')
+            print(np.shape(self.feature_array))
             #print self.feature_array
             self.feature_array.extend(X)
             self.class_array.extend(Y)
@@ -240,7 +240,7 @@ class my_thread(Process):
     
     def __init__(self, thread_id, no_images_total, manager, command_line_args):
         Process.__init__(self)
-        print thread_id
+        print(thread_id)
         self.manager = manager
         self.t_id = thread_id
         self.scan_data = feature(levels = 3, wavelet_type = 'haar', no_images = no_images_total ) #the object that will contain all of the data
@@ -314,7 +314,7 @@ class my_thread(Process):
                 #if the queue is now empty, we should wrap up and
                 #get ready to exit
                 if(self.manager.q_empty()):
-                    print 'here'
+                    print(' Queue is Empty')
                     self.manager.set_exit_status(True)
                     
                     
@@ -346,7 +346,7 @@ class my_thread(Process):
                 self.manager.t_lock_acquire()
                 self.manager.inc_scan_count()
                 self.manager.t_lock_release()                    
-                print self.manager.q_size()
+                print(self.manager.q_size())
 
                     
                 #except:
@@ -397,7 +397,7 @@ class my_thread(Process):
     def save_preprocessed(self):
         
         file_path = self.save_path +  self.scan_data.file_path[-10:-4]
-        print file_path
+        print(file_path)
         #copy the scan data
         temp = np.copy(self.scan_data.data)
         #set all Nan's to -1

@@ -111,7 +111,7 @@ class breast(object):
     def initialise(self, file_path, preprocessing = True):
         self.file_path = file_path
         #if we are preprocessing, read in the DICOM formatted image
-        print preprocessing
+        print(preprocessing)
         if(preprocessing):
             file = dicom.read_file(file_path)
             self.data = np.fromstring(file.PixelData,dtype=np.int16).reshape((file.Rows,file.Columns))
@@ -376,7 +376,6 @@ class breast(object):
         #find the most prominent lines in the Hough Transform
         h, theta, d = hough_line_peaks(h, theta, d)
         #use the peak values to create polar form of line describing edge of pectoral muscle
-        #print theta * (180.0/np.pi)
         valid_h = h[(theta < np.pi/8) & (theta > 0 )]
         
         #sometimes there are more than one index found, as the accumulator has returned
@@ -687,8 +686,6 @@ class breast(object):
             for ii in range(0,y_s.size):
                 #first check that the indicies we will be using are valid
                 if((x + x_s[ii]) >= 0) & ((x + x_s[ii]) < im.shape[1]) & ((y + y_s[ii]) >= 0) & ((y + y_s[ii]) < im.shape[0]):
-                    #print ii
-                    #found[ii] = (im[y + y_s[ii], x + x_s[ii]] == 1)
                     #if the pixel we have found is on the boundary
                     if(im[y + y_s[ii], x + x_s[ii]] == 1):
                         #if it is the first pass through, we will add this point
@@ -705,7 +702,6 @@ class breast(object):
                             x = x + x_s[ii]
                             y = y + y_s[ii]
                             found = True
-                            #print np.max(l_x)
                             break
                         
                         else:
@@ -758,7 +754,7 @@ class breast(object):
     def remove_skin(self):
         
         #first lets smooth the boundary
-        print np.shape(self.boundary)
+        print(np.shape(self.boundary))
         x = signal.savgol_filter(self.boundary, 81, 3)
         
         #now lets take derivative
@@ -934,12 +930,6 @@ class breast(object):
             
             
             
-            #find the maximum in hough space
-            #print np.shape(h)
-            #print np.shape(theta)
-            #print np.shape(d)
-            #print index
-            
             d = d[index]
             theta = theta[index]
             
@@ -952,7 +942,7 @@ class breast(object):
             y_new = np.round(d / np.sin(theta) - (np.cos(theta) / np.sin(theta)) * i)
             valid = (y_new >= 0) & (y_new < w)
             if(np.sum(valid) < 1):
-                print y_new
+                print(y_new)
                 break
             
             #print(y_new)
@@ -961,7 +951,6 @@ class breast(object):
             #now finding the mid_point
             mid = np.where(np.cumsum(valid) >= np.sum(valid)/2)[0]
             mid = mid[0]
-            #print y_new
             x_mid = i[mid]
             y_mid = y_new[mid]
             #suffix and prefix
@@ -969,8 +958,6 @@ class breast(object):
             # r = finish of line (right)
             y_v = np.array(y_new[valid])
             x_v = np.array(i[valid])
-            #print y_v
-            #print x_v
             
             x_l = x_v[0]
             y_l = y_v[0]
@@ -1009,8 +996,6 @@ class breast(object):
             
             x += h_dist * np.abs((x_r - x_l)/2)
             y += v_dist * np.abs((y_r - y_l)/2)
-            #print x_mid
-            #print y_mid
             
         """
         im = np.zeros((np.shape(self.data)))

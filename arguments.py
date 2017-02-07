@@ -51,7 +51,7 @@ class arguments(object):
         
         
         if(argv != False):
-            print argv
+            print(argv)
             self.parse_command_line(argv)
         
         
@@ -94,16 +94,14 @@ class arguments(object):
         #lets make sure all of the required arguments are there
         required = ['-i', '-s', '-l', '-m']
         count = 0
-        print opts
         for opt, arg in opts:
-            print opt
             if((opt == '-i') | (opt == '-s') | (opt == '-l') | (opt == '-m')):
                 count = count + 1
                 
         #if count doesn't equal the length of required arguments, then not all required arguments
         #were supplied
         if( count < len(required)):
-            print count
+            print(count)
             print('Not all required arguments were supplied')
             self.usage()
             sys.exit(2)
@@ -128,7 +126,6 @@ class arguments(object):
                 
             elif opt == '-l':
                 self.log_path = str(arg)
-                print self.log_path
                 
             elif opt == '-m':
                 self.metadata_path = str(arg)

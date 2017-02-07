@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 #variables that can be used for setting paths, etc.
 SAVE_DIR="preprocessedData/images/"
 LOG_DIR="/preprocessedData/log/"
@@ -12,7 +14,7 @@ mkdir -p $LOG_DIR
 
 
 echo "Running Preprocessing script"
-sudo python main_thread.py -p -i $INPUT_DIR -s $SAVE_DIR -l $LOG_DIR -m $METADATA_DIR
+python main_thread.py -p -i $INPUT_DIR -s $SAVE_DIR -l $LOG_DIR -m $METADATA_DIR
 
 
 echo "DONE"
