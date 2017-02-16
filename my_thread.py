@@ -347,9 +347,10 @@ class my_thread(Process):
                     self.manager.inc_scan_count()
                     self.manager.t_lock_release()                    
                     print(self.manager.q_size())
-
-
-                except:
+                    
+                    
+                except Exception as e:
+                    print e 
                     print('Error with current file %s' %(file_path))
                     self.manager.add_error_file(file_path)
                     #get rid of the last cancer_status flag we saved, as it is no longer valid since we didn't save the

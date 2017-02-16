@@ -46,6 +46,7 @@ from scipy import ndimage as ndi
 import pywt
 ######
 #for when I port this to Cython
+from breast_cython import cy_search_prev
 #from boundary import trace_boundary, edge_boundary
 
 
@@ -266,18 +267,16 @@ class breast(object):
                     med_current = np.median(pdf[0])
                     #now finding median value of space to left, doing it all in one line, same procedure as done above so I will allow this part
                     #of my code to be more terse :)
-                    med_left = np.median( np.cumsum( np.histogram(self.data[y:y+200, x-50:x+150], bins=np.arange(0,np.max(self.data)+1), density=True)[0]))
+                    med_left = np.median( np.cumsum( np.histogram(self.data[y:y+200, x-10:x+190], bins=np.arange(0,np.max(self.data)+1), density=True)[0]))
                     #now lets compare
                     if(med_current < med_left):
-                        
                         self.data[y:y+200,x:x+200] = 0                    
                     
                     
                     
                 y = y+200
-                x = x+200
-                
-                
+            x = x+200
+            
                 
                 
                 
@@ -412,15 +411,10 @@ class breast(object):
         
         if(self.plot):
             fig = plt.figure()
-            plt.axis('off')
-            ax2 = fig.add_subplot(1,1,1)
-            ax2.imshow(h_full, cmap='gray')
-            fig.savefig(os.getcwd() + '/figs/edge_' + self.file_path[-10:-4] +'t.'  + 'png', box_inches='tight')
-            fig.clf()
             ax2 = fig.add_subplot(1,1,1)
             ax2.imshow(self.original_scan, cmap='gray')
             plt.axis('off')
-            fig.savefig(os.getcwd() + '/figs/edge_' + self.file_path[-10:-4] +'a.'  + 'png', box_inches='tight')
+            fig.savefig(os.getcwd() + '/figs/edge_' + self.file_path[-10:-4] +'a.'  + 'png', bbox_inches='tight')
             fig.clf()
             ax2 = fig.add_subplot(1,1,1)
             ax2.imshow(edge)
@@ -689,19 +683,26 @@ class breast(object):
         y,x = np.where(im != 0)
         y = y[0]
         x = x[0]
-        l_y = []
-        l_x = []
+        
+        
+        #defining the initial boundary points as a large array of zeros
+        #this will allow for much faster indexing since I am using a cython
+        #function for checking if parts have already been found
+        #Will allocate array much larger than the true boundaries will be, 
+        #and will just have to truncate it at the end to use only the portions that we selected
+        l_y = np.zeros(15000, dtype=np.int16)
+        l_x = np.zeros(15000, dtype=np.int16)
         
         first = True
         
-        x_s = np.array([0, 0, -1, 1, -1, 1, -1, 1], dtype=np.int)
-        y_s = np.array([-1, 1, 0, 0, -1, -1, 1, 1], dtype=np.int)
+        x_s = np.array([0, 0, -1, 1, -1, 1, -1, 1], dtype=np.int16)
+        y_s = np.array([-1, 1, 0, 0, -1, -1, 1, 1], dtype=np.int16)
         
         count = 0
         
-        while((x >= 0) & (y >= 0) & (y < im.shape[0]) & (count < 15000)):
-            l_y.append(y)
-            l_x.append(x)
+        while((x >= 0) & (y >= 0) & (y < im.shape[0]) & (count < 14999)):
+            l_y[count] = y
+            l_x[count] = x
             found = False
             for ii in range(0,y_s.size):
                 #first check that the indicies we will be using are valid
@@ -718,7 +719,7 @@ class breast(object):
                             break
                         
                         #otherwise check we havent already found this point
-                        if(not self.search_prev(l_y,l_x,y + y_s[ii], x + x_s[ii], count)):
+                        if(not cy_search_prev(l_y,l_x,y + y_s[ii], x + x_s[ii], count)):
                             x = x + x_s[ii]
                             y = y + y_s[ii]
                             found = True
@@ -730,8 +731,14 @@ class breast(object):
             #if we haven'f found another part of the boundary, lets finish up
             if(found == False):
                 break
-                
+            #print('count = %d' %count)
             count += 1
+            
+        #Once we are here, we are done following the line, so will now truncate the
+        #line arrays to include just the parts that we used
+        
+        l_y = l_y[0:count-1]
+        l_x = l_x[0:count-1]
         if(self.plot):
             test = np.zeros(im.shape)
             test[l_y, l_x] = 1
@@ -751,21 +758,22 @@ class breast(object):
             
             
         #now re-write the breast boundary member variables
-        self.boundary = np.array(l_x)
-        self.boundary_y = np.array(l_y)
+        self.boundary = l_x
+        self.boundary_y = l_y
         
             
         
         
     def search_prev(self,l_y,l_x, y, x, count):
         recently_found = False
-        if(count < 10):
-            lim = len(l_y) + 1
+        if(count < 20):
+            lim = count + 1
         else:
-            lim = 10
-        for jj in range(1,lim):
-            if(l_y[-jj] == y) & (l_x[-jj] == x):
+            lim = 20
+        for jj in range(count,count-lim,-1):
+            if(l_y[jj] == y) & (l_x[jj] == x):
                 recently_found = True
+                print('recently found, count = %d' %count)
                 break
         
         return recently_found
@@ -784,8 +792,8 @@ class breast(object):
     Use these points of inflection to decide which parts of the breast to get rid of
     
     """
-        
-        
+    
+    
     def remove_skin(self):
         
         #first lets smooth the boundary
@@ -819,7 +827,7 @@ class breast(object):
         #if the value of the breast boundary close to the maximim at this point,
         #then is most likely due to the nipple
         
-        """
+        
         #if we actually found any peaks
         if(peaks.size > 0):
             #get rid of peaks near the nipple
@@ -846,7 +854,7 @@ class breast(object):
                     
                 
                 
-        """
+        
         #Code just for making pretty plots to check it is all working :)
         if(self.plot):
             fig = plt.figure()
@@ -858,19 +866,21 @@ class breast(object):
             im3 = ax1.plot(self.boundary_y, d2x, 'm', label='Second Derivative')
             #fig.colorbar(im1)
             plt.title('Breast Boundary and Second Derivative')
-            plt.legend()
+            plt.legend(loc=3)
             fig.savefig(os.getcwd() + '/figs/' + 'deriv_' + self.file_path[-10:-3] + 'png', bbox_inches='tight')
             fig.clf()
             plt.close()
 
 
             fig = plt.figure()
+            plt.axis('off')
             ax1 = fig.add_subplot(1,1,1)
-            im1 = ax1.imshow(self.data)
+            im1 = ax1.imshow(self.data, cmap='gray')
             fig.savefig(os.getcwd() + '/figs/' + 'pre_' + self.file_path[-10:-3] + 'png', bbox_inches='tight')
             fig.clf()
             
             fig = plt.figure()
+            plt.axis('off')
             ax1 = fig.add_subplot(1,1,1)
             im1 = ax1.imshow(self.breast_mask)
             fig.savefig(os.getcwd() + '/figs/' + 'msk_' + self.file_path[-10:-3] + 'png', bbox_inches='tight')
