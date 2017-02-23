@@ -1,15 +1,15 @@
-FROM ubuntu:14.04
+FROM nvidia/cuda:8.0-runtime-ubuntu14.04
 MAINTAINER Ethan Goan <e.goan@student.qut.edu.au>
 
 
 #install all of the Python Packages required
 
 RUN apt-get update
-RUN apt-get install wget
+RUN apt-get install wget -y
 
 #install Anaconda
 RUN wget https://repo.continuum.io/archive/Anaconda2-4.3.0-Linux-x86_64.sh
-RUN bash Anaconda2-4.3.0-Linux-x86_64.sh -p /anaconda -p
+RUN bash Anaconda2-4.3.0-Linux-x86_64.sh -p /anaconda -b
 RUN rm Anaconda2-4.3.0-Linux-x86_64.sh
 ENV PATH=/anaconda/bin:${PATH}
 RUN conda update -y conda
@@ -21,40 +21,25 @@ RUN conda update -y conda
 #
 #https://hub.docker.com/r/nvidia/cuda/
 #
-##############
-
-LABEL maintainer "NVIDIA CORPORATION <cudatools@nvidia.com>"
-LABEL com.nvidia.volumes.needed="nvidia_driver"
-RUN NVIDIA_GPGKEY_SUM=d1be581509378368edeec8c1eb2958702feedf3bc3d17011adbf24efacce4ab5 && \
-    NVIDIA_GPGKEY_FPR=ae09fe4bbd223a84b2ccfce3f60f4b3d7fa2af80 && \
-    apt-key adv --fetch-keys http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1404/x86_64/7fa2af80.pub && \
-    apt-key adv --export --no-emit-version -a $NVIDIA_GPGKEY_FPR | tail -n +2 > cudasign.pub && \
-    echo "$NVIDIA_GPGKEY_SUM  cudasign.pub" | sha256sum -c --strict - && rm cudasign.pub && \
-    echo "deb http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1404/x86_64 /" > /etc/apt/sources.list.d/cuda.list
-ENV CUDA_VERSION 8.0
-LABEL com.nvidia.cuda.version="8.0"
-ENV CUDA_PKG_VERSION 8-0=8.0.61-1
+#############
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        cuda-nvrtc-$CUDA_PKG_VERSION \
-        cuda-nvgraph-$CUDA_PKG_VERSION \
-        cuda-cusolver-$CUDA_PKG_VERSION \
-        cuda-cublas-$CUDA_PKG_VERSION \
-        cuda-cufft-$CUDA_PKG_VERSION \
-        cuda-curand-$CUDA_PKG_VERSION \
-        cuda-cusparse-$CUDA_PKG_VERSION \
-        cuda-npp-$CUDA_PKG_VERSION \
-        cuda-cudart-$CUDA_PKG_VERSION && \
-    ln -s cuda-$CUDA_VERSION /usr/local/cuda && \
+    cuda-core-$CUDA_PKG_VERSION \
+    cuda-misc-headers-$CUDA_PKG_VERSION \
+    cuda-command-line-tools-$CUDA_PKG_VERSION \
+    cuda-nvrtc-dev-$CUDA_PKG_VERSION \
+    cuda-nvml-dev-$CUDA_PKG_VERSION \
+    cuda-nvgraph-dev-$CUDA_PKG_VERSION \
+    cuda-cusolver-dev-$CUDA_PKG_VERSION \
+    cuda-cublas-dev-$CUDA_PKG_VERSION \
+    cuda-cufft-dev-$CUDA_PKG_VERSION \
+    cuda-curand-dev-$CUDA_PKG_VERSION \
+    cuda-cusparse-dev-$CUDA_PKG_VERSION \
+    cuda-npp-dev-$CUDA_PKG_VERSION \
+    cuda-cudart-dev-$CUDA_PKG_VERSION \
+    cuda-driver-dev-$CUDA_PKG_VERSION && \
     rm -rf /var/lib/apt/lists/*
-RUN echo "/usr/local/cuda/lib64" >> /etc/ld.so.conf.d/cuda.conf && \
-    ldconfig
-RUN echo "/usr/local/nvidia/lib" >> /etc/ld.so.conf.d/nvidia.conf && \
-    echo "/usr/local/nvidia/lib64" >> /etc/ld.so.conf.d/nvidia.conf
-ENV PATH /usr/local/nvidia/bin:/usr/local/cuda/bin:${PATH}
-ENV LD_LIBRARY_PATH /usr/local/nvidia/lib:/usr/local/nvidia/lib64
 
-
-
+ENV LIBRARY_PATH /usr/local/cuda/lib64/stubs:${LIBRARY_PATH}
 
 
 ##############
@@ -64,11 +49,9 @@ ENV LD_LIBRARY_PATH /usr/local/nvidia/lib:/usr/local/nvidia/lib64
 #
 ##############
 
-
-FROM python
 RUN pip install --upgrade pip
 RUN pip install pydicom
-RUN pip install numpy
+#RUN pip install numpy
 RUN pip install pandas
 RUN pip install matplotlib
 RUN pip install scipy
@@ -84,8 +67,18 @@ COPY read_files.py .
 COPY feature_extract.py .
 COPY my_thread.py .
 COPY breast.py  .
+COPY breast_cython.pyx .
 COPY arguments.py .
 COPY log.py .
+
+#copy script to compile Cython Files
+COPY compile.sh .
+#make it executable
+RUN chmod u+x ./compile.sh
+#give 755 permissions
+RUN chmod 755 compile.sh
+#now run it
+RUN ./compile.sh
 
 ##############
 #

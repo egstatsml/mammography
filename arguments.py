@@ -202,12 +202,12 @@ class arguments(object):
             for ii in self.weight.keys():
                 weight_string += '-w%s %s ' %(ii, self.weight[ii])
                 
-            self.train_string = '~/CUDA/src/linux/svm-train-gpu  -t %s -d %s -m 5000 -e %s %s %s/train_file_libsvm %s/model_file' %(self.kernel, self.degree, self.epsilon, weight_string, self.log_path, self.log_path)
+            self.train_string =./CUDA/src/linux/svm-train-gpu  -t %s -d %s -m 5000 -e %s %s %s/train_file_libsvm %s/model_file' %(self.kernel, self.degree, self.epsilon, weight_string, self.log_path, self.log_path)
             
             
             
             if(self.validation != 0):
-                self.validation_string = '~/libsvm/svm-predict %s/predict_file_libsvm %s/model_file %s/results.txt' %(self.log_path, self.log_path, self.log_path)
+                self.validation_string = './LIBSVM/svm-predict %s/predict_file_libsvm %s/model_file %s/results.txt' %(self.log_path, self.log_path, self.log_path)
             
             
             
