@@ -49,14 +49,21 @@ class spreadsheet(object):
         else:
             self.crosswalk = []
             self.training_path = []
-            
-            
+                
         #now setting the member variables
         self.total_no_exams = self.metadata.shape[0] - 1
         self.cancer = False     #cancer status of the current scan
         self.cancer_list = []   #list of cancer status for all of the scans
         self.filenames = [] #list that contains all of the filenames
         self.file_pos = 0   #the location of the current file we are looking for
+        
+        #if we are running on the synapse servers, we need to use 'subjectId' instead of 'patientId'
+        #just something that they changed for a part of the challenge submissions
+        #we specify that we are running as part of the challenge with the -c flag
+        if(command_line_args.challenge_submission):
+            self.patient_subject = 'subjectId'
+        else:
+            self.patient_subject = 'patientId'
         
         #lets load in all of the files
         if(command_line_args.training):
@@ -155,6 +162,7 @@ class spreadsheet(object):
         #will be either .npy or .dcm, wither way both are 4 chars long
         filename = filename[0:-4]
         list_all_files = list(self.crosswalk['filename'])
+        print list_all_files
         file_loc = []
         for ii in range(0,len(list_all_files)): 
             file_loc.append(filename in list_all_files[ii])
@@ -181,7 +189,7 @@ class spreadsheet(object):
         #by finding the row with this patient id and exam number
         #finding these individually, it's not the most elegant way to do it,
         #but it is the clearest
-        patient_mask = (self.metadata['patientId'] == crosswalk_data.iloc[0,0])
+        patient_mask = (self.metadata[self.patient_subject] == crosswalk_data.iloc[0,0])
         exam_mask = (self.metadata['examIndex'] == crosswalk_data.iloc[0,1])
         mask = (patient_mask & exam_mask)
         scan_metadata = self.metadata.loc[mask,:]
@@ -206,7 +214,7 @@ class spreadsheet(object):
             
     def get_filenames(self):
         
-        left = (self.crosswalk['patientId'] == self.patient_id) & (self.crosswalk['examIndex'] == self.exam_index) & (self.crosswalk["imageView"].str.contains('L')) 
+        left = (self.crosswalk[self.patient_subject] == self.patient_id) & (self.crosswalk['examIndex'] == self.exam_index) & (self.crosswalk["imageView"].str.contains('L')) 
         
         left_filenames = (self.crosswalk.loc[left, 'filename'])
         
@@ -216,7 +224,7 @@ class spreadsheet(object):
             self.filename_l.append(left_name)
             
             
-        right = (self.crosswalk['patientId'] == self.patient_id) & (self.crosswalk['examIndex'] == self.exam_index) & (self.crosswalk["imageView"].str.contains('R')) 
+        right = (self.crosswalk[self.patient_subject] == self.patient_id) & (self.crosswalk['examIndex'] == self.exam_index) & (self.crosswalk["imageView"].str.contains('R')) 
         
         right_filenames = (self.crosswalk.loc[right, 'filename'])
         self.no_scans_right = np.sum(right)
@@ -289,7 +297,7 @@ class spreadsheet(object):
         self.filename_l = []
         self.filename_r = []
         self.patient_id = patientId
-        mask = (self.metadata['patientId'] == patientId)
+        mask = (self.metadata[self.patient_subject] == patientId)
         patient_data = self.metadata.loc[mask,:]
         #now lets find the most recent exam and get those files
         self.exam_index = np.max(patient_data['examIndex'])
@@ -325,7 +333,7 @@ class spreadsheet(object):
         self.filename_l = []
         self.filename_r = []
         self.patient_id = patientId
-        mask = (self.metadata['patientId'] == patientId)
+        mask = (self.metadata[self.patient_subject] == patientId)
         patient_data = self.metadata.loc[mask,:]
         #now lets find the most recent exam and get those files
         self.exam_index = exam
@@ -353,7 +361,7 @@ class spreadsheet(object):
     
     def get_patient_info(self):
         #creating a mask for crop the data to information for just our patient of interest
-        mask = (self.metadata['patientId'] == self.current_patient_id)
+        mask = (self.metadata[self.patient_subject] == self.current_patient_id)
         #get the header
         header = self.metadata.columns.values
         patient_info = pd.DataFrame(header) 

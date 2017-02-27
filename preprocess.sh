@@ -16,12 +16,12 @@ mkdir -p $LOG_DIR
 #compile Cython files
 echo "Compiling Cython Files"
 #chmod u+x ./compile.sh
-./compile.sh
+#./compile.sh
 
 #python main_thread.py -p -t -i /trainingData -s /preprocessedData -l /modelState -m /metadata -k 1 -d 4 -e 0.001 -b -w 0:1,1:20 -v 100
 
 echo "Running Preprocessing script"
-python main_thread.py -p -i $INPUT_DIR -s $SAVE_DIR -l $LOG_DIR -m $METADATA_DIR -k 1 -d 4 -e 0.001 -b -w 0:1,1:20 -v 100
+python main_thread.py -p -t -c -i $INPUT_DIR -s $SAVE_DIR -l $LOG_DIR -m $METADATA_DIR -k 1 -d 4 -e 0.001 -b -w 0:1,1:20 -v 100
 
 
 echo "DONE"

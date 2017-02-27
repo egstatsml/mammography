@@ -84,7 +84,7 @@ def preprocessing(command_line_args):
     threads = []
     id = 0
     num_threads = cpu_count() - 2
-    print( num_threads )
+    print("Number of processes to be initiated = %d" %num_threads )
     
     #my_manager.register('shared',shared)
     
@@ -94,6 +94,8 @@ def preprocessing(command_line_args):
     
     
     #setting up the queue for all of the threads, which contains the filenames
+    print("Setting up Queue")
+    print descriptor.no_scans
     for ii in range(0, descriptor.no_scans):
         shared.t_lock_acquire()
         shared.q_put(descriptor.filenames[ii])
@@ -102,19 +104,24 @@ def preprocessing(command_line_args):
             shared.q_cancer_put(descriptor.cancer_list[ii])
         shared.t_lock_release()
         
-        
+    print('Set up Queue')
+    
     # Create new threads
+    print('Creating threads')
     for ii in range(0,num_threads):
+        sys.stdout.flush()
         thread = my_thread(id, descriptor.no_scans, shared, command_line_args)
         thread.start()
         threads.append(thread)
         id += 1
         
-        
+    print('Started Threads')
         
     #now some code to make sure it all runs until its done
     #keep this main thread open until all is done
     while (not shared.get_exit_status()):
+        #just so we flush all print statements to stdout
+        sys.stdout.flush()
         pass
     
     #queue is empty so we are just about ready to finish up

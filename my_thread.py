@@ -70,8 +70,8 @@ class shared(object):
     #whenever any of these reference variables are accessed, the thread lock should be applied,
     #to ensure multiple threads arent accessing the same memory at the same time
     
-    q = Queue(1000)        #queue that will contain the filenames of the scans
-    q_cancer = Queue(1000) #queue that will contain the cancer status of the scans
+    q = Queue(10000000)        #queue that will contain the filenames of the scans
+    q_cancer = Queue(10000000) #queue that will contain the cancer status of the scans
     t_lock = Lock()
     exit_flag = False
     error_files = []   #list that will have all of the files that we failed to process
@@ -239,7 +239,7 @@ class my_thread(Process):
     
     def __init__(self, thread_id, no_images_total, manager, command_line_args):
         Process.__init__(self)
-        print(thread_id)
+        print('Initialising thread %d' %thread_id)
         self.manager = manager
         self.t_id = thread_id
         self.scan_data = feature(levels = 3, wavelet_type = 'haar', no_images = no_images_total ) #the object that will contain all of the data
@@ -265,6 +265,7 @@ class my_thread(Process):
     
     def run(self):
         #just run the process function
+        print('Begin process in thread %d' %self.t_id)
         self.process()
         
         
@@ -295,7 +296,7 @@ class my_thread(Process):
     """
     
     def process(self):
-        
+        print('Running thread %d' %self.t_id)
         #while there is still names on the list, continue to loop through
         #while the queue is not empty
         while( not self.manager.get_exit_status()):
@@ -315,7 +316,10 @@ class my_thread(Process):
                 if(self.manager.q_empty()):
                     print(' Queue is Empty')
                     self.manager.set_exit_status(True)
-                        
+                    
+                if(self.manger.get_cancer_count() > 50):
+                    print('Cancer count is equal to 50 so lets try training and validating')
+                    self.manager.set_exit_status(True)
                     
                     
                 self.manager.t_lock_release()
@@ -324,7 +328,7 @@ class my_thread(Process):
                     #now we have the right filename, lets do the processing of it
                     #if we are doing the preprocessing, we will need to read the file in correctly
                     self.scan_data.initialise(file_path, self.preprocessing)
-
+                    
                     #Check if we need to run the preprocessing steps
                     if(self.preprocessing):
                         self.scan_data.preprocessing()
@@ -332,8 +336,8 @@ class my_thread(Process):
                     #check if we need to perform feature extraction for training or classification
                     if(self.training | self.validation):    
                         self.scan_data.get_features()
-
-
+                        
+                        
                     #now that we have the features, we want to append them to the list of features
                     #The list of features is shared amongst all of the class instances, so
                     #before we add anything to there, we should lock other threads from adding
@@ -357,9 +361,10 @@ class my_thread(Process):
                     #features from the scan
                     del self.cancer_status[-1]
                     
+                sys.stdout.flush()
                 self.scan_data.cleanup()
                 gc.collect()
-                    
+                
             else:
                 #we should just release the lock on the processes
                 self.manager.t_lock_release()                    
@@ -371,7 +376,7 @@ class my_thread(Process):
         self.scan_data._crop_features(self.scans_processed)
         self.add_features()
         print('Thread %d is out' %self.t_id)
-        
+        sys.stdout.flush()
         
         
     def flatten(self, x):

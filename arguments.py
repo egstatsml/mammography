@@ -55,6 +55,7 @@ class arguments(object):
         self.weight = {'0':1,'1':1}
         self.train_string = []
         self.validation_string = []
+        self.challenge_submission = False
         
         if(argv != False):
             print(argv)
@@ -97,14 +98,14 @@ class arguments(object):
        -e = Epsilon. Tolerance for termination. (Default of 0.001)
        -b = Probability estimates (Default of False)
        -w = Weight for each class. usage here should be a dictionary like reference for each class
-    
+       -c = submission to the DREAM Challenge
     """
     
     def parse_command_line(self, argv):
         
         try:
             
-            opts,args = getopt.getopt(argv, "htpbm:i:s:l:v:k:d:g:e:w:")
+            opts,args = getopt.getopt(argv, "htpbcm:i:s:l:v:k:d:g:e:w:")
             
         except getopt.GetoptError as err:
             print(str(err))
@@ -154,7 +155,7 @@ class arguments(object):
                 
             elif opt == '-v':
                 self.validation = int(arg)
-                print 'hereherehe'
+                
             elif opt == '-k':
                 self.kernel = int(arg)
                 
@@ -167,11 +168,11 @@ class arguments(object):
             elif opt == '-e':
                 self.epsilon = float(arg)
                 
-            elif opt == '-e':
-                self.epsilon = float(arg)
-                
             elif opt == '-b':
                 self.probability = True
+                
+            elif opt == '-c':
+                self.challenge_submission = True
                 
             elif opt == '-w':
                 #convert the string argument into a dictionary
@@ -194,7 +195,7 @@ class arguments(object):
                     print(e)
                     
         #and lets do some error checking on the inputs
-        self.check_inputs(opt)
+        self.check_inputs(opts)
         
         #now that everything is set and valid, we should set the strings to run the training and validation
         if(self.training):
@@ -202,7 +203,7 @@ class arguments(object):
             for ii in self.weight.keys():
                 weight_string += '-w%s %s ' %(ii, self.weight[ii])
                 
-            self.train_string =./CUDA/src/linux/svm-train-gpu  -t %s -d %s -m 5000 -e %s %s %s/train_file_libsvm %s/model_file' %(self.kernel, self.degree, self.epsilon, weight_string, self.log_path, self.log_path)
+            self.train_string ='./CUDA/svm-train-gpu  -t %s -d %s -m 5000 -e %s %s %s/train_file_libsvm %s/model_file' %(self.kernel, self.degree, self.epsilon, weight_string, self.log_path, self.log_path)
             
             
             
@@ -331,9 +332,10 @@ class arguments(object):
         -e = Epsilon. Tolerance for termination. (Default of 0.001)
         -b = Probability estimates (Default of False)
         -w = Weight for each class. usage here should be a dictionary like reference for each class
+       -c = submission to the DREAM Challenge
         
         Example 1 - run on Synapse Server to preprocess and train: 
-        python main_thread.py -p -t -i /trainingData -s /preprocessedData -l /modelState -m /metadata -k 1 -d 4 -e 0.001 -b -w 0:1,1:20
+        python main_thread.py -p -t -c -i /trainingData -s /preprocessedData -l /modelState -m /metadata -k 1 -d 4 -e 0.001 -b -w 0:1,1:20
 
         Example 2 - Run on Dimitri's Machine  to train and validate:
         sudo python main_thread.py -p -t -i /media/dperrin/ -s /media/dperrin/preprocessed/ -l ./ -m ./ -v 100 -k 1 -d 4 -e 0.001 -b -w 0:1,1:20")

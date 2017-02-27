@@ -69,7 +69,7 @@ COPY my_thread.py .
 COPY breast.py  .
 COPY breast_cython.pyx .
 COPY arguments.py .
-COPY log.py .
+COPY log.py . 
 
 #copy script to compile Cython Files
 COPY compile.sh .

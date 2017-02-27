@@ -89,7 +89,7 @@ class breast(object):
         self.nipple_y = 0
         self.threshold = 0                #threshold for segmenting fibroglandular disk
         self.file_path = []
-        self.plot = True                  #boolean for plotting figures when debugging
+        self.plot = False                  #boolean for plotting figures when debugging
         if(file_path != None):
             self.initialise(file_path)
             
@@ -114,7 +114,6 @@ class breast(object):
     def initialise(self, file_path, preprocessing = True):
         self.file_path = file_path
         #if we are preprocessing, read in the DICOM formatted image
-        print(preprocessing)
         if(preprocessing):
             file = dicom.read_file(file_path)
             self.data = np.fromstring(file.PixelData,dtype=np.int16).reshape((file.Rows,file.Columns))
@@ -572,8 +571,10 @@ class breast(object):
         #self.boundary_y, self.boundary = trace_boundary(im)
         
         #now lets remove any extra bits of skin if we find them
-        self.remove_skin()
-        
+        #will only try and do it if we have found enough bits as well
+        if(self.boundary.size > 2000):
+            self.remove_skin()
+            
         if(self.plot):
             im = np.zeros((np.shape(self.data)))
             im[self.boundary_y, self.boundary] = 1
@@ -731,7 +732,7 @@ class breast(object):
             #if we haven'f found another part of the boundary, lets finish up
             if(found == False):
                 break
-            #print('count = %d' %count)
+            
             count += 1
             
         #Once we are here, we are done following the line, so will now truncate the
@@ -749,8 +750,6 @@ class breast(object):
             test[self.boundary_y, self.boundary] = 1
             ax1 = fig.add_subplot(1,2,2)
             im1 = ax1.imshow(im)
-            
-            
             #fig.colorbar(im1)
             fig.savefig(os.getcwd() + '/figs/' + 'test_' + self.file_path[-10:-3] + 'png')
             fig.clf()
@@ -758,9 +757,10 @@ class breast(object):
             
             
         #now re-write the breast boundary member variables
-        self.boundary = l_x
-        self.boundary_y = l_y
-        
+        if(l_y.size == l_x.size):
+            self.boundary = l_x
+            self.boundary_y = l_y
+            
             
         
         
@@ -773,7 +773,6 @@ class breast(object):
         for jj in range(count,count-lim,-1):
             if(l_y[jj] == y) & (l_x[jj] == x):
                 recently_found = True
-                print('recently found, count = %d' %count)
                 break
         
         return recently_found
@@ -797,9 +796,6 @@ class breast(object):
     def remove_skin(self):
         
         #first lets smooth the boundary
-        print (self.boundary)
-        print (self.boundary_y)
-        print(np.shape(self.boundary))
         x = signal.savgol_filter(self.boundary, 81, 3)
         
         #now lets take derivative
@@ -870,8 +866,8 @@ class breast(object):
             fig.savefig(os.getcwd() + '/figs/' + 'deriv_' + self.file_path[-10:-3] + 'png', bbox_inches='tight')
             fig.clf()
             plt.close()
-
-
+            
+            
             fig = plt.figure()
             plt.axis('off')
             ax1 = fig.add_subplot(1,1,1)
@@ -928,145 +924,6 @@ class breast(object):
                 
         return np.asarray(stationary_y), np.asarray(stationary_x)
             
-            
-        
-    """
-    line_follow_hough()
-    
-    Line following based on Hough transform approach
-    
-    
-    """
-    
-    def line_follow_hough(self, line_im):
-        
-        line_im = filters.gaussian_filter(line_im, 0.5)
-        line_im[0:10] = 0
-        #define the window size
-        w = 20
-        
-        #now will begin following the line
-        y,x = np.where(line_im != 0)
-        y = y[0]
-        x = x[0]
-        
-        tau = []
-        line_x = []
-        line_y = []
-        
-        i = np.arange(0,w)
-        
-        height = line_im.shape[0]
-        #boolean to say we are at the start
-        start = True
-        x_prev = 0
-        y_prev = 0
-        
-        first = True
-        #temp = np.zeros((line_im.shape[0] + w, line_im.shape[1] + w))
-        #temp[w/2:-(w/2), w/2:-(w/2)] = line_im
-        #line_im = temp
-        while( (x > 0) & (y < height + w) ):
-            
-            line_x.append(x)
-            line_y.append(y)
-            #create window of line
-            window = line_im[y:y+w,x:x+w]
-               
-            
-            
-            #apply the Hough transform
-            h, theta, d = hough_line(window)
-            
-            h, theta, d = hough_line_peaks(h, theta, d)
-            index = np.where(h == np.max(h))[0][0]
-            
-            
-            
-            
-            d = d[index]
-            theta = theta[index]
-            
-            
-            #direction will be the highest peak
-            #subtract pi/2 to get the angle of the line, not it's normal
-            tau.append(theta - np.pi/2.0)
-            
-            #find the midpoint inside the line we just drew
-            y_new = np.round(d / np.sin(theta) - (np.cos(theta) / np.sin(theta)) * i)
-            valid = (y_new >= 0) & (y_new < w)
-            if(np.sum(valid) < 1):
-                print(y_new)
-                break
-            
-            #print(y_new)
-            
-            
-            #now finding the mid_point
-            mid = np.where(np.cumsum(valid) >= np.sum(valid)/2)[0]
-            mid = mid[0]
-            x_mid = i[mid]
-            y_mid = y_new[mid]
-            #suffix and prefix
-            # l = start of line (left)
-            # r = finish of line (right)
-            y_v = np.array(y_new[valid])
-            x_v = np.array(i[valid])
-            
-            x_l = x_v[0]
-            y_l = y_v[0]
-            x_r = x_v[-1]
-            y_r = y_v[-1]
-            
-            
-            #see if the start or end of the line is closest to the previous point
-            h_dist = 1 if((x_r + x - x_prev) > (x_l + x - x_prev)) else -1
-            v_dist = 1 if((y_r + y - y_prev) > (y_l + y - y_prev)) else -1
-            
-            x_v = x_v.astype(int)
-            y_v = y_v.astype(int)            
-            
-            if(first):
-                """
-                test = np.zeros(window.shape)
-                test[np.round(y_v),x_v] = 1
-                fig = plt.figure(num=None)
-                ax1 = fig.add_subplot(1,2,1)
-                im1 = ax1.imshow(test)
-                #fig.colorbar(im1)
-                ax2 = fig.add_subplot(1,2,2)
-                im2 = ax2.imshow(window)
-                fig.savefig(os.getcwd() + '/figs/' + 'win_' + self.file_path[-10:-3] + 'png')
-                fig.clf()
-                plt.close()
-                
-                first = False
-                """
-            x_prev = x
-            y_prev = y
-            
-            line_y.extend(y + y_v )
-            line_x.extend(x + x_v)
-            
-            x += h_dist * np.abs((x_r - x_l)/2)
-            y += v_dist * np.abs((y_r - y_l)/2)
-            
-        """
-        im = np.zeros((np.shape(self.data)))
-        im[line_y, line_x] = 1
-        #saving a figure so can look at it
-        fig = plt.figure(num=None, figsize=(40, 20), dpi=600)
-        #ax1 = fig.add_subplot(1,1,1)
-        #im1 = ax1.imshow((self.data))
-        #fig.colorbar(im1)
-        ax2 = fig.add_subplot(1,2,1)
-        im2 = ax2.imshow(im)
-        ax2 = fig.add_subplot(1,2,2)
-        im2 = ax2.imshow(line_im)
-        fig.savefig(os.getcwd() + '/figs/' + 'line_' + self.file_path[-10:-3] + 'png')
-        fig.clf()
-        plt.close()
-        """
         
         
         
