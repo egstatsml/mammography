@@ -317,7 +317,7 @@ class my_thread(Process):
                     print(' Queue is Empty')
                     self.manager.set_exit_status(True)
                     
-                if(self.manger.get_cancer_count() > 50):
+                if(self.manager.get_cancer_count() > 50):
                     print('Cancer count is equal to 50 so lets try training and validating')
                     self.manager.set_exit_status(True)
                     

@@ -14,7 +14,6 @@ and the associated metadata
 spreadsheet object is capable of reading malignant or benign scans individually
 for training purposes
 
-
 """
 import sys
 import dicom
@@ -56,14 +55,7 @@ class spreadsheet(object):
         self.cancer_list = []   #list of cancer status for all of the scans
         self.filenames = [] #list that contains all of the filenames
         self.file_pos = 0   #the location of the current file we are looking for
-        
-        #if we are running on the synapse servers, we need to use 'subjectId' instead of 'patientId'
-        #just something that they changed for a part of the challenge submissions
-        #we specify that we are running as part of the challenge with the -c flag
-        if(command_line_args.challenge_submission):
-            self.patient_subject = 'subjectId'
-        else:
-            self.patient_subject = 'patientId'
+        self.patient_subject = 'subjectId'
         
         #lets load in all of the files
         if(command_line_args.training):
@@ -162,19 +154,25 @@ class spreadsheet(object):
         #will be either .npy or .dcm, wither way both are 4 chars long
         filename = filename[0:-4]
         list_all_files = list(self.crosswalk['filename'])
-        print list_all_files
         file_loc = []
         for ii in range(0,len(list_all_files)): 
             file_loc.append(filename in list_all_files[ii])
-        temp = (filename in list(self.crosswalk['filename']))
+            
+        #temp = (filename in list(self.crosswalk['filename']))
+        #print 'here'
+        #print temp
         crosswalk_data = self.crosswalk.loc[file_loc,:]     
+        print crosswalk_data.columns.values
+        print crosswalk_data
+        print crosswalk_data['cancer']
+        self.cancer = int(crosswalk_data['cancer']) == 1
         
         #now use the helper function to actually check for cancer
-        self._check_cancer(crosswalk_data)
-
-    
-    
-    
+        #self._check_cancer(crosswalk_data)
+        
+        
+        
+        
     """
     _check_cancer()
     
@@ -196,7 +194,7 @@ class spreadsheet(object):
         
         #the spreadsheet will read a one if there is cancer
         if('L' in str(crosswalk_data.iloc[0,2])) & (scan_metadata.iloc[0,3] == 1):
-
+            
             self.cancer = True
         elif(crosswalk_data.iloc[0,2] == 'R') & (scan_metadata.iloc[0,4] == 1):
             self.cancer = True
@@ -373,5 +371,6 @@ class spreadsheet(object):
         #now return the cropped database
         return patient_info
     
-
-
+    
+    
+    

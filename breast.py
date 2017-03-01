@@ -115,6 +115,7 @@ class breast(object):
         self.file_path = file_path
         #if we are preprocessing, read in the DICOM formatted image
         if(preprocessing):
+            print file_path
             file = dicom.read_file(file_path)
             self.data = np.fromstring(file.PixelData,dtype=np.int16).reshape((file.Rows,file.Columns))
             self.original_scan = np.copy(self.data)
