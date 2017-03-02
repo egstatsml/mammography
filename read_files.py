@@ -161,12 +161,11 @@ class spreadsheet(object):
         #temp = (filename in list(self.crosswalk['filename']))
         #print 'here'
         #print temp
-        crosswalk_data = self.crosswalk.loc[file_loc,:]     
-        crosswalk_data.set_index('cancer')#crosswalk_data.columns.values)
-        self.cancer = int(crosswalk_data.iloc[0,crosswalk_data.columns.get_loc('cancer')]) == 1
+        crosswalk_data = self.crosswalk.loc[file_loc,:]
+        #self.cancer = int(crosswalk_data.iloc[0,crosswalk_data.columns.get_loc('cancer')]) == 1
         
         #now use the helper function to actually check for cancer
-        #self._check_cancer(crosswalk_data)
+        self._check_cancer(crosswalk_data)
         
         
         
@@ -191,11 +190,14 @@ class spreadsheet(object):
         scan_metadata = self.metadata.loc[mask,:]
         
         #the spreadsheet will read a one if there is cancer
-        if('L' in str(crosswalk_data.iloc[0,2])) & (scan_metadata.iloc[0,3] == 1):
-            
+        #print crosswalk_data
+        #print scan_metadata
+        if(str(crosswalk_data.iloc[0,crosswalk_data.columns.get_loc('laterality')]) == 'L') & ((scan_metadata.iloc[0,scan_metadata.columns.get_loc('cancerL')]) == 1):
             self.cancer = True
-        elif(crosswalk_data.iloc[0,2] == 'R') & (scan_metadata.iloc[0,4] == 1):
+            print('cancer')
+        elif(str(crosswalk_data.iloc[0,crosswalk_data.columns.get_loc('laterality')]) == 'R') & ((scan_metadata.iloc[0,scan_metadata.columns.get_loc('cancerR')]) == 1):
             self.cancer = True
+            print('cancer')
         else:
             self.cancer = False
             
@@ -205,9 +207,9 @@ class spreadsheet(object):
     #just creating a mask that will tell me which rows to look at in the crosswalk spreadsheet
     #to get the filenames of the scans
     
-            
-            
-            
+    
+    
+    
     def get_filenames(self):
         
         left = (self.crosswalk[self.patient_subject] == self.patient_id) & (self.crosswalk['examIndex'] == self.exam_index) & (self.crosswalk["imageView"].str.contains('L')) 
