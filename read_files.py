@@ -162,10 +162,8 @@ class spreadsheet(object):
         #print 'here'
         #print temp
         crosswalk_data = self.crosswalk.loc[file_loc,:]     
-        print crosswalk_data.columns.values
-        print crosswalk_data
-        print crosswalk_data['cancer']
-        self.cancer = int(crosswalk_data['cancer']) == 1
+        crosswalk_data.set_index('cancer')#crosswalk_data.columns.values)
+        self.cancer = int(crosswalk_data.iloc[0,crosswalk_data.columns.get_loc('cancer')]) == 1
         
         #now use the helper function to actually check for cancer
         #self._check_cancer(crosswalk_data)

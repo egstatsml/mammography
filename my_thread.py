@@ -293,7 +293,9 @@ class my_thread(Process):
     scan actually takes, just to give us an idea
     
     Finally, will make sure we will look at parts of the feature array that are actually valid
+    
     """
+    
     
     def process(self):
         print('Running thread %d' %self.t_id)
@@ -310,6 +312,7 @@ class my_thread(Process):
                 if(self.cancer_status[-1]):
                     self.manager.inc_cancer_count()
                     print('cancer count = %d' %self.manager.get_cancer_count())
+                    
                     
                 #if the queue is now empty, we should wrap up and
                 #get ready to exit
