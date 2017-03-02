@@ -79,6 +79,9 @@ class shared(object):
     cancer_count = 0
     feature_array = []
     class_array = []
+    save_timer = time.time()
+    save_time = 3600      #save once an hour or every 3600 seconds
+    
     
     ##########################################
     #
@@ -147,8 +150,7 @@ class shared(object):
         
     def first_features_added(self):
         return (len(self.feature_array) == 0)
-    
-    
+       
     def set_feature_array(self, feature_array):
         self.feature_array = feature_array
         
@@ -161,7 +163,6 @@ class shared(object):
     def append_class_array(self, class_array):
         self.class_array.append(class_array)
         
-        
     def get_feature_array(self):
         return self.feature_array
         
@@ -169,7 +170,58 @@ class shared(object):
         return self.class_array
     
     
+    
+    ###################################
+    #
+    # Functions to handle timing of saving data
+    #
+    ###################################
+    
     """
+    init_timer()
+    
+    Description:
+    Reinitialise both start and stop timers
+    
+    
+    """
+    def init_timer(self):
+        self.save_start_timer = time.time()
+        
+        
+    """
+    reset_timer()
+    
+    Description: 
+    Will just reinitialise both timers
+    This function is just here as a convenience
+    
+    """
+    
+    def reset_timer(self):
+        self.init_timer()
+        
+        
+    def save_time_elapsed(self):
+        return ( (self.save_current_timer - self.save_start_timer) >= self.save_time)
+    
+    
+    
+    def periodic_save_features(self, command_line_args):
+        self.t_loc_acquire()
+        X = np.array(self.get_feature_array())
+        Y = np.array(self.get_class_array())
+        np.save(command_line_args.save_path + '/X_temp', X)
+        np.save(command_line_args.save_path + '/Y_temp', Y)
+        print('Saved Temporary Data')
+        #reset the timer
+        self.reset_timer()
+        self.t_lock_release()
+    
+    
+    
+    """
+    
     add_features()
     
     Description: 
@@ -185,6 +237,8 @@ class shared(object):
     """
     def add_features(self,X, Y):
         
+        #request lock for this process
+        self.t_lock_acquire()
         #if this is the first set of features to be added, we should just initially
         #set the features in the manager to equal X and Y.
         #Otherwise, use extend on the list. Just a nicer way of doing it so we
@@ -194,13 +248,15 @@ class shared(object):
             self.class_array = Y
             
         else:
-            print(' adding extra features')
+            print('adding extra features')
             print(np.shape(self.feature_array))
             #print self.feature_array
             self.feature_array.extend(X)
             self.class_array.extend(Y)
-
-
+        #we are done so release the lock
+        self.t_lock_release()
+        
+        
 class my_manager(BaseManager):
     pass
 
@@ -212,18 +268,6 @@ my_manager.register('shared', shared)
 
 class my_thread(Process):    
     
-    #some reference variables that will be shared by all of the individual thread objects
-    #whenever any of these reference variables are accessed, the thread lock should be applied,
-    #to ensure multiple threads arent accessing the same memory at the same time
-    """
-    q = Queue(1000)        #queue that will contain the filenames of the scans
-    q_cancer = Queue(1000) #queue that will contain the cancer status of the scans
-    t_lock = Lock()
-    exit_flag = False
-    error_files = []   #list that will have all of the files that we failed to process
-    scan_no = 0
-    cancer_count = 0
-    """
     """
     __init__()
     
@@ -253,6 +297,15 @@ class my_thread(Process):
         self.preprocessing = command_line_args.preprocessing
         self.validation = command_line_args.validation
         self.save_path = command_line_args.save_path
+        #some variables that are used to time the system for adding files to the shared manager
+        self.add_timer = time.time()
+        #add features every 11 minutes
+        #made it not a factor of 60 minutes
+        self.add_time = 420
+        
+        
+        
+        
         
     """
     run()
@@ -318,29 +371,22 @@ class my_thread(Process):
                 #get ready to exit
                 if(self.manager.q_empty()):
                     print(' Queue is Empty')
-                    self.manager.set_exit_status(True)
-                    
-                if(self.manager.get_cancer_count() > 50):
-                    print('Cancer count is equal to 50 so lets try training and validating')
-                    self.manager.set_exit_status(True)
-                    
+                    self.manager.set_exit_status(True)                
                     
                 self.manager.t_lock_release()
                 print('Queue size = %d' %self.manager.q_size())
+                
+                #if we have made it here, we should get busy processing some datas :)
                 try:
                     #now we have the right filename, lets do the processing of it
                     #if we are doing the preprocessing, we will need to read the file in correctly
                     self.scan_data.initialise(file_path, self.preprocessing)
                     
-                    #Check if we need to run the preprocessing steps
-                    if(self.preprocessing):
-                        self.scan_data.preprocessing()
-                        self.save_preprocessed()
-                    #check if we need to perform feature extraction for training or classification
-                    if(self.training | self.validation):    
-                        self.scan_data.get_features()
-                        
-                        
+                    #begin preprocessing steps
+                    self.scan_data.preprocessing()
+                    self.save_preprocessed()
+                    self.scan_data.get_features()
+                    
                     #now that we have the features, we want to append them to the list of features
                     #The list of features is shared amongst all of the class instances, so
                     #before we add anything to there, we should lock other threads from adding
@@ -350,17 +396,27 @@ class my_thread(Process):
                     self.scan_data.current_image_no += 1   #increment the image index
                     self.scans_processed += 1              #increment the image counter
                     lock_time = timeit.default_timer()
-                    self.manager.t_lock_acquire()
-                    self.manager.inc_scan_count()
-                    self.manager.t_lock_release()                    
-                    print(self.manager.q_size())
+                    self.inc_scan_count()
                     
-                    
+                    #see if the add time has elapsed
+                    if(self.add_time_elapsed()):
+                        #if we made it in here, we are going to add the data we have currently found
+                        #to the shared data list
+                        self.add_features()
+                        
+                    #see if the save time has elapsed
+                    if(self.manager.save_time_elapsed()):
+                        #if we have made it here, it is time to do a temporary save
+                        self.periodic_save_features()
+                        
+                        
+                        
                 except Exception as e:
                     print e 
                     print('Error with current file %s' %(file_path))
                     self.manager.add_error_file(file_path)
-                    #get rid of the last cancer_status flag we saved, as it is no longer valid since we didn't save the
+                    #get rid of the last cancer_status flag we saved, as it is no longer
+                    #valid since we didn't save the
                     #features from the scan
                     del self.cancer_status[-1]
                     
@@ -376,12 +432,21 @@ class my_thread(Process):
         #there is nothing left on the queue, so we are ready to exit
         #before we exit though, we just need to crop the feature arrays to include
         #only the number of images we looked at in this individual thread
-        self.scan_data._crop_features(self.scans_processed)
         self.add_features()
+        
+        #now just print a message to say that we are done
         print('Thread %d is out' %self.t_id)
         sys.stdout.flush()
         
         
+        
+        
+    def add_time_elapsed():
+        return (time.time() - self.add_timer) > self.add_time
+    
+    
+    
+    
     def flatten(self, x):
         "Flatten one level of nesting"
         return chain.from_iterable(x)
@@ -415,21 +480,32 @@ class my_thread(Process):
         
         #now save the data
         np.save(file_path, temp)
+        
+        
+    """
+    inc_scan_count()
     
+    Description:
+    Will just increment the scans processed
     
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
+    """
+    def inc_scan_count(self):
+        self.manager.t_lock_acquire()
+        self.manager.inc_scan_count()
+        self.manager.t_lock_release()                    
+        print(self.manager.q_size())
+
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
         
     """
     reinitialise()
@@ -463,7 +539,9 @@ class my_thread(Process):
     
     
     
-    def add_features(self):
+    def add_features(self, scans_processed):
+        
+        self.scan_data._crop_features(self.scans_processed)
         
         X = []
         Y = []
@@ -503,7 +581,10 @@ class my_thread(Process):
             #set the cancer statues for this scan
             Y.append(self.cancer_status[t_ii])
         #now add the features from this list to to conplete list in the manager
-        self.manager.t_lock_acquire()
         self.manager.add_features(X, Y)
-        self.manager.t_lock_release()
-        
+        #reinitialise the feature list in the scan_data member
+        self.scan_data._initialise_feature_lists()
+        #set the number of scans processed back to zero
+        self.scans_processed = 0
+        #reset the timer
+        self.add_timer = time.time()

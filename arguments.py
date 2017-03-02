@@ -208,7 +208,7 @@ class arguments(object):
             
             
             if(self.validation != 0):
-                self.validation_string = './libsvm/svm-predict %s/predict_file_libsvm %s/model_file %s/results.txt' %(self.log_path, self.log_path, self.log_path)
+                self.validation_string = './LIBSVM/svm-predict %s/predict_file_libsvm %s/model_file %s/results.txt' %(self.log_path, self.log_path, self.log_path)
             
             
             

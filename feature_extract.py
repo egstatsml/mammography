@@ -103,7 +103,7 @@ class feature(breast):
         self.current_image_no = -1     #this will increment as we load in every individual scan
                 
         
-        self.__initialise_feature_lists()
+        self._initialise_feature_lists()
         if(file_path != None):
             self.initialise(file_path)
             
@@ -199,7 +199,7 @@ class feature(breast):
             print('Set to max level and will continue')
             self.levels = self.packets.maxlevel
             #will have to reinitialise the feature lists
-            self.__initialise_feature_lists()
+            self._initialise_feature_lists()
             
         #now lets put the indicies for each level in a nice format that is pleseant to index
         #indicies will be a list of numpy arrays for each level
@@ -346,7 +346,7 @@ class feature(breast):
         
         
     """
-    __initialise_feature_lists()
+    _initialise_feature_lists()
     
     Description:
     Is a helper function called by the __init__ function to create a multidimensional
@@ -368,7 +368,7 @@ class feature(breast):
     """
     
     
-    def __initialise_feature_lists(self):        
+    def _initialise_feature_lists(self):        
 
         #for python 2.7 and 3 compatability for range and xrange
         try:

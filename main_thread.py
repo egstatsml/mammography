@@ -86,12 +86,9 @@ def preprocessing(command_line_args):
     num_threads = cpu_count() - 2
     print("Number of processes to be initiated = %d" %num_threads )
     
-    #my_manager.register('shared',shared)
-    
     man = my_manager()
     man.start()
     shared = man.shared()
-    
     
     #setting up the queue for all of the threads, which contains the filenames
     print("Setting up Queue")
@@ -132,6 +129,7 @@ def preprocessing(command_line_args):
         t.join()
         
         
+        
     #all of the threads are done, so we can now we can use the features found to train
     #the classifier
     
@@ -141,19 +139,23 @@ def preprocessing(command_line_args):
     #will just convert the list of error files to a pandas database to look at later
     error_database = pd.DataFrame(shared.get_error_files())
     #will save the erroneous files as csv
-    error_database.to_csv('error_files.csv')
+    #error_database.to_csv('error_files.csv')
+    
     
     #now lets train our classifier
     #will just use the features from the approximation wavelet decomps
     
     X, Y, X_v, Y_v = create_classifier_arrays(shared, command_line_args.validation)
     #save this data in numpy format, and in the LIBSVM format
-    np.save(command_line_args.log_path + '/X', X)
-    np.save(command_line_args.log_path + '/Y', Y)
-    np.save(command_line_args.log_path + '/X_val', X_v)
-    np.save(command_line_args.log_path + '/Y_val', Y_v)
+    np.save(command_line_args.save_path + '/X', X)
+    np.save(command_line_args.save_path + '/Y', Y)
+    #np.save(command_line_args.log_path + '/X_val', X_v)
+    #np.save(command_line_args.log_path + '/Y_val', Y_v)
     dump_svmlight_file(X,Y,'./train_file_libsvm')
-    dump_svmlight_file(X_v,Y_v,'./predict_file_libsvm')
+    #dump_svmlight_file(X_v,Y_v,'./predict_file_libsvm')
+    
+    
+    
     
     
     
@@ -172,12 +174,12 @@ In the command_line_args object, a path to a file containing the variables to tr
 """ 
 def train_model(command_line_agrs):
     terminal_cmd(command_line_args.train_string)
-
-
+    
+    
 def validate_model(command_line_args):
     terminal_cmd(command_line_args.validation_string)
     
-
+    
 #####################################################
 #
 #                Main Loop of Program
