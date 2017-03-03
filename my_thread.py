@@ -212,8 +212,8 @@ class shared(object):
         self.t_lock_acquire()
         X = np.array(self.get_feature_array())
         Y = np.array(self.get_class_array())
-        np.save(save_path + '/X_temp', X)
-        np.save(save_path + '/Y_temp', Y)
+        np.save(save_path + '/model_state/X_temp', X)
+        np.save(save_path + '/model_state/Y_temp', Y)
         print('Saved Temporary Data')
         #reset the timer
         self.reset_timer()

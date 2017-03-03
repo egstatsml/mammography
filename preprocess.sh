@@ -1,14 +1,17 @@
 #!/usr/bin/env bash
 
 #variables that can be used for setting paths and creating directories
-SAVE_DIR="preprocessedData/images/"
+SAVE_DIR_ROOT="/preprocessedData"
+SAVE_DIR="$SAVE_DIR_ROOT"
+SAVE_DIR_MODEL_FILES="$SAVE_DIR_ROOT/model_state/"
 LOG_DIR="/modelState"
 INPUT_DIR="/trainingData/"
 METADATA_DIR="/metadata/"
 MODEL_STATE_DIR="/modelState"
 
-echo "Creating directory for preprocessed files"
-mkdir -p $SAVE_DIR
+echo "Creating directory for features found during the preprocessing stage"
+mkdir -p $SAVE_DIR_MODEL_FILES
+
 
 echo "Creating directory for log file"
 mkdir -p $LOG_DIR
