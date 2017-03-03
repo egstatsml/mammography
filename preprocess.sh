@@ -21,8 +21,7 @@ echo "Compiling Cython Files"
 #python main_thread.py -p -t -i /trainingData -s /preprocessedData -l /modelState -m /metadata -k 1 -d 4 -e 0.001 -b -w 0:1,1:20 -v 100
 
 echo "Running Preprocessing script"
-python main_thread.py -p -t -c -i $INPUT_DIR -s $SAVE_DIR -l $LOG_DIR -m $METADATA_DIR -k 1 -d 4 -e 0.001 -b -w 0:1,1:20 -v 100
-
+python main_thread.py -p -t -c -i $INPUT_DIR -s $SAVE_DIR -l $LOG_DIR -m $METADATA_DIR -k 1 -d 4 -e 0.001 -b -w 0:1,1:20 -v 100 -a $MODEL_STATE_DIR
 
 echo "DONE"
 echo "Preprocessing Run Successfully. You may now DANCE :)"
