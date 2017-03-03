@@ -149,10 +149,10 @@ def preprocessing(command_line_args):
     #save this data in numpy format, and in the LIBSVM format
     np.save(command_line_args.save_path + '/X', X)
     np.save(command_line_args.save_path + '/Y', Y)
-    #np.save(command_line_args.log_path + '/X_val', X_v)
-    #np.save(command_line_args.log_path + '/Y_val', Y_v)
-    dump_svmlight_file(X,Y,'./train_file_libsvm')
-    #dump_svmlight_file(X_v,Y_v,'./predict_file_libsvm')
+    np.save(command_line_args.log_path + '/X_val', X_v)
+    np.save(command_line_args.log_path + '/Y_val', Y_v)
+    dump_svmlight_file(X,Y,command_line_args.save_path + '/train_file_libsvm')
+    dump_svmlight_file(X_v,Y_v,'./predict_file_libsvm')
     
     
     

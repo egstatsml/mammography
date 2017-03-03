@@ -45,6 +45,7 @@ class arguments(object):
         self.save_path = []
         self.log_path = []
         self.metadata_path = []
+        self.model_path = []
         self.validation = 0
         self.kernel = 1
         self.degree = 3
@@ -80,7 +81,7 @@ class arguments(object):
       -s = Save Directory: If we are preprocessing, where should we save the preprocessed
            Images.
       -l = Log Directory: Where should we save the log file to track our progress.
-      -m = Metadata patha: where the metadata csv file is
+      -m = Metadata path: where the metadata csv file is
       -v = Validation. If we are validating the data, we want to train on a portion and
            validate the set on another portion. The number of scans used for validating will be
            supplied along with this flag
@@ -98,14 +99,14 @@ class arguments(object):
        -e = Epsilon. Tolerance for termination. (Default of 0.001)
        -b = Probability estimates (Default of False)
        -w = Weight for each class. usage here should be a dictionary like reference for each class
-       -c = submission to the DREAM Challenge
+       -a = Path where model file will be saved
     """
     
     def parse_command_line(self, argv):
         
         try:
             
-            opts,args = getopt.getopt(argv, "htpbcm:i:s:l:v:k:d:g:e:w:")
+            opts,args = getopt.getopt(argv, "htpbm:i:s:l:v:k:d:g:e:a:w:")
             
         except getopt.GetoptError as err:
             print(str(err))
@@ -170,10 +171,9 @@ class arguments(object):
                 
             elif opt == '-b':
                 self.probability = True
-                
-            elif opt == '-c':
-                self.challenge_submission = True
-                
+                              
+            elif opt == 'a':  #using -a because am running out of letters :)
+                self.model_path = str(arg)
             elif opt == '-w':
                 #convert the string argument into a dictionary
                 init_dict = ast.literal_eval('{' + str(arg) + '}')
@@ -203,12 +203,12 @@ class arguments(object):
             for ii in self.weight.keys():
                 weight_string += '-w%s %s ' %(ii, self.weight[ii])
                 
-            self.train_string ='./CUDA/svm-train-gpu  -t %s -d %s -m 5000 -e %s %s %s/train_file_libsvm %s/model_file' %(self.kernel, self.degree, self.epsilon, weight_string, self.log_path, self.log_path)
+            self.train_string ='./CUDA/svm-train-gpu  -t %s -d %s -m 5000 -e %s %s %s/train_file_libsvm %s/model_file' %(self.kernel, self.degree, self.epsilon, weight_string, self.save_path, self.model_path)
             
             
             
             if(self.validation != 0):
-                self.validation_string = './LIBSVM/svm-predict %s/predict_file_libsvm %s/model_file %s/results.txt' %(self.log_path, self.log_path, self.log_path)
+                self.validation_string = './LIBSVM/svm-predict %s/predict_file_libsvm %s/model_file %s/results.txt' %(self.log_path, self.model_path, self.log_path)
             
             
             
@@ -332,16 +332,16 @@ class arguments(object):
         -e = Epsilon. Tolerance for termination. (Default of 0.001)
         -b = Probability estimates (Default of False)
         -w = Weight for each class. usage here should be a dictionary like reference for each class
-       -c = submission to the DREAM Challenge
+        -a = path where model file will be saved
         
         Example 1 - run on Synapse Server to preprocess and train: 
-        python main_thread.py -p -t -c -i /trainingData -s /preprocessedData -l /modelState -m /metadata -k 1 -d 4 -e 0.001 -b -w 0:1,1:20
+        python main_thread.py -p -t -i /trainingData -s /preprocessedData -l /modelState -m /metadata -k 1 -d 4 -e 0.001 -b -w 0:1,1:20 -a ./modelState
 
         Example 2 - Run on Dimitri's Machine  to train and validate:
-        sudo python main_thread.py -p -t -i /media/dperrin/ -s /media/dperrin/preprocessed/ -l ./ -m ./ -v 100 -k 1 -d 4 -e 0.001 -b -w 0:1,1:20")
+        sudo python main_thread.py -p -t -i /media/dperrin/ -s /media/dperrin/preprocessed/ -l ./ -m ./ -v 100 -k 1 -d 4 -e 0.001 -b -w 0:1,1:20") -a /media/dperrin/modelState
         
         Example 3 - Run just training and validation on Dimitri's Machine
-        sudo python main_thread.py -t -i /media/dperrin/preprocessed -s /media/dperrin/preprocessed/ -l ./ -m ./ -v 100 -k 1 -d 4 -e 0.001 -b -w 0:1,1:20")
+        sudo python main_thread.py -t -i /media/dperrin/preprocessed -s /media/dperrin/preprocessed/ -l ./ -m ./ -v 100 -k 1 -d 4 -e 0.001 -b -w 0:1,1:20") -a /media/dperrin/modelState
         
         
         

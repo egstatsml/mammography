@@ -160,7 +160,6 @@ class spreadsheet(object):
         #print temp
         crosswalk_data = self.crosswalk.loc[file_loc,:]
         #self.cancer = int(crosswalk_data.iloc[0,crosswalk_data.columns.get_loc('cancer')]) == 1
-        
         #now use the helper function to actually check for cancer
         self._check_cancer(crosswalk_data)
         
@@ -181,30 +180,43 @@ class spreadsheet(object):
         #by finding the row with this patient id and exam number
         #finding these individually, it's not the most elegant way to do it,
         #but it is the clearest
-        patient_mask = (self.metadata[self.patient_subject] == crosswalk_data.iloc[0,0])
-        exam_mask = (self.metadata['examIndex'] == crosswalk_data.iloc[0,1])
+        
+        patient_mask = (self.metadata.iloc[:, self.metadata.columns.get_loc(self.patient_subject)] == crosswalk_data.iloc[0,crosswalk_data.columns.get_loc(self.patient_subject)])
+        exam_mask = (self.metadata.iloc[:,self.metadata.columns.get_loc('examIndex')] == crosswalk_data.iloc[0,crosswalk_data.columns.get_loc('examIndex')])
         mask = (patient_mask & exam_mask)
         scan_metadata = self.metadata.loc[mask,:]
+        #print scan_metadata
+        #print crosswalk_data
         
         #the spreadsheet will read a one if there is cancer
         #print crosswalk_data
         #print scan_metadata
-        if(str(crosswalk_data.iloc[0,crosswalk_data.columns.get_loc('laterality')]) == 'L') & ((scan_metadata.iloc[0,scan_metadata.columns.get_loc('cancerL')]) == 1):
+        #( 'L' in str(crosswalk_data.iloc[0,crosswalk_data.columns.get_loc('laterality')])) &
+        #print str(crosswalk_data.iloc[0,crosswalk_data.columns.get_loc('laterality')])
+        #print str(crosswalk_data.iloc[0,crosswalk_data.columns.get_loc('laterality')]) == 'L'
+        #print scan_metadata
+        #print (scan_metadata.iloc[0,scan_metadata.columns.get_loc('cancerL')])
+        #print(str(scan_metadata.iloc[0,scan_metadata.columns.get_loc('cancerL')]) == '1')
+        #print(scan_metadata.columns.get_loc('cancerL'))
+        
+        if(str(crosswalk_data.iloc[0,crosswalk_data.columns.get_loc('laterality')]) == 'L') & (str(scan_metadata.iloc[0,scan_metadata.columns.get_loc('cancerL')]) == '1'):
             self.cancer = True
-            print('cancer')
-        elif(str(crosswalk_data.iloc[0,crosswalk_data.columns.get_loc('laterality')]) == 'R') & ((scan_metadata.iloc[0,scan_metadata.columns.get_loc('cancerR')]) == 1):
+            print('cancer left')
+            
+        elif(str(crosswalk_data.iloc[0,crosswalk_data.columns.get_loc('laterality')]) == 'R') & (str(scan_metadata.iloc[0,scan_metadata.columns.get_loc('cancerR')]) == '1'):
             self.cancer = True
-            print('cancer')
+            print('cancer right')
         else:
             self.cancer = False
             
             
             
             
+            
+            
+            
     #just creating a mask that will tell me which rows to look at in the crosswalk spreadsheet
-    #to get the filenames of the scans
-    
-    
+    #to get the filenames of the scans    
     
     
     def get_filenames(self):
@@ -212,6 +224,7 @@ class spreadsheet(object):
         left = (self.crosswalk[self.patient_subject] == self.patient_id) & (self.crosswalk['examIndex'] == self.exam_index) & (self.crosswalk["imageView"].str.contains('L')) 
         
         left_filenames = (self.crosswalk.loc[left, 'filename'])
+        
         
         self.no_scans_left = np.sum(left)
         for ii in range(0, np.sum(left)):
@@ -226,11 +239,11 @@ class spreadsheet(object):
         for ii in range(0, np.sum(right)):
             right_name = right_filenames.iloc[ii]
             self.filename_r.append(right_name)
-        
-        
-        
-        
-        
+            
+            
+            
+            
+            
     """
     return_filename()
     

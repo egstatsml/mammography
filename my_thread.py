@@ -1,6 +1,7 @@
 #!/usr/bin/python
 import threading
 import timeit
+import time
 import gc
 from multiprocessing import Process, Lock, Queue
 from multiprocessing.managers import BaseManager
@@ -80,7 +81,7 @@ class shared(object):
     feature_array = []
     class_array = []
     save_timer = time.time()
-    save_time = 3600      #save once an hour or every 3600 seconds
+    save_time = 600      #save once an hour or every 3600 seconds
     
     
     ##########################################
@@ -203,23 +204,23 @@ class shared(object):
         
         
     def save_time_elapsed(self):
-        return ( (self.save_current_timer - self.save_start_timer) >= self.save_time)
+        return ( (time.time() - self.save_timer) >= self.save_time)
     
     
     
-    def periodic_save_features(self, command_line_args):
-        self.t_loc_acquire()
+    def periodic_save_features(self, save_path):
+        self.t_lock_acquire()
         X = np.array(self.get_feature_array())
         Y = np.array(self.get_class_array())
-        np.save(command_line_args.save_path + '/X_temp', X)
-        np.save(command_line_args.save_path + '/Y_temp', Y)
+        np.save(save_path + '/X_temp', X)
+        np.save(save_path + '/Y_temp', Y)
         print('Saved Temporary Data')
         #reset the timer
         self.reset_timer()
         self.t_lock_release()
-    
-    
-    
+        
+        
+        
     """
     
     add_features()
@@ -237,6 +238,7 @@ class shared(object):
     """
     def add_features(self,X, Y):
         
+        print('saving features to the temp array')
         #request lock for this process
         self.t_lock_acquire()
         #if this is the first set of features to be added, we should just initially
@@ -248,7 +250,6 @@ class shared(object):
             self.class_array = Y
             
         else:
-            print('adding extra features')
             print(np.shape(self.feature_array))
             #print self.feature_array
             self.feature_array.extend(X)
@@ -301,7 +302,7 @@ class my_thread(Process):
         self.add_timer = time.time()
         #add features every 11 minutes
         #made it not a factor of 60 minutes
-        self.add_time = 420
+        self.add_time = 180
         
         
         
@@ -394,20 +395,22 @@ class my_thread(Process):
                     self.time_process.append(timeit.default_timer() - start_time)
                     #print('time = %d s' %self.time_process[-1])
                     self.scan_data.current_image_no += 1   #increment the image index
-                    self.scans_processed += 1              #increment the image counter
                     lock_time = timeit.default_timer()
-                    self.inc_scan_count()
+                    #now increment the total scan count as well
+                    self.inc_total_scan_count()
                     
                     #see if the add time has elapsed
                     if(self.add_time_elapsed()):
                         #if we made it in here, we are going to add the data we have currently found
                         #to the shared data list
+                        print('lets try and add some features shall we :)')
                         self.add_features()
+                        print('Added Temporary Data in %d' %self.t_id)
                         
                     #see if the save time has elapsed
                     if(self.manager.save_time_elapsed()):
                         #if we have made it here, it is time to do a temporary save
-                        self.periodic_save_features()
+                        self.manager.periodic_save_features(self.save_path)
                         
                         
                         
@@ -441,7 +444,7 @@ class my_thread(Process):
         
         
         
-    def add_time_elapsed():
+    def add_time_elapsed(self):
         return (time.time() - self.add_timer) > self.add_time
     
     
@@ -489,40 +492,12 @@ class my_thread(Process):
     Will just increment the scans processed
     
     """
-    def inc_scan_count(self):
+    def inc_total_scan_count(self):
         self.manager.t_lock_acquire()
         self.manager.inc_scan_count()
         self.manager.t_lock_release()                    
         print(self.manager.q_size())
-
         
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-    """
-    reinitialise()
-    
-    Description:
-    Reinitialise the reference variables
-    Need to do when we are moving from training to classifying
-    
-    """
-    
-    def reinitialise_ref(my_thread):
-        
-        my_thread.exit_flag = False
-        my_thread.error_files = []   #list that will have all of the files that we failed to process
-        my_thread.cancer_status = []
-        my_thread.scan_no = 0
-        my_thread.cancer_count = 0
         
         
         
@@ -534,27 +509,32 @@ class my_thread(Process):
     Description:
     Am done with selection and aquisition of features. 
     Will add the features from this thread to the manager
-        
+    
     """
     
     
     
-    def add_features(self, scans_processed):
+    def add_features(self):
         
-        self.scan_data._crop_features(self.scans_processed)
+        print('Adding features to temp array')
+        print self.scans_processed
+        self.scan_data._crop_features(self.scan_data.current_image_no)
         
+        print len(self.scan_data.homogeneity)
         X = []
         Y = []
-        for t_ii in range(0, self.scans_processed):
+        for t_ii in range(0, self.scan_data.current_image_no):
             X.append([])
-            for lvl in range(self.scan_data.levels):
-            
+            for lvl in range(self.scan_data.levels):                
                 homogeneity = self.scan_data.homogeneity[t_ii][lvl]
                 entropy = self.scan_data.entropy[t_ii][lvl]
                 energy = self.scan_data.energy[t_ii][lvl]
                 contrast = self.scan_data.contrast[t_ii][lvl]
                 dissimilarity = self.scan_data.dissimilarity[t_ii][lvl]
                 correlation = self.scan_data.correlation[t_ii][lvl]
+                
+                print('homogeneity')
+                print homogeneity
                 
                 #wave_energy = self.scan_data.wave_energy[t_ii][lvl]
                 #wave_entropy = self.scan_data.wave_entropy[t_ii][lvl]
@@ -583,8 +563,12 @@ class my_thread(Process):
         #now add the features from this list to to conplete list in the manager
         self.manager.add_features(X, Y)
         #reinitialise the feature list in the scan_data member
-        self.scan_data._initialise_feature_lists()
+        self.scan_data.reinitialise_feature_lists()
         #set the number of scans processed back to zero
-        self.scans_processed = 0
+        self.scan_data.current_image_no = 0
         #reset the timer
         self.add_timer = time.time()
+        
+        
+        
+        

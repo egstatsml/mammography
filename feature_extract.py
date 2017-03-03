@@ -80,7 +80,6 @@ class feature(breast):
         self.wave_correlation = []
         
         
-        
         #FEATURES FROM FIBROGLANDULAR DISK
         self.fibro_homogeneity = []
         self.fibro_entropy = []
@@ -345,6 +344,50 @@ class feature(breast):
         
         
         
+    
+    def reinitialise_feature_lists(self):
+        
+        #clear all  of the feature lists
+        #GLOBAL FEATURES
+        self.homogeneity = []
+        self.entropy = []
+        self.energy = []
+        self.contrast = []
+        self.dissimilarity = []
+        self.correlation = []
+        self.density = []
+        
+        #Wavelet FEATURES
+        self.wave_kurtosis = []
+        self.wave_entropy = []
+        self.wave_energy = []
+        self.wave_contrast = []
+        self.wave_dissimilarity = []
+        self.wave_correlation = []
+        
+        
+        
+        #FEATURES FROM FIBROGLANDULAR DISK
+        self.fibro_homogeneity = []
+        self.fibro_entropy = []
+        self.fibro_energy = []
+        self.fibro_contrast = []
+        self.fibro_dissimilarity = []
+        self.fibro_correlation = []
+        
+        #FEATURES FROM MICROCALCIFICATIONS
+        self.micro_homogeneity = []
+        self.micro_entropy = []
+        self.micro_energy = []
+        self.micro_contrast = []
+        self.micro_dissimilarity = []
+        self.micro_correlation = []
+        
+        #now initialise the feature lists
+        self._initialise_feature_lists()
+        
+        
+        
     """
     _initialise_feature_lists()
     
@@ -368,8 +411,10 @@ class feature(breast):
     """
     
     
+    
+    
     def _initialise_feature_lists(self):        
-
+        
         #for python 2.7 and 3 compatability for range and xrange
         try:
             xrange
