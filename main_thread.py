@@ -77,7 +77,7 @@ def terminal_cmd(command):
     
     
     
-def preprocessing(command_line_args):
+def begin_processes(command_line_args):
     
     #sys.stdout = logger(command_line_args.log_path)
     descriptor = spreadsheet(command_line_args)
@@ -148,13 +148,29 @@ def preprocessing(command_line_args):
     X, Y, X_v, Y_v = create_classifier_arrays(shared, command_line_args.validation)
     #save this data in numpy format, and in the LIBSVM format
     np.save(command_line_args.save_path + '/X', X)
-    np.save(command_line_args.save_path + '/Y', Y)
-    np.save(command_line_args.log_path + '/X_val', X_v)
-    np.save(command_line_args.log_path + '/Y_val', Y_v)
-    dump_svmlight_file(X,Y,command_line_args.save_path + '/train_file_libsvm')
+    np.save(command_line_args.save_path + '/model_data/Y', Y)
+    np.save(command_line_args.log_path + '/model_data/X_val', X_v)
+    np.save(command_line_args.log_path + '/model_data/Y_val', Y_v)
+    dump_svmlight_file(X,Y,command_line_args.save_path + '/model_data/train_file_libsvm')
     dump_svmlight_file(X_v,Y_v,'./predict_file_libsvm')
     
     
+    
+    
+    
+"""
+preprocessing()
+
+Description:
+
+Will call the function to begin all threads and start preprocessing all of the data
+
+"""    
+
+def preprocessing(command_line_args):
+    
+    #basically can just run the main thread
+    begin_processes(command_line_args)
     
     
     
@@ -171,8 +187,35 @@ this function will be called. Uses the GPU enhanced version of LIBSVM to train t
 
 In the command_line_args object, a path to a file containing the variables to train the models is found.
 
-""" 
+"""
+
+
 def train_model(command_line_agrs):
+
+    #if we are forcing to capture the features, we will do so now.
+    #otherwise we will use the ones found during initial preprocessing
+    if(command_line_args.extract_features):
+        begin_processes(command_line_args)
+        
+    #if we aren't extracting files, lets check that there is already
+    #a file in libsvm format. If there isn't we will make one
+    elif(not os.path.isfile(command_line_args.input_path + '/model_data/train_file_libsvm')):
+        #if this file doesn't exist, we have two options
+        #use the near incomplete features if the preprocessing run finished completely
+        #otherwise use the nearly complete feature set
+        if( os.path.isfile(command_line_args.input_path + '/model_data/X.npy')):
+            X = np.load(command_line_args.input_path + '/model_data/X.npy')
+            Y = np.load(command_line_args.input_path + '/model_data/Y.npy')
+        else:
+            X = np.load(command_line_args.input_path + '/model_data/X_temp.npy')
+            Y = np.load(command_line_args.input_path + '/model_data/Y_temp.npy')
+            
+            
+        #now lets make an libsvm compatable file         
+        dump_svmlight_file(X,Y,command_line_args.save_path + '/model_data/train_file_libsvm')
+        
+        
+    #now features are extracted, lets classify using this bad boy
     terminal_cmd(command_line_args.train_string)
     
     

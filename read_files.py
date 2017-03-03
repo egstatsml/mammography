@@ -44,8 +44,7 @@ class spreadsheet(object):
         self.metadata = pd.read_csv(command_line_args.metadata_path + '/exams_metadata.tsv', sep='\t')
         self.crosswalk = pd.read_csv(command_line_args.metadata_path + '/images_crosswalk.tsv', sep='\t')    
         self.training_path = command_line_args.input_path
-        
-        
+                
         #now setting the member variables
         self.total_no_exams = self.metadata.shape[0] - 1
         self.cancer = False     #cancer status of the current scan
@@ -99,18 +98,26 @@ class spreadsheet(object):
         
         #now lets load in all of the filenames
         for (data_dir, dirnames, filenames) in os.walk(directory):
+            
             self.filenames.extend(filenames)
             break
+
+        #lets check all of the filenames to make sure they are valid
+        for filename in self.filenames:
+            if len(filename) != 10:#('npy' not in str(filename)) | ('dcm' not in str(filename)):
+                #then this file is not a valid scan, so lets get rid of it from the list
+                print filename
+                self.filenames.remove(filename)
         
-        if(data_type == 'training'):
-            #now will add the cancer status of these files
-            for ii in range(0, len(self.filenames)):
-                self.next_scan()
-                self.cancer_list.append(self.cancer)
+        
+        #now will add the cancer status of these files
+        for ii in range(0, len(self.filenames)):
+            self.next_scan()
+            self.cancer_list.append(self.cancer)
                 
             #after done adding the cancer status, will set reset the file position back to the start (0)
-            self.file_pos = 0
-            
+        self.file_pos = 0
+        
             
             
             
@@ -150,6 +157,7 @@ class spreadsheet(object):
         #will get rid of any file extentsion suffixies
         #will be either .npy or .dcm, wither way both are 4 chars long
         filename = filename[0:-4]
+        print filename
         list_all_files = list(self.crosswalk['filename'])
         file_loc = []
         for ii in range(0,len(list_all_files)): 
@@ -233,6 +241,7 @@ class spreadsheet(object):
             
             
         right = (self.crosswalk[self.patient_subject] == self.patient_id) & (self.crosswalk['examIndex'] == self.exam_index) & (self.crosswalk["imageView"].str.contains('R')) 
+        
         
         right_filenames = (self.crosswalk.loc[right, 'filename'])
         self.no_scans_right = np.sum(right)

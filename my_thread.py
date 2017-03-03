@@ -384,8 +384,10 @@ class my_thread(Process):
                     self.scan_data.initialise(file_path, self.preprocessing)
                     
                     #begin preprocessing steps
-                    self.scan_data.preprocessing()
-                    self.save_preprocessed()
+                    if(self.preprocessing):
+                        self.scan_data.preprocessing()
+                        self.save_preprocessed()
+                    
                     self.scan_data.get_features()
                     
                     #now that we have the features, we want to append them to the list of features

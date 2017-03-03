@@ -57,6 +57,7 @@ class arguments(object):
         self.train_string = []
         self.validation_string = []
         self.challenge_submission = False
+        self.extract_features = False
         
         if(argv != False):
             print(argv)
@@ -100,13 +101,19 @@ class arguments(object):
        -b = Probability estimates (Default of False)
        -w = Weight for each class. usage here should be a dictionary like reference for each class
        -a = Path where model file will be saved
+       -f = extract features from preprocessed data. NOTE that this is done by default
+             when you specify you wan't to do preprocessing with the -p flag.
+            If you have already done the preprocessing though and you want to extract 
+            features again, you should use this flag, but you shouldn't use this flag in
+            conjunction with the preprocessing flag
+    
     """
     
     def parse_command_line(self, argv):
         
         try:
             
-            opts,args = getopt.getopt(argv, "htpbm:i:s:l:v:k:d:g:e:a:w:")
+            opts,args = getopt.getopt(argv, "htpbfm:i:s:l:v:k:d:g:e:a:w:")
             
         except getopt.GetoptError as err:
             print(str(err))
@@ -172,8 +179,14 @@ class arguments(object):
             elif opt == '-b':
                 self.probability = True
                               
-            elif opt == 'a':  #using -a because am running out of letters :)
+            elif opt == '-a':  #using -a because am running out of letters :)
                 self.model_path = str(arg)
+                print('found model path')
+                print(self.model_path)
+                
+            elif opt == '-f':
+                self.extract_features = True
+                
             elif opt == '-w':
                 #convert the string argument into a dictionary
                 init_dict = ast.literal_eval('{' + str(arg) + '}')
@@ -202,8 +215,18 @@ class arguments(object):
             weight_string = ''
             for ii in self.weight.keys():
                 weight_string += '-w%s %s ' %(ii, self.weight[ii])
+            
+            #This is here so that we can run training and preprocessing in the same
+            #step if we like
+            #if we are preprocessing, the train file will be in the save_path
+            #if we aren't, it should be in the input_path
+            if(self.preprocessing):
+                train_file_path = self.save_path
+            else:
+                train_file_path = self.input_path
                 
-            self.train_string ='./CUDA/svm-train-gpu  -t %s -d %s -m 5000 -e %s %s %s/train_file_libsvm %s/model_file' %(self.kernel, self.degree, self.epsilon, weight_string, self.save_path, self.model_path)
+                
+            self.train_string ='./CUDA/svm-train-gpu  -t %s -d %s -m 5000 -e %s %s %s/model_data/train_file_libsvm %s/model_file' %(self.kernel, self.degree, self.epsilon, weight_string, train_file_path, self.model_path)
             
             
             
@@ -251,6 +274,26 @@ class arguments(object):
                     sys.exit(2)
                     
                     
+                    
+        #if we are doing the preprocessing, we will be extracting features while we are there
+        #if the user supplies flags for both feature extraction and preprocessing, just
+        #display a little warning to let them know what is going to happen
+        if(self.preprocessing & self.extract_features & self.training):
+            print("""
+            WARNING!
+            You have supplied flags for both preprocessing (-p) and feature extratction (-f)
+            Feature extraction is done by default if preprocessing is selected.
+            
+            This can cause a problem if you have specified that you would like to do training
+            as well with the (-t) flag, which you have also done.
+            
+            To avoid doing it twice by accident, during the preprocessing and training stage,
+            I am disabling the (-f) flag so feature extracted is only done once.
+            Trust me, this is what you wanted to really happen
+            """)
+            self.extract_features = False
+            
+            
         #if we do want to do some training, we should ensure that the data has already been
         #preprocessed, or that it will be done in this run of the program
         if(self.training):
