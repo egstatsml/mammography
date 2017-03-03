@@ -147,7 +147,7 @@ def begin_processes(command_line_args):
     
     X, Y, X_v, Y_v = create_classifier_arrays(shared, command_line_args.validation)
     #save this data in numpy format, and in the LIBSVM format
-    np.save(command_line_args.save_path + '/X', X)
+    np.save(command_line_args.save_path + '/model_data/X', X)
     np.save(command_line_args.save_path + '/model_data/Y', Y)
     np.save(command_line_args.log_path + '/model_data/X_val', X_v)
     np.save(command_line_args.log_path + '/model_data/Y_val', Y_v)
