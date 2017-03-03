@@ -3,7 +3,7 @@
 #variables that can be used for setting paths and creating directories
 SAVE_DIR_ROOT="/preprocessedData"
 SAVE_DIR="$SAVE_DIR_ROOT"
-SAVE_DIR_MODEL_FILES="$SAVE_DIR_ROOT/model_state/"
+SAVE_DIR_MODEL_FILES="$SAVE_DIR_ROOT/model_data/"
 LOG_DIR="/modelState"
 INPUT_DIR="/trainingData/"
 METADATA_DIR="/metadata/"
@@ -25,6 +25,10 @@ echo "Compiling Cython Files"
 
 echo "Running Preprocessing script"
 python main_thread.py -p -t -i $INPUT_DIR -s $SAVE_DIR -l $LOG_DIR -m $METADATA_DIR -k 1 -d 4 -e 0.001 -b -w 0:1,1:20 -v 100 -a $MODEL_STATE_DIR
+
+#save the model in the modelstate dir
+#echo "Copying the model to the modelState dir"
+#cp $SAVE_DIR_MODEL_FILES/model_file $MODEL_STATE_DIR/model_file
 
 echo "DONE"
 echo "Preprocessing Run Successfully. You may now DANCE :)"

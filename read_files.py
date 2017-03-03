@@ -157,7 +157,6 @@ class spreadsheet(object):
         #will get rid of any file extentsion suffixies
         #will be either .npy or .dcm, wither way both are 4 chars long
         filename = filename[0:-4]
-        print filename
         list_all_files = list(self.crosswalk['filename'])
         file_loc = []
         for ii in range(0,len(list_all_files)): 

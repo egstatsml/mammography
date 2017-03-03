@@ -81,7 +81,7 @@ class shared(object):
     feature_array = []
     class_array = []
     save_timer = time.time()
-    save_time = 600      #save once an hour or every 3600 seconds
+    save_time = 200      #save once an hour or every 3600 seconds
     
     
     ##########################################
@@ -212,8 +212,8 @@ class shared(object):
         self.t_lock_acquire()
         X = np.array(self.get_feature_array())
         Y = np.array(self.get_class_array())
-        np.save(save_path + '/model_state/X_temp', X)
-        np.save(save_path + '/model_state/Y_temp', Y)
+        np.save(save_path + '/model_data/X_temp', X)
+        np.save(save_path + '/model_data/Y_temp', Y)
         print('Saved Temporary Data')
         #reset the timer
         self.reset_timer()
@@ -373,6 +373,11 @@ class my_thread(Process):
                 if(self.manager.q_empty()):
                     print(' Queue is Empty')
                     self.manager.set_exit_status(True)                
+                    
+                if(self.manager.get_cancer_count() > 3):
+                    print('Cancer Count is greater than 3 so lets exit')
+                    self.manager.set_exit_status(True)                
+                    
                     
                 self.manager.t_lock_release()
                 print('Queue size = %d' %self.manager.q_size())
@@ -534,9 +539,6 @@ class my_thread(Process):
                 contrast = self.scan_data.contrast[t_ii][lvl]
                 dissimilarity = self.scan_data.dissimilarity[t_ii][lvl]
                 correlation = self.scan_data.correlation[t_ii][lvl]
-                
-                print('homogeneity')
-                print homogeneity
                 
                 #wave_energy = self.scan_data.wave_energy[t_ii][lvl]
                 #wave_entropy = self.scan_data.wave_entropy[t_ii][lvl]
