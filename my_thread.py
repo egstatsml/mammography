@@ -182,7 +182,7 @@ class shared(object):
     init_timer()
     
     Description:
-    Reinitialise both start and stop timers
+    Initialise timer
     
     
     """
@@ -215,9 +215,11 @@ class shared(object):
         np.save(save_path + '/model_data/X_temp', X)
         np.save(save_path + '/model_data/Y_temp', Y)
         print('Saved Temporary Data')
+        print(X.shape)
         #reset the timer
         self.reset_timer()
         self.t_lock_release()
+        
         
         
         
@@ -237,8 +239,6 @@ class shared(object):
     Y = 1D array containing status of each of training scans
     """
     def add_features(self,X, Y):
-        
-        print('saving features to the temp array')
         #request lock for this process
         self.t_lock_acquire()
         #if this is the first set of features to be added, we should just initially
@@ -251,7 +251,6 @@ class shared(object):
             
         else:
             print(np.shape(self.feature_array))
-            #print self.feature_array
             self.feature_array.extend(X)
             self.class_array.extend(Y)
         #we are done so release the lock
@@ -402,8 +401,6 @@ class my_thread(Process):
                     #The list of features is shared amongst all of the class instances, so
                     #before we add anything to there, we should lock other threads from adding
                     #to it
-                    self.time_process.append(timeit.default_timer() - start_time)
-                    #print('time = %d s' %self.time_process[-1])
                     self.scan_data.current_image_no += 1   #increment the image index
                     lock_time = timeit.default_timer()
                     #now increment the total scan count as well
@@ -413,13 +410,13 @@ class my_thread(Process):
                     if(self.add_time_elapsed()):
                         #if we made it in here, we are going to add the data we have currently found
                         #to the shared data list
-                        print('lets try and add some features shall we :)')
                         self.add_features()
                         print('Added Temporary Data in %d' %self.t_id)
                         
                     #see if the save time has elapsed
                     if(self.manager.save_time_elapsed()):
                         #if we have made it here, it is time to do a temporary save
+                        print('Am going to SAVE THE TEMP FEATURES NOW')
                         self.manager.periodic_save_features(self.save_path)
                         
                         
@@ -506,7 +503,6 @@ class my_thread(Process):
         self.manager.t_lock_acquire()
         self.manager.inc_scan_count()
         self.manager.t_lock_release()                    
-        print(self.manager.q_size())
         
         
         
@@ -526,11 +522,8 @@ class my_thread(Process):
     
     def add_features(self):
         
-        print('Adding features to temp array')
-        print self.scans_processed
         self.scan_data._crop_features(self.scan_data.current_image_no)
         
-        print len(self.scan_data.homogeneity)
         X = []
         Y = []
         for t_ii in range(0, self.scan_data.current_image_no):

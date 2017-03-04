@@ -152,7 +152,7 @@ Will call the function to begin all threads and start preprocessing all of the d
 
 def preprocessing(command_line_args):
     
-    #basically can just run the main thread
+    #basically can just run all the processes
     begin_processes(command_line_args)
     
     
@@ -174,9 +174,10 @@ In the command_line_args object, a path to a file containing the variables to tr
 
 
 def train_model(command_line_agrs):
-
+    
     #if we are forcing to capture the features, we will do so now.
     #otherwise we will use the ones found during initial preprocessing
+    #force this with the -f argument 
     if(command_line_args.extract_features):
         begin_processes(command_line_args)
         
@@ -202,8 +203,8 @@ def train_model(command_line_agrs):
     #now features are extracted, lets classify using this bad boy
     terminal_cmd(command_line_args.train_string)
     
-
-
+    
+    
 def validate_model(command_line_args):
     
     #if preprocessing was specified in this run (-p) than tho model will
