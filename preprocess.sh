@@ -20,7 +20,7 @@ mkdir -p $LOG_DIR
 
 
 echo "Running Preprocessing script"
-python main_thread.py -p -i $INPUT_DIR -s $SAVE_IMAGE_DIR -l $LOG_DIR -m $METADATA_DIR -a $MODEL_DIR_MODEL_FILES
+python main_thread.py -p -i $INPUT_DIR -s $SAVE_IMAGE_DIR -l $LOG_DIR -m $METADATA_DIR -a $SAVE_DIR_MODEL_FILES
 
 
 #save the model in the modelstate dir
