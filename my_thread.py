@@ -187,7 +187,7 @@ class shared(object):
     
     """
     def init_timer(self):
-        self.save_start_timer = time.time()
+        self.save_timer = time.time()
         
         
     """
@@ -308,6 +308,7 @@ class my_thread(Process):
         
         
         
+        
     """
     run()
     
@@ -374,9 +375,11 @@ class my_thread(Process):
                     print(' Queue is Empty')
                     self.manager.set_exit_status(True)                
                     
-                if(self.manager.get_cancer_count() > 3):
-                    print('Cancer Count is greater than 3 so lets exit')
-                    self.manager.set_exit_status(True)                
+                    
+                #this is just here whilst debugging to shorten the script
+                #if(self.manager.get_cancer_count() > 6):
+                #    print('Cancer Count is greater than 3 so lets exit')
+                #    self.manager.set_exit_status(True)                
                     
                     
                 self.manager.t_lock_release()
@@ -392,7 +395,7 @@ class my_thread(Process):
                     if(self.preprocessing):
                         self.scan_data.preprocessing()
                         self.save_preprocessed()
-                    
+                        
                     self.scan_data.get_features()
                     
                     #now that we have the features, we want to append them to the list of features

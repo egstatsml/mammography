@@ -49,24 +49,13 @@ def flatten(x):
     return chain.from_iterable(x)
 
 
-def create_classifier_arrays(shared, validation):
-    #How do we want to split it
-    if(validation):
-        val = validation
-    else:
-        val = 1
+def create_classifier_arrays(shared):
         
     #convert the list of features and class discriptors into arrays
     X = np.array(shared.get_feature_array())
     Y = np.array(shared.get_class_array())
     
-    X_t = X[0:-val,:]
-    Y_t = Y[0:-val]
-    
-    X_val = X[-val::,:]
-    Y_val = Y[-val::]
-    
-    return X_t, Y_t, X_val, Y_val
+    return X, Y
 
 
 def terminal_cmd(command):
@@ -96,9 +85,7 @@ def begin_processes(command_line_args):
     for ii in range(0, descriptor.no_scans):
         shared.t_lock_acquire()
         shared.q_put(descriptor.filenames[ii])
-        #if we are training, add the descriptor for cancer status
-        if(command_line_args.training):
-            shared.q_cancer_put(descriptor.cancer_list[ii])
+        shared.q_cancer_put(descriptor.cancer_list[ii])
         shared.t_lock_release()
         
     print('Set up Queue')
@@ -129,7 +116,6 @@ def begin_processes(command_line_args):
         t.join()
         
         
-        
     #all of the threads are done, so we can now we can use the features found to train
     #the classifier
     
@@ -145,16 +131,12 @@ def begin_processes(command_line_args):
     #now lets train our classifier
     #will just use the features from the approximation wavelet decomps
     
-    X, Y, X_v, Y_v = create_classifier_arrays(shared, command_line_args.validation)
+    X, Y = create_classifier_arrays(shared)
     #save this data in numpy format, and in the LIBSVM format
     print('Saving the final data')
     np.save(command_line_args.save_path + '/model_data/X', X)
     np.save(command_line_args.save_path + '/model_data/Y', Y)
-    np.save(command_line_args.log_path + './X_val', X_v)
-    np.save(command_line_args.log_path + './Y_val', Y_v)
-    dump_svmlight_file(X,Y,command_line_args.save_path + '/model_data/train_file_libsvm')
-    dump_svmlight_file(X_v,Y_v,'./predict_file_libsvm')
-    
+    dump_svmlight_file(X,Y,command_line_args.save_path + '/model_data/data_file_libsvm')
     
     
     
@@ -200,6 +182,7 @@ def train_model(command_line_agrs):
         
     #if we aren't extracting files, lets check that there is already
     #a file in libsvm format. If there isn't we will make one
+    
     elif(not os.path.isfile(command_line_args.input_path + '/model_data/train_file_libsvm')):
         #if this file doesn't exist, we have two options
         #use the near incomplete features if the preprocessing run finished completely
@@ -219,14 +202,23 @@ def train_model(command_line_agrs):
     #now features are extracted, lets classify using this bad boy
     terminal_cmd(command_line_args.train_string)
     
-    
+
+
 def validate_model(command_line_args):
+    
+    #if preprocessing was specified in this run (-p) than tho model will
+    #have first preprocessed the data
+    #Otherwise will assume that preprocessing has already been done prior
+
+    #run validation
     terminal_cmd(command_line_args.validation_string)
+    
+    
     
     
 #####################################################
 #
-#                Main Loop of Program
+#                Main of Program
 #
 #####################################################
 
@@ -249,28 +241,4 @@ if __name__ == '__main__':
         validate_model(command_line_args)
         
         
-        
-        
-    """
-    print('---- TIME INFORMATION ----')
-    #lets print the time info for each thread
-    print('Time for each thread to process a single scan')
-    for t in threads:
-        print('Thread %d :' %(t.t_id))
-        print('Average Time  = %f s' %(np.mean(t.time_process)))
-        print('Max Time  = %f s' %(np.max(t.time_process)))
-        print('Min Time  = %f s' %(np.min(t.time_process)))
-        print(' ')
-    
-    #printing the total run time of the program
-    run_total_sec = timeit.default_timer() - program_start
-    run_hours = run_total_sec / 3600
-    run_mins = (run_total_sec - run_hours * 60) / 60
-    run_secs = (run_total_sec - run_hours * 3600 -  run_mins * 60)
-    
-    
-    print('Run Time for %d scans = %hours %d minutes and %f seconds' %(descriptor.no_scans, run_hours, run_mins, run_secs))
-    """ 
-    
-    
     print("Exiting Main Thread")

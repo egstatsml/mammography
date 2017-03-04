@@ -26,7 +26,7 @@ import pandas as pd
 
 
 class spreadsheet(object):
-
+    
     """
     __init__()
     
@@ -34,7 +34,7 @@ class spreadsheet(object):
     
     
     @param command_line_args = arguments object that holds the path and boolean values determined
-                               from the command line 
+    from the command line 
     
     
     """
@@ -53,32 +53,48 @@ class spreadsheet(object):
         self.file_pos = 0   #the location of the current file we are looking for
         self.patient_subject = 'subjectId'
         
-        #lets load in all of the files
-        if(command_line_args.training):
-            self.get_training_scans(command_line_args.input_path)
-        elif(command_line_args.validation):
-            self.get_validation_scans(command_line_args.input_path)
+        
+        #lets load in the files
+        #
+        #If we are running the validation model on the server, we wont have access to any
+        #metadata about the cancer status of this file. 
+        #If we are running validation (-v) and running on synapse server for the challenge (-c)
+        #we wont try and load in the cancer status, we will just set them all to 0
+        #
+        #
+        #For every other instance (including validation on pilot data, as I wan't to get
+        #performance metrics) we will load the cancer status.
+        
+        
+        #if we are validatinging and on the synapse servers for the challenge
+        if(command_line_args.validation & command_line_args.challenge_submission):
+            self.get_validation_challenge_scans(command_line_args.input_path)        
+            
+            
+        #otherwise just load all of the scans and get their cancer status
+        else:
+            self.get_all_scans(command_line_args.input_path)
+            
+            
+        #now lets set the number of scans we have available
         self.no_scans = len(self.filenames)
         
         
+        
     """
-    get_training_data()
+    get_validation_data()
     
     Description:
     Will call the get_all_scans() function with the training parameter set, and will then 
     load in all of the files
     
     """
-    
-    def get_training_scans(self, directory):
         
-        #call the get_all_scans function and tell it to look in the training data
-        self.get_all_scans('training', directory)
-        
-        
-    def get_validation_scans(self, directory):
+    def get_validation_challenge_scans(self, directory):
         #call the get_all_scans function and tell it to look in the validation data
-        self.get_all_scans('validation', directory)
+        self.get_all_scans(directory, 'validation_challenge')
+        
+        
         
         
     """
@@ -86,42 +102,40 @@ class spreadsheet(object):
     
     Description:
     Function will load in all of the filenames available for the scans and store them in a list.
-    Will use member variable self.run_synapse to see if we are running on local machine or on synapse server
-    
+   
     
     @param data_type = string to say where we are looking for the data
-                 'training' = look in the training directory
-                 'validation' = look in the classifying directory
+                 'all' = default value, and we will get the cancer status as well
+                 'validation_challenge' = just get the files, don't try and get the cancer status
+    
     """
     
-    def get_all_scans(self, data_type, directory):
+    def get_all_scans(self,directory, data_type = 'all'):
         
         #now lets load in all of the filenames
         for (data_dir, dirnames, filenames) in os.walk(directory):
-            
             self.filenames.extend(filenames)
-            break
-
-        #lets check all of the filenames to make sure they are valid
-        for filename in self.filenames:
-            if len(filename) != 10:#('npy' not in str(filename)) | ('dcm' not in str(filename)):
-                #then this file is not a valid scan, so lets get rid of it from the list
-                print filename
-                self.filenames.remove(filename)
+            break   
         
-        
-        #now will add the cancer status of these files
-        for ii in range(0, len(self.filenames)):
-            self.next_scan()
-            self.cancer_list.append(self.cancer)
+        #if we aren't doing validation on the the synapse servers
+        if(data_type == 'all'):
+            #now will add the cancer status of these files
+            for ii in range(0, len(self.filenames)):
+                self.next_scan()
+                self.cancer_list.append(self.cancer)
                 
-            #after done adding the cancer status, will set reset the file position back to the start (0)
-        self.file_pos = 0
-        
+                #after done adding the cancer status, will set reset the file position back to the start (0)
+            self.file_pos = 0
             
-            
-            
-            
+        else:    
+            #just create a list of allllll zeros
+            for ii in range(0, len(self.filenames)):
+                self.cancer_list.append(0)
+                
+                
+                
+                
+                
     """
     next_scan()
     

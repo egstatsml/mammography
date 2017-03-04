@@ -2,29 +2,26 @@
 
 #variables that can be used for setting paths and creating directories
 SAVE_DIR_ROOT="/preprocessedData"
-SAVE_DIR="$SAVE_DIR_ROOT"
-SAVE_DIR_MODEL_FILES="$SAVE_DIR_ROOT/model_data/"
+SAVE_IMAGE_DIR="$SAVE_DIR_ROOT/preprocessedTrain/"
+SAVE_DIR_MODEL_FILES="$SAVE_IMAGE_DIR/model_data/"
 LOG_DIR="/modelState"
 INPUT_DIR="/trainingData/"
 METADATA_DIR="/metadata/"
 MODEL_STATE_DIR="/modelState"
 
+echo "Creating directory where preprocessed images will be saved"
+mkdir -p $SAVE_IMAGE_DIR
+
 echo "Creating directory for features found during the preprocessing stage"
 mkdir -p $SAVE_DIR_MODEL_FILES
-
 
 echo "Creating directory for log file"
 mkdir -p $LOG_DIR
 
-#compile Cython files
-echo "Compiling Cython Files"
-#chmod u+x ./compile.sh
-#./compile.sh
-
-#python main_thread.py -p -t -i /trainingData -s /preprocessedData -l /modelState -m /metadata -k 1 -d 4 -e 0.001 -b -w 0:1,1:20 -v 100
 
 echo "Running Preprocessing script"
-python main_thread.py -p -t -i $INPUT_DIR -s $SAVE_DIR -l $LOG_DIR -m $METADATA_DIR -k 1 -d 4 -e 0.001 -b -w 0:1,1:20 -v 100 -a $MODEL_STATE_DIR
+python main_thread.py -p -i $INPUT_DIR -s $SAVE_IMAGE_DIR -l $LOG_DIR -m $METADATA_DIR -a $MODEL_DIR_MODEL_FILES
+
 
 #save the model in the modelstate dir
 #echo "Copying the model to the modelState dir"

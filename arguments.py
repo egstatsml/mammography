@@ -46,7 +46,7 @@ class arguments(object):
         self.log_path = []
         self.metadata_path = []
         self.model_path = []
-        self.validation = 0
+        self.validation = False
         self.kernel = 1
         self.degree = 3
         self.gamma = 0
@@ -101,8 +101,9 @@ class arguments(object):
        -b = Probability estimates (Default of False)
        -w = Weight for each class. usage here should be a dictionary like reference for each class
        -a = Path where model file will be saved
+       -c = Challenge Submission
        -f = extract features from preprocessed data. NOTE that this is done by default
-             when you specify you wan't to do preprocessing with the -p flag.
+            when you specify you wan't to do preprocessing with the -p flag.
             If you have already done the preprocessing though and you want to extract 
             features again, you should use this flag, but you shouldn't use this flag in
             conjunction with the preprocessing flag
@@ -113,7 +114,7 @@ class arguments(object):
         
         try:
             
-            opts,args = getopt.getopt(argv, "htpbfm:i:s:l:v:k:d:g:e:a:w:")
+            opts,args = getopt.getopt(argv, "htpcbvfm:i:s:l:k:d:g:e:a:w:")
             
         except getopt.GetoptError as err:
             print(str(err))
@@ -162,7 +163,7 @@ class arguments(object):
                 self.metadata_path = str(arg)
                 
             elif opt == '-v':
-                self.validation = int(arg)
+                self.validation = True
                 
             elif opt == '-k':
                 self.kernel = int(arg)
@@ -178,7 +179,10 @@ class arguments(object):
                 
             elif opt == '-b':
                 self.probability = True
-                              
+                
+            elif opt == '-c':
+                self.challenge_submission = True
+                
             elif opt == '-a':  #using -a because am running out of letters :)
                 self.model_path = str(arg)
                 print('found model path')
@@ -226,12 +230,18 @@ class arguments(object):
                 train_file_path = self.input_path
                 
                 
-            self.train_string ='./CUDA/svm-train-gpu  -t %s -d %s -m 5000 -e %s %s %s/model_data/train_file_libsvm %s/model_file' %(self.kernel, self.degree, self.epsilon, weight_string, train_file_path, self.model_path)
+            print train_file_path
+            
+            self.train_string ='./CUDA/svm-train-gpu  -t %s -d %s -m 5000 -e %s %s %s/model_data/data_file_libsvm %s/model_file' %(self.kernel, self.degree, self.epsilon, weight_string, train_file_path, self.model_path)
+            
+            print self.train_string
             
             
+        if(self.validation):
+            self.validation_string = './LIBSVM/svm-predict %s/data_file_libsvm %s/model_file %s/results.txt' %(self.save_path + '/model_data', self.model_path, self.log_path)
+            print self.validation_string
             
-            if(self.validation != 0):
-                self.validation_string = './LIBSVM/svm-predict %s/predict_file_libsvm %s/model_file %s/results.txt' %(self.log_path, self.model_path, self.log_path)
+            
             
             
             
@@ -375,22 +385,35 @@ class arguments(object):
         -e = Epsilon. Tolerance for termination. (Default of 0.001)
         -b = Probability estimates (Default of False)
         -w = Weight for each class. usage here should be a dictionary like reference for each class
-        -a = path where model file will be saved
+        -a = Path where model file will be saved
+        -c = Challenge Submission
+        -f = extract features from preprocessed data. NOTE that this is done by default
+            when you specify you wan't to do preprocessing with the -p flag.
+            If you have already done the preprocessing though and you want to extract 
+            features again, you should use this flag, but you shouldn't use this flag in
+            conjunction with the preprocessing flag
         
-        Example 1 - run on Synapse Server to preprocess and train: 
-        python main_thread.py -p -t -i /trainingData -s /preprocessedData -l /modelState -m /metadata -k 1 -d 4 -e 0.001 -b -w 0:1,1:20 -a ./modelState
+        Note it is best if you split the tasks up, say preprocess (-p) then train (-t)
+        and then validate (-v) though in validation you may want to use the preprocessing
+        flag to specify that you want to preprocess the data. This option is given so that
+        if you preprocess the data you don't have to run it all again unless you specify it.
+        
+        
+        
+        Example 1 - run on Synapse Server to preprocess 
+        python main_thread.py -p -t -i /trainingData -s /preprocessedData -l /modelState -m /metadata 
 
-        Example 2 - Run on Dimitri's Machine  to train and validate:
-        sudo python main_thread.py -p -t -i /media/dperrin/ -s /media/dperrin/preprocessed/ -l ./ -m ./ -v 100 -k 1 -d 4 -e 0.001 -b -w 0:1,1:20") -a /media/dperrin/modelState
+
+        Example 2 - Run on Dimitri's Machine  to train:
+        sudo python main_thread.py -t -i /media/dperrin/preprocessed/preprocessedTrain/ -s /media/dperrin/preprocessed/preprocessedTrain -l ./ -m ./  -k 1 -d 4 -e 0.001 -b -w 0:1,1:20 -a /media/dperrin/preprocessed/preprocessedTrain/model_data
         
-        Example 3 - Run just training and validation on Dimitri's Machine
-        sudo python main_thread.py -t -i /media/dperrin/preprocessed -s /media/dperrin/preprocessed/ -l ./ -m ./ -v 100 -k 1 -d 4 -e 0.001 -b -w 0:1,1:20") -a /media/dperrin/modelState
+        Example 3 - Run validation and preprocess the validation data on Dimitri's Machine
         
+        sudo python main_thread.py -p -v -i /media/dperrin/val_images/ -s /media/dperrin/preprocessed/preprocessedVal -l ./ -m ./  -a /media/dperrin/preprocessed/preprocessedTrain/model_data
         
+        Example 4 - Run validation and on Dimitri's Machine, assuming we have previously preprocessed it
         
+        sudo python main_thread.py -v -i /media/dperrin/preprocessed/preprocessedVal/ -s /media/dperrin/preprocessed/preprocessedVal -l ./ -m ./  -a /media/dperrin/preprocessed/preprocessedTrain/model_data
         """)
-              
-              
-        print("Argument Flags: \n -h = Help: print help message \n -t = Train: if we are training the model. If this flag is not specified, the system will not train. \n -p = Preprocessing: if we are preprocessing the data. If this flag is not supplied the system will assume the data in the input path has already been preprocessed. Note if this argument is supplied, then a save path must be specified to save the preprocessed scans. This is done with the -s variable and is described below. \n -i = Input directory = where we will be reading the data from \n Eg. if we are preprocessing, read data from the initial folder. \n If not, will want to specify folder where scans have already been preprocessed. \n -s = Save Directory: If we are preprocessing, where should we save the preprocessed Images. \n -l = Log Directory: Where should we save the log file to track our progress. -m = Metadata directory: Where the metadata csv file is stored \n \n --------------------------------------- \n Required Arguments: \n -i, -s, -l \n If these arguments are not supplied, along with a correct path for each argument, the program will not run, and you will see this message :) \n \n Example - run on Synapse Server: \n sudo python main_thread.py -p -t -i /trainingData -s /preprocessedData -l /modelState -m /metadata \n \n Example - Run on Dimitri's Machine \n sudo python main_thread.py -p -t -i /media/dperrin/ -s /media/dperrin/preprocessedData/ -l ./ -m ./ -v 100")
-        
-    
+
+
