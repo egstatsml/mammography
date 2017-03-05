@@ -81,7 +81,7 @@ class shared(object):
     feature_array = []
     class_array = []
     save_timer = time.time()
-    save_time = 200      #save once an hour or every 3600 seconds
+    save_time = 3600      #save once an hour or every 3600 seconds
     
     
     ##########################################
@@ -299,9 +299,9 @@ class my_thread(Process):
         self.save_path = command_line_args.save_path
         #some variables that are used to time the system for adding files to the shared manager
         self.add_timer = time.time()
-        #add features every 11 minutes
+        #add features every 13 minutes
         #made it not a factor of 60 minutes
-        self.add_time = 180
+        self.add_time = 780
         
         
         

@@ -53,6 +53,9 @@ class spreadsheet(object):
         self.file_pos = 0   #the location of the current file we are looking for
         self.patient_subject = 'subjectId'
         
+        #just printing the database headers to make sure they are correct
+        print(self.metadata.columns.values)
+        print(self.crosswalk.columns.values)        
         
         #lets load in the files
         #
