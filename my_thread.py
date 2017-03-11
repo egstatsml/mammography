@@ -71,8 +71,11 @@ class shared(object):
     #whenever any of these reference variables are accessed, the thread lock should be applied,
     #to ensure multiple threads arent accessing the same memory at the same time
     
-    q = Queue(10000000)        #queue that will contain the filenames of the scans
-    q_cancer = Queue(10000000) #queue that will contain the cancer status of the scans
+    q = Queue(10000000)             #queue that will contain the filenames of the scans
+    q_cancer = Queue(10000000)      #queue that will contain the cancer status of the scans
+    q_laterality = Queue(10000000)  #queue that will contain the laterality (view) of the scans
+    q_exam = Queue(10000000)        #queue that will contain the exam index of the scans
+    q_subject_id = Queue(10000000)  #queue that will contain the subject ID of the scans
     t_lock = Lock()
     exit_flag = False
     error_files = []   #list that will have all of the files that we failed to process
@@ -80,6 +83,9 @@ class shared(object):
     cancer_count = 0
     feature_array = []
     class_array = []
+    laterality_array = []
+    exam_array = []
+    subject_id_array = []
     save_timer = time.time()
     save_time = 3600      #save once an hour or every 3600 seconds
     
@@ -97,13 +103,31 @@ class shared(object):
     
     def q_cancer_get(self):
         return self.q_cancer.get()
-        
+    
+    def q_laterality_get(self):
+        return self.q_laterality.get()
+    
+    def q_exam_get(self):
+        return self.q_exam.get()
+    
+    def q_subject_id_get(self):
+        return self.q_subject_id.get()    
+    
     def q_put(self, arg):
         self.q.put(arg)
         
     def q_cancer_put(self, arg):
         self.q_cancer.put(arg)
         
+    def q_laterality_put(self, arg):
+        self.q_laterality.put(arg)
+        
+    def q_exam_put(self, arg):
+        self.q_exam.put(arg)
+        
+    def q_subject_id_put(self, arg):
+        return self.q_subject_id.put(arg)    
+    
     def q_empty(self):
         return self.q.empty()
     
@@ -170,6 +194,14 @@ class shared(object):
     def get_class_array(self):
         return self.class_array
     
+    def get_laterality_array(self):
+        return self.laterality_array
+    
+    def get_exam_array(self):
+        return self.exam_array
+    
+    def get_subject_id_array(self):
+        return self.subject_id_array
     
     
     ###################################
@@ -212,8 +244,16 @@ class shared(object):
         self.t_lock_acquire()
         X = np.array(self.get_feature_array())
         Y = np.array(self.get_class_array())
+        lateralities = np.array(self.get_lateralities_array(), dtype='S1')
+        exams = np.array(self.get_exams(), dtype=np.int)
+        subject_ids = np.array(self.get_subject_ids(), dtype='S12')
+        
         np.save(save_path + '/model_data/X_temp', X)
         np.save(save_path + '/model_data/Y_temp', Y)
+        np.save(command_line_args.save_path + '/model_data/lateralities_temp', lateralities)
+        np.save(command_line_args.save_path + '/model_data/exams_temp', exams)
+        np.save(command_line_args.save_path + '/model_data/subject_ids_temp', subject_ids)
+        
         print('Saved Temporary Data')
         print(X.shape)
         #reset the timer
@@ -223,8 +263,7 @@ class shared(object):
         
         
         
-    """
-    
+    """    
     add_features()
     
     Description: 
@@ -237,8 +276,12 @@ class shared(object):
         M = Number of features per scan
     
     Y = 1D array containing status of each of training scans
+    laterality = list containing the laterality of each scan (either 'L' or 'R')
+    exam = list containing the examination number of each scan
+    subject_id = list containing the subject ID of all the scans
     """
-    def add_features(self,X, Y):
+    
+    def add_features(self,X, Y, laterality, exam, subject_id):
         #request lock for this process
         self.t_lock_acquire()
         #if this is the first set of features to be added, we should just initially
@@ -248,11 +291,17 @@ class shared(object):
         if(self.first_features_added()):
             self.feature_array = X
             self.class_array = Y
+            self.laterality_array = laterality
+            self.exam_array = exam
+            self.subject_id_array = subject_id
             
         else:
             print(np.shape(self.feature_array))
             self.feature_array.extend(X)
             self.class_array.extend(Y)
+            self.laterality_array.extend(laterality)
+            self.exam_array.extend(exam)
+            self.subject_id_array.extend(subject_id)
         #we are done so release the lock
         self.t_lock_release()
         
@@ -292,7 +341,10 @@ class my_thread(Process):
         self.time_process = []   #a list containing the time required to perform preprocessing
                                  #on each scan, will use this to find average of all times
         self.scans_processed = 0
-        self.cancer_status = []
+        self.cancer_status = []        
+        self.subject_ids = []
+        self.lateralities = []
+        self.exam_nos = []
         self.training = command_line_args.training
         self.preprocessing = command_line_args.preprocessing
         self.validation = command_line_args.validation
@@ -362,12 +414,19 @@ class my_thread(Process):
             self.manager.t_lock_acquire()
             if(not (self.manager.q_empty()) ):
                 file_path = self.data_path + self.manager.q_get()
+                #get the cancer status.
+                #if we are validating on the synapse servers, the cancer status is not
+                #given, so I have set them all to false in read_files
                 self.cancer_status.append(self.manager.q_cancer_get())
+                #add the rest of the metadata to the list
+                self.subject_ids.append(self.manager.q_subject_id_get())
+                self.lateralities.append(self.manager.q_laterality_get())
+                self.exam_nos.append(self.manager.q_exam_get())
                 if(self.cancer_status[-1]):
                     self.manager.inc_cancer_count()
                     print('cancer count = %d' %self.manager.get_cancer_count())
-                    
-                    
+                        
+                        
                 #if the queue is now empty, we should wrap up and
                 #get ready to exit
                 if(self.manager.q_empty()):
@@ -376,11 +435,11 @@ class my_thread(Process):
                     
                     
                 #this is just here whilst debugging to shorten the script
-                #if(self.manager.get_cancer_count() > 6):
-                #    print('Cancer Count is greater than 3 so lets exit')
+                #if(self.manager.get_cancer_count() > 2):
+                #    print('Cancer Count is greater than 2 so lets exit')
                 #    self.manager.set_exit_status(True)                
                     
-                    
+                #are done getting metadata and filenames from the queue, so unlock processes
                 self.manager.t_lock_release()
                 print('Queue size = %d' %self.manager.q_size())
                 
@@ -429,6 +488,9 @@ class my_thread(Process):
                     #valid since we didn't save the
                     #features from the scan
                     del self.cancer_status[-1]
+                    del self.lateralities[-1]
+                    del self.exam_nos[-1]
+                    del self.subject_ids[-1]
                     
                 sys.stdout.flush()
                 self.scan_data.cleanup()
@@ -557,13 +619,22 @@ class my_thread(Process):
                 #X[ii, jj*no_features + 4*feat_len] = dissimilarity[0,jj]
                 #X[ii, jj*no_features + 5*feat_len] = correlation[0,jj]
                 
-                
-            #set the cancer statues for this scan
-            Y.append(self.cancer_status[t_ii])
+            
+            #add the density measure for this scan
+            print('density = %f' %(self.scan_data.density[t_ii]))
+            X[t_ii].append(self.scan_data.density[t_ii])
+            #set the cancer statues for this scan            
+            Y.append(self.cancer_status[t_ii])    
         #now add the features from this list to to conplete list in the manager
-        self.manager.add_features(X, Y)
+        self.manager.add_features(X, Y, self.lateralities, self.exam_nos, self.subject_ids)
         #reinitialise the feature list in the scan_data member
         self.scan_data.reinitialise_feature_lists()
+        #reinitialise the metadata
+        self.cancer_status = []        
+        self.subject_ids = []
+        self.lateralities = []
+        self.exam_nos = []
+        
         #set the number of scans processed back to zero
         self.scan_data.current_image_no = 0
         #reset the timer

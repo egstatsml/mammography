@@ -41,20 +41,35 @@ class spreadsheet(object):
     
     def __init__(self, command_line_args):
         
-        self.metadata = pd.read_csv(command_line_args.metadata_path + '/exams_metadata.tsv', sep='\t')
-        self.crosswalk = pd.read_csv(command_line_args.metadata_path + '/images_crosswalk.tsv', sep='\t')    
-        self.training_path = command_line_args.input_path
-                
         #now setting the member variables
-        self.total_no_exams = self.metadata.shape[0] - 1
-        self.cancer = False     #cancer status of the current scan
-        self.cancer_list = []   #list of cancer status for all of the scans
-        self.filenames = [] #list that contains all of the filenames
-        self.file_pos = 0   #the location of the current file we are looking for
+        self.cancer = False        #cancer status of the current scan
+        self.cancer_list = []      #list of cancer status for all of the scans DONE IN THIS PROCESS!!!!!
+        self.laterality = []       #laterality of current scan
+        self.laterality_list = []  #list of laterality of all scans
+        self.exam = []             #exam index of current scan 
+        self.exam_list = []        #list of exam indicies for all scans
+        self.subject_id = []       #ID of current scan
+        self.subject_id_list = []  #list of subject ID's for all scans
+        self.filenames = []        #list that contains all of the filenames
+        self.file_pos = 0          #the location of the current file we are looking for
+        
+        #this variable is here just because there was a minor discrepancy between the pilot metadata
+        #given out early in the challenge
         self.patient_subject = 'subjectId'
         
+        #load in data from the spreadsheets
+        self.crosswalk = pd.read_csv(command_line_args.metadata_path + '/images_crosswalk.tsv', sep='\t')    
+        self.training_path = command_line_args.input_path
+        #will have access to the metadata if we are validating on the synapse servers
+        #though if we are validating for ourselves we will use the validation data
+        print command_line_args.validation
+        print command_line_args.challenge_submission
+        if( not(command_line_args.validation & command_line_args.challenge_submission) ):
+            print 'here'
+            self.metadata = pd.read_csv(command_line_args.metadata_path + '/exams_metadata.tsv', sep='\t')
+            print(self.metadata.columns.values)
+            
         #just printing the database headers to make sure they are correct
-        print(self.metadata.columns.values)
         print(self.crosswalk.columns.values)        
         
         #lets load in the files
@@ -68,28 +83,28 @@ class spreadsheet(object):
         #For every other instance (including validation on pilot data, as I wan't to get
         #performance metrics) we will load the cancer status.
         
-        
         #if we are validatinging and on the synapse servers for the challenge
         if(command_line_args.validation & command_line_args.challenge_submission):
             self.get_validation_challenge_scans(command_line_args.input_path)        
-            
-            
+                
         #otherwise just load all of the scans and get their cancer status
         else:
             self.get_all_scans(command_line_args.input_path)
-            
             
         #now lets set the number of scans we have available
         self.no_scans = len(self.filenames)
         
         
         
+        
+        
+        
     """
-    get_validation_data()
+    get_validation_challenge_scans()
     
     Description:
-    Will call the get_all_scans() function with the training parameter set, and will then 
-    load in all of the files
+    Will call the get_all_scans() function with the validation argument set, and will then 
+    load in all of the files. This is done so we don't try and get the cancer status
     
     """
         
@@ -105,7 +120,7 @@ class spreadsheet(object):
     
     Description:
     Function will load in all of the filenames available for the scans and store them in a list.
-   
+    
     
     @param data_type = string to say where we are looking for the data
                  'all' = default value, and we will get the cancer status as well
@@ -120,25 +135,21 @@ class spreadsheet(object):
             self.filenames.extend(filenames)
             break   
         
-        #if we aren't doing validation on the the synapse servers
-        if(data_type == 'all'):
-            #now will add the cancer status of these files
-            for ii in range(0, len(self.filenames)):
-                self.next_scan()
-                self.cancer_list.append(self.cancer)
-                
-                #after done adding the cancer status, will set reset the file position back to the start (0)
-            self.file_pos = 0
+        #now will add the cancer status of these files
+        for ii in range(0, len(self.filenames)):
+            self.next_scan(data_type)
+            self.cancer_list.append(self.cancer)
+            self.laterality_list.append(self.laterality)
+            self.exam_list.append(self.exam)
+            self.subject_id_list.append(self.subject_id)
             
-        else:    
-            #just create a list of allllll zeros
-            for ii in range(0, len(self.filenames)):
-                self.cancer_list.append(0)
-                
-                
-                
-                
-                
+        #after done adding the cancer status, will set reset the file position back to the start (0)
+        self.file_pos = 0
+        
+        
+        
+        
+        
     """
     next_scan()
     
@@ -149,16 +160,21 @@ class spreadsheet(object):
     Will use the filename of the scan and backtrack to the metadata spredsheet to see if it is
     a cancerous scan or not
     
+    @param data_type = string to tell us if we are validating or not
+                     == 'all' when not validating
+                     == 'validation_challenge' when validating on the servers
+    
     """
     
-    def next_scan(self):
+    def next_scan(self, data_type = 'all'):
         
         #find the patient number of the current scan, the exam number ant the breast we are
         #looking at
         
         current_file = self.filenames[self.file_pos]
-        #now lets check if this file has cancer
-        self.check_cancer(current_file)
+        #now lets get info from this scan, such as the cancer status,
+        #view and exam number
+        self.get_info(current_file, data_type)
         
         #increment the scan position
         self.file_pos = self.file_pos + 1
@@ -168,8 +184,23 @@ class spreadsheet(object):
         return self.training_path + self.filenames[self.file_pos -1]
     
     
+    """
+    get_info()
     
-    def check_cancer(self, filename):
+    Description:
+    Will get all of the relevant data from the current scan
+    
+    @param filename = string containing just the code of the current image
+    @param data_type = string saying whether we are training or validating
+                     == 'all' when not validating
+                     == 'validation_challenge' when validating on the servers
+                      
+    """
+    
+    
+    
+    
+    def get_info(self, filename, data_type):
         
         #will get rid of any file extentsion suffixies
         #will be either .npy or .dcm, wither way both are 4 chars long
@@ -179,17 +210,26 @@ class spreadsheet(object):
         for ii in range(0,len(list_all_files)): 
             file_loc.append(filename in list_all_files[ii])
             
-        #temp = (filename in list(self.crosswalk['filename']))
-        #print 'here'
-        #print temp
+            
         crosswalk_data = self.crosswalk.loc[file_loc,:]
-        #self.cancer = int(crosswalk_data.iloc[0,crosswalk_data.columns.get_loc('cancer')]) == 1
+        #get the view and exam index of this scan
+        self.laterality = crosswalk_data.iloc[0, crosswalk_data.columns.get_loc('laterality')]
+        self.exam = crosswalk_data.iloc[0, crosswalk_data.columns.get_loc('examIndex')]
+        self.subject_id = crosswalk_data.iloc[0, crosswalk_data.columns.get_loc(str(self.patient_subject))]
         #now use the helper function to actually check for cancer
-        self._check_cancer(crosswalk_data)
-        
-        
-        
-        
+        #but only do this if we aren't validating on the synapse servers
+        if(data_type != 'validation_challenge'):
+            self._check_cancer(crosswalk_data)
+        #otherwise it doesn't really matter what the cancer status is,
+        #but just set it to false
+        else:
+            self.cancer = False
+            
+            
+            
+            
+            
+            
     """
     _check_cancer()
     

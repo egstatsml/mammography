@@ -189,6 +189,7 @@ class arguments(object):
                 print(self.model_path)
                 
             elif opt == '-f':
+                print 'here'
                 self.extract_features = True
                 
             elif opt == '-w':
@@ -219,12 +220,12 @@ class arguments(object):
             weight_string = ''
             for ii in self.weight.keys():
                 weight_string += '-w%s %s ' %(ii, self.weight[ii])
-            
+                
             #This is here so that we can run training and preprocessing in the same
             #step if we like
             #if we are preprocessing, the train file will be in the save_path
             #if we aren't, it should be in the input_path
-            if(self.preprocessing):
+            if(self.preprocessing | self.extract_features):
                 train_file_path = self.save_path
             else:
                 train_file_path = self.input_path
@@ -238,7 +239,11 @@ class arguments(object):
             
             
         if(self.validation):
-            self.validation_string = './LIBSVM/svm-predict %s/data_file_libsvm %s/model_file %s/results.txt' %(self.save_path + '/model_data', self.model_path, self.log_path)
+            self.validation_string = './LIBSVM/svm-predict %s/model_data/data_file_libsvm %s/model_file %s/model_data/results.txt' %(self.save_path, self.model_path, self.save_path)            
+            #if we want probability measures, just add the -b flag
+            if(self.probability):
+                self.validation_string += ' -b'
+                
             print self.validation_string
             
             
@@ -274,7 +279,7 @@ class arguments(object):
         
         if(not self.training):
             #if we aren't validating, make sure no classifier parameters are set
-            unwanted = ['-k', '-d', '-g', '-e', '-b', '-w']
+            unwanted = ['-k', '-d', '-g', '-e', '-w']
             for opt, arg in opts:
                 if opt in unwanted:
                     print('parameter %s supplied, but not training' %opt)
@@ -338,6 +343,12 @@ class arguments(object):
                     
                     
                     
+                if(self.model_path == []):
+                    print("""
+                    ERROR: Have specified you want to run validation, but haven't included the model path
+                    using the flag (-a).
+                    """)
+                    sys.exit(2)
                     
                     
                     

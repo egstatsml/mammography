@@ -214,8 +214,10 @@ class feature(breast):
             self._get_features_level(level)
             
             
-            
-            
+        #estimate the density of the breast
+        self.density.append(np.divide(np.nansum(self.data), np.nansum(np.isfinite(self.data))))
+        print self.density[-1]
+        
             
             
             
