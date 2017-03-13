@@ -95,5 +95,5 @@ RUN make -C ./CUDA/
 RUN make clean -C ./LIBSVM/
 RUN make -C ./LIBSVM/
 
-COPY preprocess.sh .
-
+COPY train.sh .
+RUN chmod 755 train.sh

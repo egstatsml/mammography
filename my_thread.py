@@ -81,6 +81,7 @@ class shared(object):
     error_files = []   #list that will have all of the files that we failed to process
     scan_no = 0
     cancer_count = 0
+    benign_count = 0
     feature_array = []
     class_array = []
     laterality_array = []
@@ -157,9 +158,15 @@ class shared(object):
         
     def inc_cancer_count(self):
         self.cancer_count += 1
+
+    def inc_benign_count(self):
+        self.benign_count += 1
         
     def get_cancer_count(self):
         return self.cancer_count
+
+    def get_benign_count(self):
+        return self.benign_count
     
     def inc_scan_count(self):
         self.scan_no += 1
@@ -202,6 +209,10 @@ class shared(object):
     
     def get_subject_id_array(self):
         return self.subject_id_array
+    
+
+    
+    
     
     
     ###################################
@@ -422,11 +433,27 @@ class my_thread(Process):
                 self.subject_ids.append(self.manager.q_subject_id_get())
                 self.lateralities.append(self.manager.q_laterality_get())
                 self.exam_nos.append(self.manager.q_exam_get())
+                #if this scan is cancerous
                 if(self.cancer_status[-1]):
                     self.manager.inc_cancer_count()
                     print('cancer count = %d' %self.manager.get_cancer_count())
-                        
-                        
+
+                #otherwise it must be a benign scan
+                else:
+                    self.manager.inc_benign_count()
+                    print('benign count = %d' %self.manager.get_benign_count())
+                
+
+                #if we have enough benign scans, lets not worry about it this scan
+                #as we have enough for training purposes
+                if(self.manager.get_benign_count > 50):
+                    self.remove_most_recent_metadata_entries():
+                    print('Skipping %s since we have enough benign scans :)' %(file_path))
+                    #now we can just continue with this loop and go on about our business
+                    #this will go to next iteration of the while loop
+                    continue
+
+                
                 #if the queue is now empty, we should wrap up and
                 #get ready to exit
                 if(self.manager.q_empty()):
@@ -487,10 +514,8 @@ class my_thread(Process):
                     #get rid of the last cancer_status flag we saved, as it is no longer
                     #valid since we didn't save the
                     #features from the scan
-                    del self.cancer_status[-1]
-                    del self.lateralities[-1]
-                    del self.exam_nos[-1]
-                    del self.subject_ids[-1]
+                    self.remove_most_recent_metadata_entries():
+                    
                     
                 sys.stdout.flush()
                 self.scan_data.cleanup()
@@ -510,6 +535,23 @@ class my_thread(Process):
         print('Thread %d is out' %self.t_id)
         sys.stdout.flush()
         
+
+
+    """
+    remove_most_recent_metadata_entries():
+
+    Description:
+    Function will remove the data entries from the last scan if there was
+    and error, or if there was too many scans collected etc.
+    """ 
+        
+    def remove_most_recent_metadata_entries(self):
+        
+        del self.cancer_status[-1]
+        del self.lateralities[-1]
+        del self.exam_nos[-1]
+        del self.subject_ids[-1]        
+
         
         
         
