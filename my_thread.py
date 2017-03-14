@@ -498,20 +498,6 @@ class my_thread(Process):
                         lock_time = timeit.default_timer()
                         #now increment the total scan count as well
                         self.inc_total_scan_count()
-                        
-                        #see if the add time has elapsed
-                        if(self.add_time_elapsed()):
-                            #if we made it in here, we are going to add the data we have currently found
-                            #to the shared data list
-                            self.add_features()
-                            print('Added Temporary Data in %d' %self.t_id)
-                            
-                        #see if the save time has elapsed
-                        if(self.manager.save_time_elapsed()):
-                            #if we have made it here, it is time to do a temporary save
-                            print('Am going to SAVE THE TEMP FEATURES NOW')
-                            self.manager.periodic_save_features(self.save_path)
-                            
                             
                             
                     except Exception as e:

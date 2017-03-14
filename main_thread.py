@@ -306,9 +306,6 @@ def validate_model(command_line_args, descriptor):
     #now will find the AUROC score
     print('Area Under the Curve Prediction Score = %f' %(roc_auc_score(actual_breast, predicted_breast))) 
     
-    #convert it to a pandas dataframe
-    inference = pd.DataFrame( {'laterality' : actual_laterality, 'confidence' : predicted_breast, 'subjectId' : actual_subject_ids} )
-
     #now save this as a tsv file
     #inference.to_csv('/output/predictions.tsv', sep='\t')
     out = open('/output/predictions.tsv', 'w')
@@ -350,8 +347,8 @@ if __name__ == '__main__':
     
     if(command_line_args.preprocessing | command_line_args.validation | command_line_args.extract_features):
         descriptor = spreadsheet(command_line_args)
-    
-    
+        
+        
     if(command_line_args.preprocessing):
         preprocessing(command_line_args, descriptor)
         
