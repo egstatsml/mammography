@@ -71,11 +71,11 @@ class shared(object):
     #whenever any of these reference variables are accessed, the thread lock should be applied,
     #to ensure multiple threads arent accessing the same memory at the same time
     
-    q = Queue(10000000)             #queue that will contain the filenames of the scans
-    q_cancer = Queue(10000000)      #queue that will contain the cancer status of the scans
-    q_laterality = Queue(10000000)  #queue that will contain the laterality (view) of the scans
-    q_exam = Queue(10000000)        #queue that will contain the exam index of the scans
-    q_subject_id = Queue(10000000)  #queue that will contain the subject ID of the scans
+    q = Queue(350000)             #queue that will contain the filenames of the scans
+    q_cancer = Queue(350000)      #queue that will contain the cancer status of the scans
+    q_laterality = Queue(350000)  #queue that will contain the laterality (view) of the scans
+    q_exam = Queue(350000)        #queue that will contain the exam index of the scans
+    q_subject_id = Queue(350000)  #queue that will contain the subject ID of the scans
     t_lock = Lock()
     exit_flag = False
     error_files = []   #list that will have all of the files that we failed to process
@@ -419,6 +419,9 @@ class my_thread(Process):
         #while there is still names on the list, continue to loop through
         #while the queue is not empty
         while( not self.manager.get_exit_status()):
+            #variable that is used to see if we want to process this scan
+            #or skip it
+            valid = True
             #lock the threads so only one is accessing the queue at a time
             #start the preprocessing timer
             start_time = timeit.default_timer()
@@ -437,23 +440,25 @@ class my_thread(Process):
                 if(self.cancer_status[-1]):
                     self.manager.inc_cancer_count()
                     print('cancer count = %d' %self.manager.get_cancer_count())
-
+                    
                 #otherwise it must be a benign scan
                 else:
                     self.manager.inc_benign_count()
                     print('benign count = %d' %self.manager.get_benign_count())
-                
-
+                    
+                    
                 #if we have enough benign scans, lets not worry about it this scan
                 #as we have enough for training purposes
-                if(self.manager.get_benign_count > 50):
-                    self.remove_most_recent_metadata_entries():
+                #if we are validating, the benign count will most likely be more,
+                #but we want to keep going to try and classify benign scans
+                if(self.manager.get_benign_count() > 30000) & (not self.validation):
+                    self.remove_most_recent_metadata_entries()
                     print('Skipping %s since we have enough benign scans :)' %(file_path))
                     #now we can just continue with this loop and go on about our business
                     #this will go to next iteration of the while loop
-                    continue
-
-                
+                    valid = False
+                    
+                    
                 #if the queue is now empty, we should wrap up and
                 #get ready to exit
                 if(self.manager.q_empty()):
@@ -470,52 +475,54 @@ class my_thread(Process):
                 self.manager.t_lock_release()
                 print('Queue size = %d' %self.manager.q_size())
                 
-                #if we have made it here, we should get busy processing some datas :)
-                try:
-                    #now we have the right filename, lets do the processing of it
-                    #if we are doing the preprocessing, we will need to read the file in correctly
-                    self.scan_data.initialise(file_path, self.preprocessing)
-                    
-                    #begin preprocessing steps
-                    if(self.preprocessing):
-                        self.scan_data.preprocessing()
-                        self.save_preprocessed()
+                #if we have made it here, and it isn't a scan we wish to skip
+                #we should get busy processing some datas :)
+                if(valid):
+                    try:
+                        #now we have the right filename, lets do the processing of it
+                        #if we are doing the preprocessing, we will need to read the file in correctly
+                        self.scan_data.initialise(file_path, self.preprocessing)
                         
-                    self.scan_data.get_features()
-                    
-                    #now that we have the features, we want to append them to the list of features
-                    #The list of features is shared amongst all of the class instances, so
-                    #before we add anything to there, we should lock other threads from adding
-                    #to it
-                    self.scan_data.current_image_no += 1   #increment the image index
-                    lock_time = timeit.default_timer()
-                    #now increment the total scan count as well
-                    self.inc_total_scan_count()
-                    
-                    #see if the add time has elapsed
-                    if(self.add_time_elapsed()):
-                        #if we made it in here, we are going to add the data we have currently found
-                        #to the shared data list
-                        self.add_features()
-                        print('Added Temporary Data in %d' %self.t_id)
+                        #begin preprocessing steps
+                        if(self.preprocessing):
+                            self.scan_data.preprocessing()
+                            self.save_preprocessed()
+                            
+                        self.scan_data.get_features()
                         
-                    #see if the save time has elapsed
-                    if(self.manager.save_time_elapsed()):
-                        #if we have made it here, it is time to do a temporary save
-                        print('Am going to SAVE THE TEMP FEATURES NOW')
-                        self.manager.periodic_save_features(self.save_path)
+                        #now that we have the features, we want to append them to the list of features
+                        #The list of features is shared amongst all of the class instances, so
+                        #before we add anything to there, we should lock other threads from adding
+                        #to it
+                        self.scan_data.current_image_no += 1   #increment the image index
+                        lock_time = timeit.default_timer()
+                        #now increment the total scan count as well
+                        self.inc_total_scan_count()
                         
+                        #see if the add time has elapsed
+                        if(self.add_time_elapsed()):
+                            #if we made it in here, we are going to add the data we have currently found
+                            #to the shared data list
+                            self.add_features()
+                            print('Added Temporary Data in %d' %self.t_id)
+                            
+                        #see if the save time has elapsed
+                        if(self.manager.save_time_elapsed()):
+                            #if we have made it here, it is time to do a temporary save
+                            print('Am going to SAVE THE TEMP FEATURES NOW')
+                            self.manager.periodic_save_features(self.save_path)
+                            
+                            
+                            
+                    except Exception as e:
+                        print e 
+                        print('Error with current file %s' %(file_path))
+                        self.manager.add_error_file(file_path)
+                        #get rid of the last cancer_status flag we saved, as it is no longer
+                        #valid since we didn't save the
+                        #features from the scan
+                        self.remove_most_recent_metadata_entries()
                         
-                        
-                except Exception as e:
-                    print e 
-                    print('Error with current file %s' %(file_path))
-                    self.manager.add_error_file(file_path)
-                    #get rid of the last cancer_status flag we saved, as it is no longer
-                    #valid since we didn't save the
-                    #features from the scan
-                    self.remove_most_recent_metadata_entries():
-                    
                     
                 sys.stdout.flush()
                 self.scan_data.cleanup()
@@ -535,11 +542,11 @@ class my_thread(Process):
         print('Thread %d is out' %self.t_id)
         sys.stdout.flush()
         
-
-
+        
+        
     """
     remove_most_recent_metadata_entries():
-
+    
     Description:
     Function will remove the data entries from the last scan if there was
     and error, or if there was too many scans collected etc.
@@ -551,7 +558,7 @@ class my_thread(Process):
         del self.lateralities[-1]
         del self.exam_nos[-1]
         del self.subject_ids[-1]        
-
+        
         
         
         

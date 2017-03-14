@@ -153,9 +153,11 @@ def begin_processes(command_line_args, descriptor):
     #will just use the features from the approximation wavelet decomps
     
     X, Y, lateralities, exams, subject_ids = create_classifier_arrays(shared)
-    pca = PCA(n_components=20)#, whiten=True)
-    X = pca.fit_transform(X)
-    #print X.shape
+    #if we specified we want to do PCA
+    if(command_line_args.principal_components):
+        print('Performing PCA on texture features with %d principal components' %(command_line_args.principal_components))
+        pca = PCA(n_components=20)
+        X = pca.fit_transform(X)
     
     #save this data in numpy format, and in the LIBSVM format
     print('Saving the final data')
@@ -273,10 +275,11 @@ def validate_model(command_line_args, descriptor):
     #single exam
     
     predicted_breast = []   #prediction based on individual breasts in the data set
-    actual_breast = []     #actual classifier value based
-                           #WILL ONLY BE USEFUL IF VALIDATING ON OUR DATA 
-                           
-                           
+    actual_breast = []      #actual classifier value based
+                            #WILL ONLY BE USEFUL IF VALIDATING ON OUR DATA 
+    actual_laterality = []  #save the laterality of this breast as well
+    actual_subject_ids = [] #list that has the actual subject id's 
+    
     for subject in subject_ids_set:
     #am going to initialise a mask of all the positions of scans for the current patient
         subject_mask = subject_ids == subject
@@ -296,10 +299,28 @@ def validate_model(command_line_args, descriptor):
                     #add the mean of the prediction value found from these scans to the list
                     predicted_breast.append( np.mean(predicted[mask]) )
                     actual_breast.append( np.mean(actual[mask]) )
+                    actual_laterality.append(laterality)
+                    actual_subject_ids.append(subject)
                     
     print predicted_breast
     #now will find the AUROC score
     print('Area Under the Curve Prediction Score = %f' %(roc_auc_score(actual_breast, predicted_breast))) 
+    
+    #convert it to a pandas dataframe
+    inference = pd.DataFrame( {'laterality' : actual_laterality, 'confidence' : predicted_breast, 'subjectId' : actual_subject_ids} )
+
+    #now save this as a tsv file
+    #inference.to_csv('/output/predictions.tsv', sep='\t')
+    out = open('/output/predictions.tsv', 'w')
+    for row in range(0, len(actual_subject_ids)):
+        out.write('%s\t' %actual_subject_ids[row])
+        out.write('%s\t' %actual_laterality[row])
+        out.write('%s\t' %predicted_breast[row])
+        out.write('\n')
+        
+    out.close()
+    
+    
     
     
 #####################################################

@@ -57,6 +57,8 @@ class arguments(object):
         self.train_string = []
         self.validation_string = []
         self.challenge_submission = False
+        self.sub_challenge = 1
+        self.principal_components = 0
         self.extract_features = False
         
         if(argv != False):
@@ -94,14 +96,20 @@ class arguments(object):
           
            NOTE: Default used here is polynomial, whilst default in LIBSVM is RBF. Have had
            troubles with RBF, so should avoid using it at the moment.
-    
+         
        -d = Degree of kernel. Only valid for polynomial and Sigmoid kernels (Default of 3)
        -g = Gamma. (Default of 1/n_features)
        -e = Epsilon. Tolerance for termination. (Default of 0.001)
        -b = Probability estimates (Default of False)
        -w = Weight for each class. usage here should be a dictionary like reference for each class
-       -a = Path where model file will be saved
        -c = Challenge Submission
+       --sub = Sub challenge we are running for
+             1 = Sub Challenge 1 - Don't use any metadata as features for classification
+             2 = Sub challenge 2 - Use metadata for classification
+       --pca = If we want to do PCA on the textural based features we find
+               Should supply the number of principal components to be used
+               Note will not do PCA on any metadata or density estimate features
+        --model = Path of directory where model should be saved
        -f = extract features from preprocessed data. NOTE that this is done by default
             when you specify you wan't to do preprocessing with the -p flag.
             If you have already done the preprocessing though and you want to extract 
@@ -114,7 +122,7 @@ class arguments(object):
         
         try:
             
-            opts,args = getopt.getopt(argv, "htpcbvfm:i:s:l:k:d:g:e:a:w:")
+            opts,args = getopt.getopt(argv, "htpbvfm:i:s:l:k:d:g:e:w:c:", ['sub=', 'pca=', 'model='])
             
         except getopt.GetoptError as err:
             print(str(err))
@@ -181,9 +189,15 @@ class arguments(object):
                 self.probability = True
                 
             elif opt == '-c':
-                self.challenge_submission = True
+                self.challenge_submission = True            
                 
-            elif opt == '-a':  #using -a because am running out of letters :)
+            elif opt == '--sub':
+                self.sub_challenge = int(arg)
+                
+            elif opt == '--pca':
+                self.principal_components = int(arg)
+                
+            elif opt == '--model':  #using -a because am running out of letters :)
                 self.model_path = str(arg)
                 print('found model path')
                 print(self.model_path)
@@ -275,8 +289,7 @@ class arguments(object):
         #now lets do some quick checking of our inputs to make sure no un-used inputs were provided
         #example if we aren't training, we shouldn't expect any information on the type or degree of the
         #kernel to be supplied.
-        #This shouldn't cause any errors in the code, but it probably would cause an unwanted run path of the model
-        
+        #This shouldn't cause any errors in the code, but it probably would cause an unwanted run path of the model        
         if(not self.training):
             #if we aren't validating, make sure no classifier parameters are set
             unwanted = ['-k', '-d', '-g', '-e', '-w']
@@ -307,6 +320,7 @@ class arguments(object):
             Trust me, this is what you wanted to really happen
             """)
             self.extract_features = False
+            
             
             
         #if we do want to do some training, we should ensure that the data has already been
@@ -351,12 +365,20 @@ class arguments(object):
                     sys.exit(2)
                     
                     
+        #if we are doing a challenge submission, we should make sure that the correct argument is supplied
+        #should be 1 for sub challenge 1, or 2 for sub challenge 2
+        if(self.challenge_submission):
+            if(self.sub_challenge != 1) | (self.sub_challenge != 2):
+                print('ERROR')
+                print('You supplied the -c flag to say that it is a challemge submission, but haven\'t supplied a correct argument.')
+                print('It should be either 1 for sub challenge 1 or 2 for sub challenge 2.')
+                print('You supplied %d ' %(self.sub_challenge))
+                print('For more usage information, run with -h argument')
+                sys.exit(2)
                     
-                    
-                    
-                    
-                    
-                    
+                
+                
+                
     """
     usage()
     
@@ -396,8 +418,14 @@ class arguments(object):
         -e = Epsilon. Tolerance for termination. (Default of 0.001)
         -b = Probability estimates (Default of False)
         -w = Weight for each class. usage here should be a dictionary like reference for each class
-        -a = Path where model file will be saved
         -c = Challenge Submission
+        --sub = Sub challenge we are running for
+             1 = Sub Challenge 1 - Don't use any metadata as features for classification
+             2 = Sub challenge 2 - Use metadata for classification
+        --pca = If we want to do PCA on the textural based features we find
+                Should supply the number of principal components to be used
+                Note will not do PCA on any metadata or density estimate features
+        --model = Path of directory where model should be saved
         -f = extract features from preprocessed data. NOTE that this is done by default
             when you specify you wan't to do preprocessing with the -p flag.
             If you have already done the preprocessing though and you want to extract 

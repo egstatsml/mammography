@@ -6,13 +6,13 @@
 ./clean.sh
 
 #run preprocessing
-python main_thread.py -p -i /media/dperrin/pilot_images/ -s /media/dperrin/preprocessed/preprocessedTrain/ -l ./ -m ./  -a /media/dperrin/preprocessed/preprocessedTrain/model_data/
+python main_thread.py -p -i /media/dperrin/pilot_images/ -s /media/dperrin/preprocessed/preprocessedTrain/ -l ./ -m ./  --model /media/dperrin/preprocessed/preprocessedTrain/model_data/ --pca 20 --sub 1
 
 
 #run training
-sudo python main_thread.py -t -i /media/dperrin/preprocessed/preprocessedTrain/ -s /media/dperrin/preprocessed/preprocessedTrain/ -l ./ -m ./  -a /media/dperrin/preprocessed/preprocessedTrain/model_data/ -w 0:1,1:20
+sudo python main_thread.py -t -i /media/dperrin/preprocessed/preprocessedTrain/ -s /media/dperrin/preprocessed/preprocessedTrain/ -l ./ -m ./  --model /media/dperrin/preprocessed/preprocessedTrain/model_data/ --sub 1 -w 0:1,1:20
 
 
 #run validation
 
-sudo python main_thread.py -p -v -i /media/dperrin/val_images/ -s /media/dperrin/preprocessed/preprocessedVal/ -l ./ -m ./  -a /media/dperrin/preprocessed/preprocessedTrain/model_data/
+sudo python main_thread.py -p -v -i /media/dperrin/val_images/ -s /media/dperrin/preprocessed/preprocessedVal/ -l ./ -m ./  --model /media/dperrin/preprocessed/preprocessedTrain/model_data/ --pca 20 --sub 1

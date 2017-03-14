@@ -58,8 +58,6 @@ Defining the breast class
 Will contain all information regarding the mammogram scan of the breast
 and some functions to process the data
 
-
-
 """
 
 
@@ -1009,14 +1007,14 @@ class breast(object):
         self.fibroglandular_mask = (self.data > self.threshold) & (self.data < upper_limit)
         self.fibroglandular_mask[edge_mask == 1] = False
         
-        """
+        
         fig = plt.figure()
         ax1 = fig.add_subplot(1,1,1)
         ax1.imshow(self.fibroglandular_mask)
         fig.savefig(os.getcwd() + '/figs/' + 'msk_' + self.file_path[-10:-3] + 'png')
         fig.clf()
         plt.close()
-        """
+        
         
         
         
