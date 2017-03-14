@@ -9,6 +9,7 @@ INPUT_DIR="/trainingData/"
 METADATA_DIR="/metadata/"
 MODEL_STATE_DIR="/modelState"
 
+
 echo "Creating directory where preprocessed images will be saved"
 mkdir -p $SAVE_IMAGE_DIR
 
@@ -19,7 +20,7 @@ echo "Creating directory for log file"
 mkdir -p $LOG_DIR
 
 echo "Running Preprocessing script"
-python main_thread.py -p -i $INPUT_DIR -s $SAVE_IMAGE_DIR -l $LOG_DIR -m $METADATA_DIR -a $SAVE_DIR_MODEL_FILES
+python main_thread.py -p -i $INPUT_DIR -s $SAVE_IMAGE_DIR -l $LOG_DIR -m $METADATA_DIR --model $SAVE_DIR_MODEL_FILES --sub 1 -c --pca 20
 
 
 #save the model in the modelstate dir

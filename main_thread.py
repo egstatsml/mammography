@@ -156,7 +156,7 @@ def begin_processes(command_line_args, descriptor):
     #if we specified we want to do PCA
     if(command_line_args.principal_components):
         print('Performing PCA on texture features with %d principal components' %(command_line_args.principal_components))
-        pca = PCA(n_components=20)
+        pca = PCA(n_components=command_line_args.principal_components)
         X = pca.fit_transform(X)
     
     #save this data in numpy format, and in the LIBSVM format
