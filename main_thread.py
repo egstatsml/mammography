@@ -215,7 +215,7 @@ def train_model(command_line_args, descriptor):
     #if we aren't extracting files, lets check that there is already
     #a file in libsvm format. If there isn't we will make one
     
-    elif(not os.path.isfile(command_line_args.input_path + '/model_data/train_file_libsvm')):
+    elif(not os.path.isfile(command_line_args.input_path + '/model_data/data_file_libsvm')):
         #if this file doesn't exist, we have two options
         #use the near incomplete features if the preprocessing run finished completely
         #otherwise use the nearly complete feature set
@@ -226,9 +226,8 @@ def train_model(command_line_args, descriptor):
             X = np.load(command_line_args.model_path + '/X_temp.npy')
             Y = np.load(command_line_args.model_path + '/Y_temp.npy')
             
-            
         #now lets make an libsvm compatable file         
-        dump_svmlight_file(X,Y,command_line_args.model_path + '/train_file_libsvm')
+        dump_svmlight_file(X,Y,command_line_args.model_path + '/data_file_libsvm')
         
         
     #now features are extracted, lets classify using this bad boy

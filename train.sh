@@ -9,7 +9,7 @@ INPUT_DIR="/trainingData/"
 METADATA_DIR="/metadata/"
 MODEL_STATE_DIR="/modelState"
 
-echo "TRAIINING PART OF THE MODEL"
+echo "TRAINING PART OF THE MODEL"
 echo "Running Training Script"
 python main_thread.py -t -f -i $SAVE_IMAGE_DIR -s $SAVE_IMAGE_DIR -l $LOG_DIR -m $METADATA_DIR -a $SAVE_DIR_MODEL_FILES
 
