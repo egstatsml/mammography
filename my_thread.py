@@ -76,6 +76,11 @@ class shared(object):
     q_laterality = Queue(350000)  #queue that will contain the laterality (view) of the scans
     q_exam = Queue(350000)        #queue that will contain the exam index of the scans
     q_subject_id = Queue(350000)  #queue that will contain the subject ID of the scans
+    q_bc_history = Queue(350000)
+    q_bc_first_degree_history = Queue(350000)
+    q_bc_first_degree_history_50 = Queue(350000)
+    q_anti_estrogen = Queue(350000)
+    
     t_lock = Lock()
     exit_flag = False
     error_files = []   #list that will have all of the files that we failed to process
@@ -87,6 +92,10 @@ class shared(object):
     laterality_array = []
     exam_array = []
     subject_id_array = []
+    bc_history_array = []
+    bc_first_degree_array = []
+    bc_first_degree_50_array = []
+    anti_estrogen_array = []
     save_timer = time.time()
     save_time = 3600      #save once an hour or every 3600 seconds
     
@@ -114,6 +123,18 @@ class shared(object):
     def q_subject_id_get(self):
         return self.q_subject_id.get()    
     
+    def q_bc_history_get(self):
+        return self.q_bc_history.get()
+        
+    def q_bc_first_degree_history_get(self):
+        return self.q_bc_first_degree_history.get()
+        
+    def q_bc_first_degree_history_50_get(self):
+        return self.q_bc_first_degree_history_50.get()
+        
+    def q_anti_estrogen_get(self):
+        return self.q_anti_estrogen.get()
+        
     def q_put(self, arg):
         self.q.put(arg)
         
@@ -129,6 +150,18 @@ class shared(object):
     def q_subject_id_put(self, arg):
         return self.q_subject_id.put(arg)    
     
+    def q_bc_history_put(self, arg):
+        self.q_bc_history.put(arg)
+        
+    def q_bc_first_degree_history_put(self, arg):
+        self.q_bc_first_degree_history.put(arg)
+        
+    def q_bc_first_degree_history_50_put(self, arg):
+        self.q_bc_first_degree_history_50.put(arg)
+        
+    def q_anti_estrogen_put(self, arg):
+        self.q_anti_estrogen.put(arg)
+        
     def q_empty(self):
         return self.q.empty()
     
@@ -158,13 +191,13 @@ class shared(object):
         
     def inc_cancer_count(self):
         self.cancer_count += 1
-
+        
     def inc_benign_count(self):
         self.benign_count += 1
         
     def get_cancer_count(self):
         return self.cancer_count
-
+    
     def get_benign_count(self):
         return self.benign_count
     
@@ -210,7 +243,20 @@ class shared(object):
     def get_subject_id_array(self):
         return self.subject_id_array
     
-
+    def get_bc_history_array(self):
+        return self.bc_history_array
+    
+    def get_bc_first_degree_history_array(self):
+        return self.bc_first_degree_history_array
+    
+    def get_bc_first_degree_history_50_array(self):
+        return self.bc_first_degree_history_50_array
+    
+    def get_anti_estrogen_array(self):
+        return self.anti_estrogen_array
+    
+    
+    
     
     
     
@@ -290,9 +336,10 @@ class shared(object):
     laterality = list containing the laterality of each scan (either 'L' or 'R')
     exam = list containing the examination number of each scan
     subject_id = list containing the subject ID of all the scans
+    
     """
     
-    def add_features(self,X, Y, laterality, exam, subject_id):
+    def add_features(self,X, Y, laterality, exam, subject_id, bc_histories, bc_first_degree_histories, bc_first_degree_histories_50, anti_estrogens):
         #request lock for this process
         self.t_lock_acquire()
         #if this is the first set of features to be added, we should just initially
@@ -305,6 +352,10 @@ class shared(object):
             self.laterality_array = laterality
             self.exam_array = exam
             self.subject_id_array = subject_id
+            self.bc_history_array = bc_histories
+            self.bc_first_degree_history_array = bc_first_degree_histories
+            self.bc_first_degree_history_50_array = bc_first_degree_histories_50
+            self.anti_estrogen_array = anti_estrogens
             
         else:
             print(np.shape(self.feature_array))
@@ -313,6 +364,11 @@ class shared(object):
             self.laterality_array.extend(laterality)
             self.exam_array.extend(exam)
             self.subject_id_array.extend(subject_id)
+            self.bc_history_array.extend(bc_histories)
+            self.bc_first_degree_history_array.extend(bc_first_degree_histories)
+            self.bc_first_degree_history_50_array.extend(bc_first_degree_histories_50)
+            self.anti_estrogen_array.extend(anti_estrogens)
+            
         #we are done so release the lock
         self.t_lock_release()
         
@@ -355,6 +411,10 @@ class my_thread(Process):
         self.cancer_status = []        
         self.subject_ids = []
         self.lateralities = []
+        self.bc_histories = []
+        self.bc_first_degree_histories = []
+        self.bc_first_degree_histories_50 = []
+        self.anti_estrogens = []
         self.exam_nos = []
         self.training = command_line_args.training
         self.preprocessing = command_line_args.preprocessing
@@ -436,6 +496,11 @@ class my_thread(Process):
                 self.subject_ids.append(self.manager.q_subject_id_get())
                 self.lateralities.append(self.manager.q_laterality_get())
                 self.exam_nos.append(self.manager.q_exam_get())
+                self.bc_histories.append(self.manager.q_bc_history_get())
+                self.bc_first_degree_histories.append(self.manager.q_bc_first_degree_history_get())
+                self.bc_first_degree_histories_50.append(self.manager.q_bc_first_degree_history_50_get())
+                self.anti_estrogens.append(self.manager.q_anti_estrogen_get())
+                
                 #if this scan is cancerous
                 if(self.cancer_status[-1]):
                     self.manager.inc_cancer_count()
@@ -451,7 +516,8 @@ class my_thread(Process):
                 #as we have enough for training purposes
                 #if we are validating, the benign count will most likely be more,
                 #but we want to keep going to try and classify benign scans
-                if(self.manager.get_benign_count() > 30000) & (not self.validation):
+                #if it is a cancerous file though we should keep going
+                if(self.manager.get_benign_count() > 30000) & (not self.validation) & (not self.cancer_status[-1]):
                     self.remove_most_recent_metadata_entries()
                     print('Skipping %s since we have enough benign scans :)' %(file_path))
                     #now we can just continue with this loop and go on about our business
@@ -656,12 +722,11 @@ class my_thread(Process):
                 
             
             #add the density measure for this scan
-            print('density = %f' %(self.scan_data.density[t_ii]))
             X[t_ii].append(self.scan_data.density[t_ii])
             #set the cancer statues for this scan            
             Y.append(self.cancer_status[t_ii])    
         #now add the features from this list to to conplete list in the manager
-        self.manager.add_features(X, Y, self.lateralities, self.exam_nos, self.subject_ids)
+        self.manager.add_features(X, Y, self.lateralities, self.exam_nos, self.subject_ids, self.bc_histories, self.bc_first_degree_histories, self.bc_first_degree_histories_50, self.anti_estrogens)
         #reinitialise the feature list in the scan_data member
         self.scan_data.reinitialise_feature_lists()
         #reinitialise the metadata

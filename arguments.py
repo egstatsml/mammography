@@ -196,6 +196,7 @@ class arguments(object):
                 
             elif opt == '--pca':
                 self.principal_components = int(arg)
+                print self.principal_components
                 
             elif opt == '--model':  #using -a because am running out of letters :)
                 self.model_path = str(arg)
@@ -332,7 +333,7 @@ class arguments(object):
                 #if we aren't preprocessing, check that preprocessing has already been done
                 #to do this, will just list the number of files in the preprocessed directory
                 #or the 'input_path'
-                if len([name for name in os.listdir(self.input_path) if os.path.isfile(os.path.join(self.input_path, name))]) < 100:
+                if len([name for name in os.listdir(self.input_path) if os.path.isfile(os.path.join(self.input_path, name))]) < 50:
                     print('ERROR')
                     print('You have suggested training the model, but we haven\'t preprocessed the data yet')
                     print('Before training can be done, the model must be run with the -p aregument to preprocess the data')

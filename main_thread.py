@@ -60,8 +60,14 @@ def create_classifier_arrays(shared):
     lateralities = np.array(shared.get_laterality_array())
     exams = np.array(shared.get_exam_array(), dtype=np.int)
     subject_ids = np.array(shared.get_subject_id_array())
+    bc_histories = np.array(shared.get_bc_history_array(), dtype=np.int16)
+    bc_first_degree_histories = np.array(shared.get_bc_first_degree_history_array(), dtype=np.int16)
+    bc_first_degree_histories_50 = np.array(shared.get_bc_first_degree_history_50_array(), dtype=np.int16)
+    anti_estrogens = np.array(shared.get_anti_estrogen_array(), dtype=np.int16)
     
-    return X, Y, lateralities, exams, subject_ids
+    return X, Y, lateralities, exams, subject_ids, bc_histories, bc_first_degree_histories, bc_first_degree_histories_50, anti_estrogens
+
+
 
 
 
@@ -95,20 +101,24 @@ def begin_processes(command_line_args, descriptor):
     man = my_manager()
     man.start()
     shared = man.shared()
-
+    
     print("Number of Scans = %d" %(descriptor.no_scans))
     #setting up the queue for all of the threads, which contains the filenames
     #also add everything for the metadata queues
     print("Setting up Queues")
     
     for ii in range(0, descriptor.no_scans):
-        shared.t_lock_acquire()
+        
         shared.q_put(descriptor.filenames[ii])
         shared.q_cancer_put(descriptor.cancer_list[ii])
         shared.q_laterality_put(descriptor.laterality_list[ii])
         shared.q_exam_put(descriptor.exam_list[ii])
         shared.q_subject_id_put(descriptor.subject_id_list[ii])
-        shared.t_lock_release()        
+        shared.q_bc_history_put(descriptor.bc_history_list[ii])
+        shared.q_bc_first_degree_history_put(descriptor.bc_first_degree_history_list[ii])
+        shared.q_bc_first_degree_history_50_put(descriptor.bc_first_degree_history_50_list[ii])        
+        shared.q_anti_estrogen_put(descriptor.anti_estrogen_list[ii])
+        
     print('Set up Queues')
     
     
@@ -152,13 +162,13 @@ def begin_processes(command_line_args, descriptor):
     #now lets save the features found
     #will just use the features from the approximation wavelet decomps
     
-    X, Y, lateralities, exams, subject_ids = create_classifier_arrays(shared)
+    X, Y, lateralities, exams, subject_ids, bc_histories, bc_first_degree_histories, bc_first_degree_histories_50, anti_estrogens = create_classifier_arrays(shared)
     #if we specified we want to do PCA
     if(command_line_args.principal_components):
         print('Performing PCA on texture features with %d principal components' %(command_line_args.principal_components))
         pca = PCA(n_components=command_line_args.principal_components)
         X = pca.fit_transform(X)
-    
+        
     #save this data in numpy format, and in the LIBSVM format
     print('Saving the final data')
     np.save(command_line_args.save_path + '/model_data/X', X)
@@ -166,6 +176,11 @@ def begin_processes(command_line_args, descriptor):
     np.save(command_line_args.save_path + '/model_data/lateralities', lateralities)
     np.save(command_line_args.save_path + '/model_data/exams', exams)
     np.save(command_line_args.save_path + '/model_data/subject_ids', subject_ids)
+    np.save(command_line_args.save_path + '/model_data/bc_histories', bc_histories)
+    np.save(command_line_args.save_path + '/model_data/bc_first_degree_histories', bc_first_degree_histories)
+    np.save(command_line_args.save_path + '/model_data/bc_first_degree_histories_50', bc_first_degree_histories_50)
+    np.save(command_line_args.save_path + '/model_data/anti_estrogens', anti_estrogens)
+    
     dump_svmlight_file(X,Y,command_line_args.save_path + '/model_data/data_file_libsvm')
     
     

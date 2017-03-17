@@ -50,8 +50,20 @@ class spreadsheet(object):
         self.exam_list = []        #list of exam indicies for all scans
         self.subject_id = []       #ID of current scan
         self.subject_id_list = []  #list of subject ID's for all scans
+        self.bc_history = []
+        self.bc_history_list = []
+        self.anti_estrogen = []
+        self.anti_estrogen_list = []
+        self.bc_first_degree_history = []
+        self.bc_first_degree_history_list = []
+        self.bc_first_degree_history_50 = []
+        self.bc_first_degree_history_50_list = []
+        
+        
         self.filenames = []        #list that contains all of the filenames
         self.file_pos = 0          #the location of the current file we are looking for
+        self.sub_challenge = command_line_args.sub_challenge  #save which sub challenge we are doing
+        #this is so we know whether to store metadata or not
         
         #this variable is here just because there was a minor discrepancy between the pilot metadata
         #given out early in the challenge
@@ -65,7 +77,7 @@ class spreadsheet(object):
         print command_line_args.validation
         print command_line_args.challenge_submission
         if( not(command_line_args.validation & command_line_args.challenge_submission) ):
-            print 'here'
+            print('am getting the metadata')
             self.metadata = pd.read_csv(command_line_args.metadata_path + '/exams_metadata.tsv', sep='\t')
             print(self.metadata.columns.values)
             
@@ -135,14 +147,24 @@ class spreadsheet(object):
             self.filenames.extend(filenames)
             break   
         
-        #now will add the cancer status of these files
-        for ii in range(0, len(self.filenames)):
-            self.next_scan(data_type)
-            self.cancer_list.append(self.cancer)
-            self.laterality_list.append(self.laterality)
-            self.exam_list.append(self.exam)
-            self.subject_id_list.append(self.subject_id)
-            
+        if(data_type == 'all'):
+            #now will add the cancer status of these files
+            for ii in range(0, len(self.filenames)):
+                self.next_scan(data_type)
+                self.cancer_list.append(self.cancer)
+                self.laterality_list.append(self.laterality)
+                self.exam_list.append(self.exam)
+                self.subject_id_list.append(self.subject_id)
+                
+                #add the medata features, though these will only be used
+                #if we have specified we are doing sub challenge 2
+                #otherwise everything is just set to zero
+                self.bc_history_list.append(self.bc_history)
+                self.bc_first_degree_history_list.append(self.bc_first_degree_history)
+                self.bc_first_degree_history_50_list.append(self.bc_first_degree_history_50)
+                self.anti_estrogen_list.append(self.anti_estrogen)
+                    
+                    
         #after done adding the cancer status, will set reset the file position back to the start (0)
         self.file_pos = 0
         
@@ -216,6 +238,11 @@ class spreadsheet(object):
         self.laterality = crosswalk_data.iloc[0, crosswalk_data.columns.get_loc('laterality')]
         self.exam = crosswalk_data.iloc[0, crosswalk_data.columns.get_loc('examIndex')]
         self.subject_id = crosswalk_data.iloc[0, crosswalk_data.columns.get_loc(str(self.patient_subject))]
+        
+        #if we are doing sub challenge 2, lets add some metadata as features
+        #if we aren't it will just set all the metadata to zero
+        self.metadata_sub_challenge_2(crosswalk_data)
+            
         #now use the helper function to actually check for cancer
         #but only do this if we aren't validating on the synapse servers
         if(data_type != 'validation_challenge'):
@@ -272,6 +299,45 @@ class spreadsheet(object):
             print('cancer right')
         else:
             self.cancer = False
+            
+            
+            
+            
+            
+            
+    """
+    metatdata_sub_challenge_2()
+    
+    Description:
+    If we are taking part in sub challene 2, will get the metadata as well
+    
+    I copied most of the code from the _check_cancer function above ;)
+    which is sloppy but I will let it slide this time
+    
+    """
+    
+    def metadata_sub_challenge_2(self, crosswalk_data):
+        
+        if(self.sub_challenge == 2):
+            patient_mask = (self.metadata.iloc[:, self.metadata.columns.get_loc(self.patient_subject)] == crosswalk_data.iloc[0,crosswalk_data.columns.get_loc(self.patient_subject)])
+            exam_mask = (self.metadata.iloc[:,self.metadata.columns.get_loc('examIndex')] == crosswalk_data.iloc[0,crosswalk_data.columns.get_loc('examIndex')])
+            mask = (patient_mask & exam_mask)
+            scan_metadata = self.metadata.loc[mask,:]
+            self.bc_history = int(scan_metadata.iloc[0,scan_metadata.columns.get_loc('bcHistory')])
+            self.anti_estrogen = int(scan_metadata.iloc[0,scan_metadata.columns.get_loc('antiestrogen')])
+            self.bc_first_degree_history = int(scan_metadata.iloc[0,scan_metadata.columns.get_loc('firstDegreeWithBc')])
+            self.bc_first_degree_history_50 = int(scan_metadata.iloc[0,scan_metadata.columns.get_loc('firstDegreeWithBc50')])
+            
+            
+        else:
+            self.bc_history = 0
+            self.anti_estrogen = 0
+            self.bc_first_degree_history = 0
+            self.bc_first_degree_history_50 = 0
+            
+            
+            
+            
             
             
             

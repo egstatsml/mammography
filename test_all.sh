@@ -6,7 +6,7 @@
 ./clean.sh
 
 #run preprocessing
-python main_thread.py -p -i /media/dperrin/pilot_images/ -s /media/dperrin/preprocessed/preprocessedTrain/ -l ./ -m ./  --model /media/dperrin/preprocessed/preprocessedTrain/model_data/ --pca 20 --sub 1
+python main_thread.py -p -i /media/dperrin/pilot_images/ -s /media/dperrin/preprocessed/preprocessedTrain/ -l ./ -m ./  --model /media/dperrin/preprocessed/preprocessedTrain/model_data/ --pca 20 --sub 2
 
 
 #run training
