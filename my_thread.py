@@ -517,7 +517,7 @@ class my_thread(Process):
                 #if we are validating, the benign count will most likely be more,
                 #but we want to keep going to try and classify benign scans
                 #if it is a cancerous file though we should keep going
-                if(self.manager.get_benign_count() > 30000) & (not self.validation) & (not self.cancer_status[-1]):
+                if(self.manager.get_benign_count() > 20) & (not self.validation) & (not self.cancer_status[-1]):
                     self.remove_most_recent_metadata_entries()
                     print('Skipping %s since we have enough benign scans :)' %(file_path))
                     #now we can just continue with this loop and go on about our business

@@ -122,7 +122,7 @@ class arguments(object):
         
         try:
             
-            opts,args = getopt.getopt(argv, "htpbvfm:i:s:l:k:d:g:e:w:c:", ['sub=', 'pca=', 'model='])
+            opts,args = getopt.getopt(argv, "htpbvfcm:i:s:l:k:d:g:e:w:", ['sub=', 'pca=', 'model='])
             
         except getopt.GetoptError as err:
             print(str(err))
@@ -369,7 +369,7 @@ class arguments(object):
         #if we are doing a challenge submission, we should make sure that the correct argument is supplied
         #should be 1 for sub challenge 1, or 2 for sub challenge 2
         if(self.challenge_submission):
-            if(self.sub_challenge != 1) | (self.sub_challenge != 2):
+            if not( (self.sub_challenge == 1) | (self.sub_challenge == 2) ):
                 print('ERROR')
                 print('You supplied the -c flag to say that it is a challemge submission, but haven\'t supplied a correct argument.')
                 print('It should be either 1 for sub challenge 1 or 2 for sub challenge 2.')
