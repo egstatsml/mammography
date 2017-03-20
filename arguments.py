@@ -219,7 +219,7 @@ class arguments(object):
                     print init_dict.keys()
                     for jj in self.weight.keys():
                         self.weight[jj] = init_dict[int(jj)]
-                        
+                                                
                 except Exception as e:
                     print('There was an error with your weight inputs.')
                     print('You should enter weights for each class in a dictionary style format,but with no spaces please :)')
@@ -244,8 +244,7 @@ class arguments(object):
                 train_file_path = self.save_path
             else:
                 train_file_path = self.input_path
-                
-                
+                    
             print train_file_path
             
             self.train_string ='./CUDA/svm-train-gpu  -t %s -d %s -m 5000 -e %s %s %s/model_data/data_file_libsvm %s/model_file' %(self.kernel, self.degree, self.epsilon, weight_string, train_file_path, self.model_path)

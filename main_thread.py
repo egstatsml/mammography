@@ -90,6 +90,45 @@ def terminal_cmd(command):
     
     
     
+"""
+add_metadata_features()
+
+Description:
+If we are running model for sub challenge 2, we should add the metadata features
+
+@param X = original textural based features
+@param Y = array with class identiers
+@param command_line_args = arguments object with all of our arguments we parsed in
+
+"""
+
+def add_metadata_features(X,Y,command_line_args):
+    
+    
+    #load in metadata
+    bc_histories = np.load(command_line_args.save_path + '/model_data/bc_histories.npy')
+    bc_first_degree_histories = np.load(command_line_args.save_path + '/model_data/bc_first_degree_histories.npy')
+    bc_first_degree_histories_50 = np.load(command_line_args.save_path + '/model_data/bc_first_degree_histories_50.npy')
+    anti_estrogens = np.load(command_line_args.save_path + '/model_data/anti_estrogens.npy')
+    
+    print('X shape')
+    print X.shape
+    print('bc shape')
+    print bc_histories.shape
+    
+    
+    X = np.append(X,bc_histories.reshape([bc_histories.size, 1]), axis=1)
+    X = np.append(X,bc_first_degree_histories.reshape([bc_first_degree_histories.size, 1]), axis=1)
+    X = np.append(X,bc_first_degree_histories_50.reshape([bc_first_degree_histories_50.size, 1]), axis=1)
+    X = np.append(X,anti_estrogens.reshape([anti_estrogens.size, 1]), axis=1)
+    
+    return X,Y
+    
+    
+    
+    
+    
+    
     
 def begin_processes(command_line_args, descriptor):
     #initialise list of threads
@@ -237,13 +276,17 @@ def train_model(command_line_args, descriptor):
         if( os.path.isfile(command_line_args.model_path + '/X.npy')):
             X = np.load(command_line_args.model_path + '/X.npy')
             Y = np.load(command_line_args.model_path + '/Y.npy')
+            
         else:
             X = np.load(command_line_args.model_path + '/X_temp.npy')
             Y = np.load(command_line_args.model_path + '/Y_temp.npy')
             
+        #if we are doing sub challenge 2, add the metadata features
+        if(command_line_args.sub_challenge == 2):
+            X,Y = add_metadata_features(X,Y,command_line_args)            
+            
         #now lets make an libsvm compatable file         
         dump_svmlight_file(X,Y,command_line_args.model_path + '/data_file_libsvm')
-        
         
     #now features are extracted, lets classify using this bad boy
     terminal_cmd(command_line_args.train_string)
@@ -260,9 +303,23 @@ def validate_model(command_line_args, descriptor):
     #may want to just extract features though, if we do, we have that ability
     if(command_line_args.extract_features):
         begin_processes(command_line_args, descriptor)
-    
+        
     #Otherwise will assume that preprocessing has already been done prior
     
+    #if we are doing sub challege 2, we will need to add the metadata features to the feature array
+    
+    if(command_line_args.sub_challenge == 2):
+        X = np.load(command_line_args.save_path + '/model_data/X.npy')
+        Y = np.load(command_line_args.save_path + '/model_data/Y.npy')
+        X,Y = add_metadata_features(X,Y,command_line_args)            
+        
+        #now lets make an libsvm compatable file         
+        dump_svmlight_file(X,Y,command_line_args.model_path + '/data_file_libsvm')
+        
+        
+        
+        
+        
     #run validation
     terminal_cmd(command_line_args.validation_string)
     #now load in the validation data

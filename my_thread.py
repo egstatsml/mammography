@@ -420,6 +420,7 @@ class my_thread(Process):
         self.preprocessing = command_line_args.preprocessing
         self.validation = command_line_args.validation
         self.save_path = command_line_args.save_path
+        self.challenge_submission = command_line_args.challenge_submission
         #some variables that are used to time the system for adding files to the shared manager
         self.add_timer = time.time()
         #add features every 13 minutes
@@ -517,7 +518,7 @@ class my_thread(Process):
                 #if we are validating, the benign count will most likely be more,
                 #but we want to keep going to try and classify benign scans
                 #if it is a cancerous file though we should keep going
-                if(self.manager.get_benign_count() > 20) & (not self.validation) & (not self.cancer_status[-1]):
+                if(self.manager.get_benign_count() > 30000) & (not self.validation) & (not self.cancer_status[-1]):
                     self.remove_most_recent_metadata_entries()
                     print('Skipping %s since we have enough benign scans :)' %(file_path))
                     #now we can just continue with this loop and go on about our business
@@ -571,11 +572,25 @@ class my_thread(Process):
                         print('Error with current file %s' %(file_path))
                         self.manager.add_error_file(file_path)
                         #get rid of the last cancer_status flag we saved, as it is no longer
-                        #valid since we didn't save the
-                        #features from the scan
-                        self.remove_most_recent_metadata_entries()
+                        #valid since we didn't save the features from the scan
+                        #
+                        #NOTE: we won't want to get rid of these features whilst validating
+                        #on the synapse server. Just find features from what we have and run with it
+                        if(not self.validation) & (not self.challenge_submission):
+                            print('removing this scan')
+                            self.remove_most_recent_metadata_entries()
+                        #if we are validating for the challenge, lets try our best on what we have
                         
-                    
+                        else:
+                            
+                            #should be safe to have this outside a try and catch, as it
+                            #should never fail
+                            self.scan_data.get_features()
+                            self.scan_data.current_image_no += 1   #increment the image index
+                            self.inc_total_scan_count()
+                            
+                            
+                            
                 sys.stdout.flush()
                 self.scan_data.cleanup()
                 gc.collect()

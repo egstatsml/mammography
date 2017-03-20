@@ -186,8 +186,9 @@ class feature(breast):
         #perform the wavelet decomposition
         a = np.copy(self.data)
         
-        a[self.fibroglandular_mask == False ] = np.nan        
-        
+        if(self.fibroglandular_mask != []):
+            a[self.fibroglandular_mask == False ] = np.nan        
+            
         self.packets = pywt.WaveletPacket2D(data=a, wavelet=self.wavelet_type, mode='sym')
         
         #check that the number of levels isnt to high
@@ -326,12 +327,12 @@ class feature(breast):
         
         
         
-        
-        
-        
-        
-        
-        
+    
+    
+    
+    
+    
+    
     def _crop_features(self, num_scans):
         
         self.homogeneity = self.homogeneity[0:num_scans][:][:] 
