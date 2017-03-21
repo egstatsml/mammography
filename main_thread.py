@@ -273,13 +273,9 @@ def train_model(command_line_args, descriptor):
         #if this file doesn't exist, we have two options
         #use the near incomplete features if the preprocessing run finished completely
         #otherwise use the nearly complete feature set
-        if( os.path.isfile(command_line_args.model_path + '/X.npy')):
-            X = np.load(command_line_args.model_path + '/X.npy')
-            Y = np.load(command_line_args.model_path + '/Y.npy')
-            
-        else:
-            X = np.load(command_line_args.model_path + '/X_temp.npy')
-            Y = np.load(command_line_args.model_path + '/Y_temp.npy')
+        if( os.path.isfile(command_line_args.input_path + '/model_data/X.npy')):
+            X = np.load(command_line_args.input_path + '/model_data/X.npy')
+            Y = np.load(command_line_args.input_path + '/model_data/Y.npy')
             
         #if we are doing sub challenge 2, add the metadata features
         if(command_line_args.sub_challenge == 2):
@@ -318,7 +314,7 @@ def validate_model(command_line_args, descriptor):
         
         
         
-        
+       
         
     #run validation
     terminal_cmd(command_line_args.validation_string)
