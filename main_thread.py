@@ -273,9 +273,9 @@ def train_model(command_line_args, descriptor):
         #if this file doesn't exist, we have two options
         #use the near incomplete features if the preprocessing run finished completely
         #otherwise use the nearly complete feature set
-        if( os.path.isfile(command_line_args.model_path + '/X.npy')):
-            X = np.load(command_line_args.model_path + '/X.npy')
-            Y = np.load(command_line_args.model_path + '/Y.npy')
+        if( os.path.isfile(command_line_args.input_path + '/model_data/X.npy')):
+            X = np.load(command_line_args.input_path + '/model_data/X.npy')
+            Y = np.load(command_line_args.input_path + '/model_data/Y.npy')
             
         else:
             X = np.load(command_line_args.model_path + '/X_temp.npy')
@@ -375,11 +375,13 @@ def validate_model(command_line_args, descriptor):
                     
     print predicted_breast
     #now will find the AUROC score
-    print('Area Under the Curve Prediction Score = %f' %(roc_auc_score(actual_breast, predicted_breast))) 
+    #print('Area Under the Curve Prediction Score = %f' %(roc_auc_score(actual_breast, predicted_breast))) 
     
     #now save this as a tsv file
     #inference.to_csv('/output/predictions.tsv', sep='\t')
     out = open('/output/predictions.tsv', 'w')
+    #write the headers for the predictions file
+    out.write('subjectId\tlaterality\tconfidence\n')
     for row in range(0, len(actual_subject_ids)):
         out.write('%s\t' %actual_subject_ids[row])
         out.write('%s\t' %actual_laterality[row])

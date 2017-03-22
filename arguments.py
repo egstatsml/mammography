@@ -29,6 +29,7 @@ and therefore wont parse the arguments
 @param argv = If supplied should contain a list of the arguments supplied from the command line
               Otherwise will retain default value of False, and the user can manually parse
               the arguments at a later stage by calling the parse_command_line function
+Enjoy
 
 """
 
@@ -247,7 +248,7 @@ class arguments(object):
                     
             print train_file_path
             
-            self.train_string ='./CUDA/svm-train-gpu  -t %s -d %s -m 5000 -e %s %s %s/model_data/data_file_libsvm %s/model_file' %(self.kernel, self.degree, self.epsilon, weight_string, train_file_path, self.model_path)
+            self.train_string ='./CUDA/svm-train-gpu -c 100 -t %s -d %s -m 8000 -e %s %s %s/model_data/data_file_libsvm %s/model_file' %(self.kernel, self.degree, self.epsilon, weight_string, train_file_path, self.model_path)
             
             print self.train_string
             
@@ -348,10 +349,10 @@ class arguments(object):
             #if we aren't training
             if(not self.training):
                 #the file should already exist then
-                if(not os.path.isfile(self.log_path + 'model_file')):
+                if(not os.path.isfile(self.model_path + 'model_file')):
                     print('ERROR')
                     print('You have suggested running validation, but the model doesn\'t exist yet, and you haven\'t specified that you want to train the model')
-                    print('Before validation can be done, the model must be run with the -t aregument to train')
+                    print('Before validation can be done, the model must be run with the -t argument to train')
                     print('For more usage information, run with -h argument')
                     sys.exit(2)        
                     

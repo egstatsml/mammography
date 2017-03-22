@@ -204,9 +204,16 @@ class spreadsheet(object):
         crosswalk_data = self.crosswalk.loc[file_loc,:]
         #get the view and exam index of this scan
         self.laterality = crosswalk_data.iloc[0, crosswalk_data.columns.get_loc('laterality')]
-        self.exam = crosswalk_data.iloc[0, crosswalk_data.columns.get_loc('examIndex')]
         self.subject_id = crosswalk_data.iloc[0, crosswalk_data.columns.get_loc(str(self.patient_subject))]
-        
+        #if we are validating on synapse servers, the exam index is not available, so just set
+        #them all to 1. This is because the scans from the validation set are only one exam
+        #per subject
+        if(self.challenge_submission & self.validation):
+            #just set the exam index to one
+            self.exam = 1
+        else:
+            #set it to what it really is
+            self.exam = crosswalk_data.iloc[0, crosswalk_data.columns.get_loc('examIndex')]
         #if we are doing sub challenge 2, lets add some metadata as features
         #if we aren't it will just set all the metadata to zero
         self.metadata_sub_challenge_2(crosswalk_data)

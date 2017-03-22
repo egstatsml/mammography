@@ -534,8 +534,8 @@ class my_thread(Process):
                     
                     
                 #this is just here whilst debugging to shorten the script
-                #if(self.manager.get_cancer_count() > 2):
-                #    print('Cancer Count is greater than 2 so lets exit')
+                #if(self.manager.get_benign_count() > 200):
+                #    print('benign Count is greater than 200 so lets exit')
                 #    self.manager.set_exit_status(True)                
                     
                 #are done getting metadata and filenames from the queue, so unlock processes
@@ -553,7 +553,8 @@ class my_thread(Process):
                         #begin preprocessing steps
                         if(self.preprocessing):
                             self.scan_data.preprocessing()
-                            self.save_preprocessed()
+                            if(not self.challenge_submission) & (not self.validation):
+                                self.save_preprocessed()
                             
                         self.scan_data.get_features()
                         
@@ -625,6 +626,10 @@ class my_thread(Process):
         del self.lateralities[-1]
         del self.exam_nos[-1]
         del self.subject_ids[-1]        
+        del self.bc_histories[-1]
+        del self.bc_first_degree_histories[-1]
+        del self.bc_first_degree_histories_50[-1]
+        del self.anti_estrogens[-1]
         
         
         
