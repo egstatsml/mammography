@@ -569,7 +569,7 @@ class my_thread(Process):
                         
                         
                     except Exception as e:
-                        raise
+                        
                         #print the error message
                         print e 
                         print('Error with current file %s' %(file_path))

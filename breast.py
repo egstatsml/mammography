@@ -376,12 +376,23 @@ class breast(object):
         #to make sure we use the first maximum found, just using the where function and taking
         #the first element found
         
-        index = np.where(np.abs(h) == np.max(valid_h))[0][0]
+        #a boolean variable that we will use to decide if we are going to remove the pectoral muscle
+        remove_pectoral = []
         
+        #if there are any valid peaks found
         
-        pectoral_rho = d[index] #will need to account for rho being negative, but shouldnt happen for pectoral muscle case
-        pectoral_theta = theta[index]
-        
+        if(np.sum(valid_h)):
+            index = np.where(np.abs(h) == np.max(valid_h))[0][0]
+            pectoral_rho = d[index] #will need to account for rho being negative, but shouldnt happen for pectoral muscle case
+            pectoral_theta = theta[index]
+            remove_pectoral = True
+            
+        #if there weren't any vali peaks found, then let
+        else:
+            remove_pectoral = False
+            
+            
+            
         #creating a list of positional indicies where the pectoral muscle is
         x_pec = []
         y_pec = []
@@ -777,8 +788,8 @@ class breast(object):
             
         #now re-write the breast boundary member variables
         if(l_y.size == l_x.size):
-            self.boundary = l_x
-            self.boundary_y = l_y
+            self.boundary = l_x.astype(np.int)
+            self.boundary_y = l_y.astype(np.int)
             
             
         
