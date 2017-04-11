@@ -192,7 +192,7 @@ class feature(breast):
         #if there has been a problem with the preprocessed data,
         #extract features from the original scan
         if(np.nansum(a) < 1000):
-            a = np.copy(self.data.original_scan)
+            a = np.copy(self.original_scan)
             
         a[np.isnan(a)] = 0    
         self.packets = pywt.WaveletPacket2D(data=a, wavelet=self.wavelet_type, mode='sym')
@@ -313,23 +313,18 @@ class feature(breast):
             print(self.file_path)
             print('sum temp = %d' %(np.sum(temp[temp_mask])))
             print('sum temp_mask = %d' %(np.sum(temp_mask)))        
+            temp_mask[not temp_mask] = True
+            temp[temp_mask] = 1
+            
+            
+            """    
             fig = plt.figure()
-            ax1 = fig.add_subplot(1,2,1)
-            ax1.imshow(self.data)
-            ax1 = fig.add_subplot(1,2,2)
-            ax1.imshow(self.packets[self.indicies[0][ii,jj]].data)
-            fig.savefig(os.getcwd() + '/figs/' + 'data_' + self.file_path[-10:-3] + 'png')
+            ax1 = fig.add_subplot(1,1,1)
+            ax1.imshow(self.packets[self.indicies[level][ii,jj]].data)
+            fig.savefig((os.getcwd() + '/figs/' + 'l_%d_i_%d_j_%d_data_' + self.file_path[-10:-3] + 'png') %(level, ii, jj))
             fig.clf()
             plt.close()
-            
-        """    
-        fig = plt.figure()
-        ax1 = fig.add_subplot(1,1,1)
-        ax1.imshow(self.packets[self.indicies[level][ii,jj]].data)
-        fig.savefig((os.getcwd() + '/figs/' + 'l_%d_i_%d_j_%d_data_' + self.file_path[-10:-3] + 'png') %(level, ii, jj))
-        fig.clf()
-        plt.close()
-        """
+            """
             
             
         #probably be negative, but if it isn't, set it to zero

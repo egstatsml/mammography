@@ -87,7 +87,7 @@ class breast(object):
         self.nipple_y = 0
         self.threshold = 0                #threshold for segmenting fibroglandular disk
         self.file_path = []
-        self.plot = True                  #boolean for plotting figures when debugging
+        self.plot = False                  #boolean for plotting figures when debugging
         if(file_path != None):
             self.initialise(file_path)
             
@@ -390,7 +390,7 @@ class breast(object):
         #if there weren't any vali peaks found, then let
         else:
             remove_pectoral = False
-            
+            pectoral_rho = 0
             
             
         #creating a list of positional indicies where the pectoral muscle is
@@ -400,7 +400,7 @@ class breast(object):
         #if the vertical position at the left edge is greater than the height of the
         #image, then what we have found is invalid
         #if it is less than, lets roll and remove it
-        if(np.int(pectoral_rho) < self.data.shape[0]):
+        if(np.int(pectoral_rho / np.sin(pectoral_theta)) < self.data.shape[0]) & (remove_pectoral):
             
             #now lets get rid of all information to the left of this line
             #as this will be the pectoral muscle
@@ -700,6 +700,9 @@ class breast(object):
         
         
     def trace_boundary(self):
+        
+        print self.boundary
+        print self.boundary_y
         
         im = np.zeros(self.data.shape, dtype=np.int)
         im[self.boundary_y,self.boundary] = 1

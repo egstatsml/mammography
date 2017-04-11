@@ -570,7 +570,7 @@ class my_thread(Process):
                         
                         
                     except Exception as e:
-                        
+                        raise
                         #print the error message
                         print e 
                         print('Error with current file %s' %(file_path))
@@ -586,7 +586,7 @@ class my_thread(Process):
                         #if we are validating for the challenge, lets try our best on what we have
                         
                         else:
-                            
+                            self.data = np.copy(self.original_scan)
                             #should be safe to have this outside a try and catch, as it
                             #should never fail
                             self.scan_data.get_features()
