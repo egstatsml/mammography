@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 
 #variables that can be used for setting paths and creating directories
-SAVE_DIR_ROOT="/preprocessedData"
+
+#input dir is the directory where the preprocessed scans are stored
+PREPROCESSED_DIR="/preprocessedData/preprocessedTrain/"
+SAVE_DIR_ROOT="/scratch"
 SAVE_IMAGE_DIR="$SAVE_DIR_ROOT/preprocessedTrain/"
 SAVE_DIR_MODEL_FILES="$SAVE_IMAGE_DIR/model_data/"
 LOG_DIR="/modelState"
@@ -10,16 +13,20 @@ METADATA_DIR="/metadata/"
 MODEL_STATE_DIR="/modelState"
 
 echo "TRAINING PART OF THE MODEL"
+echo "Creating directory in scratch space where I can save things temporarily"
+mkdir -p $SAVE_DIR_MODEL_FILES
+echo "listing all of the home directories"
+ls /
+
+
 echo "Running Training Script"
-python main_thread.py -t -f -i $SAVE_IMAGE_DIR -s $SAVE_IMAGE_DIR -l $LOG_DIR -m $METADATA_DIR -a $SAVE_DIR_MODEL_FILES
+python main_thread.py -t -i $PREPROCESSED_DIR -s $SAVE_IMAGE_DIR -l $LOG_DIR -m $METADATA_DIR --model $MODEL_STATE_DIR --sub 1 --pca 20 -w 0:1,1:20 -k 1
 
 
 #save the model in the modelstate dir
 #echo "Copying the model to the modelState dir"
-cp $SAVE_DIR_MODEL_FILES/model_file/ $MODEL_STATE_DIR/model_file/ -r -f
+cp $SAVE_IMAGE_DIR/ $MODEL_STATE_DIR/ -r -f
 
-
-#sudo python main_thread.py -t -i /media/dperrin/preprocessed/preprocessedTrain/ -s /media/dperrin/preprocessed/preprocessedTrain/ -l ./ -m ./  -a /media/dperrin/preprocessed/preprocessedTrain/model_data/ -f
 
 
 echo "DONE"
