@@ -87,7 +87,7 @@ class breast(object):
         self.nipple_y = 0
         self.threshold = 0                #threshold for segmenting fibroglandular disk
         self.file_path = []
-        self.plot = False                  #boolean for plotting figures when debugging
+        self.plot = True                  #boolean for plotting figures when debugging
         if(file_path != None):
             self.initialise(file_path)
             
@@ -163,7 +163,7 @@ class breast(object):
         self.remove_label()
         self.remove_artifacts()
         self.breast_boundary()
-        self.cross_entropy_threshold()
+        self.fibroglandular_segmentation()
         
         
         
@@ -295,17 +295,17 @@ class breast(object):
     def pectoral_muscle_present(self):
         
         #find the mean value for just the pixels that arent background
-        mean_val = np.mean(self.data[self.data > 0])
+        mean_val = 1.2*np.mean(self.data[self.data > 0])
         #now will search the top left corner
         count = 0
-        for y in range(0, 100):
+        for y in range(0, 200):
             for x in range(0, 50):
                 if(self.data[y,x] > mean_val):
                     count = count+1
                     
         #if the majority of these pixels read greater than the average, then
         #pectoral muscle is said to be present and we should find it
-        if(count >= (100.0*50.0*0.5)):
+        if(count >= (200.0*50.0*0.60)):
             self.pectoral_present = True
             return True
         else:
@@ -385,65 +385,71 @@ class breast(object):
         #creating a list of positional indicies where the pectoral muscle is
         x_pec = []
         y_pec = []
-        #now lets get rid of all information to the left of this line
-        #as this will be the pectoral muscle
-        for x in range(0, np.shape(edge)[1]):
-            y = np.int((pectoral_rho - x * np.cos(pectoral_theta))/np.sin(pectoral_theta))
-            if( (y >= 0) & (y < self.im_height)):
-                #are in range set all pixels to the left of this x value to zero
-                self.data[0:np.floor(y).astype(int), x] = 0
-                #set these locations in the pectoral muscle binary map to true
-                self.pectoral_mask[0:np.floor(y).astype(int), x] = True
-                #save the location indicies
-                x_pec.append(x)
-                y_pec.append(y)
+        #lets check that the region that we have found is correct for the pectoral muscle
+        #if the vertical position at the left edge is greater than the height of the
+        #image, then what we have found is invalid
+        #if it is less than, lets roll and remove it
+        if(np.int(pectoral_rho) < self.data.shape[0]):
+            
+            #now lets get rid of all information to the left of this line
+            #as this will be the pectoral muscle
+            for x in range(0, np.shape(edge)[1]):
+                y = np.int((pectoral_rho - x * np.cos(pectoral_theta))/np.sin(pectoral_theta))
+                if( (y >= 0) & (y < self.im_height)):
+                    #are in range set all pixels to the left of this x value to zero
+                    self.data[0:np.floor(y).astype(int), 0:x] = 0
+                    #set these locations in the pectoral muscle binary map to true
+                    self.pectoral_mask[0:np.floor(y).astype(int), 0:x] = True
+                    #save the location indicies
+                    x_pec.append(x)
+                    y_pec.append(y)
+                    
+                    #save the positional indicies to the class member variables, but do it as arrays
+            self.x_pec = np.array(x_pec)
+            self.y_pec = np.array(y_pec)
+            
+            self.pectoral_removed = True
+            
+            
+            #plotting figure for VRES report
+            
+            if(self.plot):
+                fig = plt.figure()
+                ax2 = fig.add_subplot(1,1,1)
+                ax2.imshow(self.original_scan, cmap='gray')
+                plt.axis('off')
+                fig.savefig(os.getcwd() + '/figs/edge_' + self.file_path[-10:-4] +'a.'  + 'png', bbox_inches='tight')
+                fig.clf()
+                ax2 = fig.add_subplot(1,1,1)
+                ax2.imshow(edge)
+                plt.axis('off')
+                fig.savefig(os.getcwd() + '/figs/edge_' + self.file_path[-10:-4] +'b.' + 'png',bbox_inches='tight')
+                fig.clf()
+                ax2 = fig.add_subplot(1,1,1)
+                ax2.imshow(edge)
+                fig.clf()
+                ax2 = fig.add_subplot(1,1,1)
+                ax2.imshow(h_full, aspect='auto')
+                plt.axis('off')
+                fig.savefig(os.getcwd() + '/figs/edge_' + self.file_path[-10:-4] +'c.' + 'png',bbox_inches='tight')
+                fig.clf()
+                ax2 = fig.add_subplot(1,1,1)
+                ax2.imshow(edge)
                 
-        #save the positional indicies to the class member variables, but do it as arrays
-        self.x_pec = np.array(x_pec)
-        self.y_pec = np.array(y_pec)
-        
-        self.pectoral_removed = True
-        
-        
-        #plotting figure for VRES report
-        
-        if(self.plot):
-            fig = plt.figure()
-            ax2 = fig.add_subplot(1,1,1)
-            ax2.imshow(self.original_scan, cmap='gray')
-            plt.axis('off')
-            fig.savefig(os.getcwd() + '/figs/edge_' + self.file_path[-10:-4] +'a.'  + 'png', bbox_inches='tight')
-            fig.clf()
-            ax2 = fig.add_subplot(1,1,1)
-            ax2.imshow(edge)
-            plt.axis('off')
-            fig.savefig(os.getcwd() + '/figs/edge_' + self.file_path[-10:-4] +'b.' + 'png',bbox_inches='tight')
-            fig.clf()
-            ax2 = fig.add_subplot(1,1,1)
-            ax2.imshow(edge)
-            fig.clf()
-            ax2 = fig.add_subplot(1,1,1)
-            ax2.imshow(h_full, aspect='auto')
-            plt.axis('off')
-            fig.savefig(os.getcwd() + '/figs/edge_' + self.file_path[-10:-4] +'c.' + 'png',bbox_inches='tight')
-            fig.clf()
-            ax2 = fig.add_subplot(1,1,1)
-            ax2.imshow(edge)
-            
-            fig.clf()
-            ax2 = fig.add_subplot(1,1,1)
-            ax2.imshow(self.data, cmap='gray')
-            plt.axis('off')
-            fig.savefig(os.getcwd() + '/figs/edge_' + self.file_path[-10:-4] +'d.' + 'png',bbox_inches='tight')
-            fig.clf()
-            ax2 = fig.add_subplot(1,1,1)
-            ax2.imshow(edge)
-            
-            fig.clf()
-            plt.close()
-            
-            
-            
+                fig.clf()
+                ax2 = fig.add_subplot(1,1,1)
+                ax2.imshow(self.data, cmap='gray')
+                plt.axis('off')
+                fig.savefig(os.getcwd() + '/figs/edge_' + self.file_path[-10:-4] +'d.' + 'png',bbox_inches='tight')
+                fig.clf()
+                ax2 = fig.add_subplot(1,1,1)
+                ax2.imshow(edge)
+                
+                fig.clf()
+                plt.close()
+                
+                
+                
             
             
             
@@ -476,7 +482,6 @@ class breast(object):
     def breast_boundary(self):
         
         temp = np.copy(self.data.astype(np.int))
-        
         
         #now do a directional blur to the left
         
@@ -561,8 +566,6 @@ class breast(object):
         self.data[ self.breast_mask == 0 ] = np.nan
         
         #use the breast mask we have found to locate the true breast boundary
-        
-        #self.boundary_y, self.boundary_x = edge_boundary(self.breast_mask, self.pectoral_mask, self.pectoral_present)
         self.edge_boundary()
         #now trace the boundary so we can create a parametric model of the breast boundary    
         self.trace_boundary()
@@ -573,6 +576,8 @@ class breast(object):
         #will only try and do it if we have found enough bits as well
         if(self.boundary.size > 2000):
             self.remove_skin()
+        else:
+            print('%s skin not removed' %(self.file_path))
             
         if(self.plot):
             im = np.zeros((np.shape(self.data)))
@@ -617,11 +622,25 @@ class breast(object):
         
         edges = sobel(self.breast_mask)
         #apply small blur to edge
-        edges = filters.gaussian_filter(edges,3) 
+        edges = filters.gaussian_filter(edges,5) 
         
         if(self.pectoral_present):
             #remove edges where the pectoral muscle was
             edges[self.pectoral_mask] = 0
+            
+            
+        if(self.plot):
+            fig = plt.figure(num=None, figsize=(80, 50), dpi=300)
+            ax1 = fig.add_subplot(1,2,1)
+            im1 = ax1.imshow(self.breast_mask)
+            ax1 = fig.add_subplot(1,2,2)
+            im1 = ax1.imshow(edges)
+            fig.savefig(os.getcwd() + '/figs/' + 'plot_' + self.file_path[-10:-3] + 'png')
+            fig.clf()
+            plt.close()
+            
+            
+            
             
             
         #now find the boundary
@@ -657,7 +676,8 @@ class breast(object):
                         y.append( y_temp[ii] )
                         boundary.append( boundary_temp[ii] )
                         break
-                        
+                    
+                    
         #now save the true boundary location
         self.boundary = np.array(boundary)
         self.boundary_y = np.array(y)
@@ -795,14 +815,47 @@ class breast(object):
     def remove_skin(self):
         
         #first lets smooth the boundary
-        x = signal.savgol_filter(self.boundary, 81, 3)
+        x = signal.savgol_filter(self.boundary, 51, 3)
+        y = signal.savgol_filter(self.boundary_y, 51, 3)
+        #finding the derivatives
+        dx = self.deriv(x)
+        d2x = self.deriv(dx)
+        dy = self.deriv(y)
+        d2y = self.deriv(dy)
         
-        #now lets take derivative
-        dx = np.gradient(x)
-        #lets find the second derivative, but first lets smooth it again
-        temp = signal.savgol_filter(dx, 31, 2)
-        d2x = np.gradient(temp)        
-        d2x = signal.savgol_filter(d2x, 31, 2)
+        
+        curvature = (dx * d2y - dy * d2x)/((dx**2 + dy**2)**(3/2))
+        curvature[np.abs(curvature) > 0.5] = 0
+        #apply low pass filter
+        curvature = self.hamming_lpf(curvature)
+        
+        t = np.arange(np.size(curvature))
+        print('curve')
+        curv_x, curv_y = self.stationary_points(curvature)
+        
+        #use this to find the location of excess skin
+        print np.median(curvature)
+        mask = (curvature <  -1.0 * np.abs(3.0 * np.median(curvature)))
+        skin = np.where(mask)
+        
+        if(np.sum(mask[0: round(len(curvature) * 1.0/3.0)])):
+            top = skin[0][skin[0] < len(curvature) * 1.0/3.0]
+        else:
+            top = [1]
+            
+        if(np.sum(mask[round(len(curvature) * 2.0/3.0)::])):
+            bottom = skin[0][skin[0] > len(curvature) * 2.0/3.0]
+        else:
+            bottom = [len(curvature) -1]
+            
+            
+        #will use these locations to find the top and bottom parts of skin
+            
+        peaks = np.array([top[-1], bottom[0]])
+        print peaks
+        
+        
+        
         
         #now want to find point of inflection in  breast boundary
         #which is where the second derivative will equal zero
@@ -811,9 +864,9 @@ class breast(object):
         
         #finding peaks in second derivative
         #first filter out small  values
-        d2x[np.abs(d2x) < np.mean(np.abs(d2x)) * 5] = 0
+        #d2x[np.abs(d2x) < np.mean(np.abs(d2x)) * 5] = 0
         
-        peaks = np.array( signal.find_peaks_cwt(d2x, np.arange(25,40)))
+        #peaks = np.array( signal.find_peaks_cwt(d2x, np.arange(25,40)))
         #now filter out peaks until we get the one pertaining to any extra skin
         
         #sometimes get peaks in the middle caused by the nipple in the scan
@@ -857,7 +910,7 @@ class breast(object):
             #im1 = ax1.plot(dx, 'b')
             if(peaks.size > 0):
                 im1 = ax1.scatter(self.boundary_y[peaks], d2x[peaks], label='Peaks')
-            im2 = ax1.plot(self.boundary_y, np.divide(self.boundary.astype(float), np.max(self.boundary.astype(float))) * np.max(d2x), 'r', label='Scaled Breast Boundary')
+            im2 = ax1.plot(self.boundary_y, np.divide(x.astype(float), np.max(self.boundary.astype(float))) * np.max(d2x), 'r', label='Scaled Breast Boundary')
             im3 = ax1.plot(self.boundary_y, d2x, 'm', label='Second Derivative')
             #fig.colorbar(im1)
             plt.title('Breast Boundary and Second Derivative')
@@ -865,6 +918,15 @@ class breast(object):
             fig.savefig(os.getcwd() + '/figs/' + 'deriv_' + self.file_path[-10:-3] + 'png', bbox_inches='tight')
             fig.clf()
             plt.close()
+            
+            
+            fig = plt.figure()
+            ax1 = fig.add_subplot(1,1,1)
+            im1 = ax1.plot(t,curvature)
+            im1 = ax1.scatter(curv_x, curv_y)
+            fig.savefig(os.getcwd() + '/figs/' + 'curv_' + self.file_path[-10:-3] + 'png', bbox_inches='tight')
+            fig.clf()
+        
             
             
             fig = plt.figure()
@@ -926,6 +988,72 @@ class breast(object):
         
         
         
+    
+    
+    """
+    fibroglandular_segmentation()
+    
+    Description:
+    Will attempt to segment the fibroglandular disk out of the mammogram
+    using the minimum cross entropy threshold method.
+    
+    Will not search near the breast boundary, as the skin component in the image can contain
+    a high intensity pixels which will confound segmentation.
+    
+    
+    """
+    
+    
+    def fibroglandular_segmentation(self):
+        
+        #create a mask that contains pixels at and near the boundary
+        #to do this, will just be blurring the boundary we have previously defined
+        
+        boundary_blur = np.zeros(self.data.shape)
+        breast_pixels = np.zeros(self.data.shape)
+        
+        boundary_blur[self.boundary_y,self.boundary] = 1
+        #blur with Gaussian filter that has large standard deviation
+        boundary_blur = filters.gaussian_filter(boundary_blur,40) 
+        boundary_blur[boundary_blur != 0] = 1
+        #convert it to a boolean mask
+        boundary_blur = boundary_blur.astype(np.bool)
+        #use this to create an array of just the breast pixels, not any
+        #of the skin
+        breast_pixels[boundary_blur == False] = self.data[boundary_blur == False]
+        #set the pixels at and near the skin boundary to nan
+        breast_pixels[boundary_blur == True] = np.nan
+        #pass this to the cross entropy threshold function to find the optimal
+        #threshold that minimises cross entropy
+        #threshold value is saved in the self.threshold member variableB
+        print('found threshold')
+        self.cross_entropy_threshold(breast_pixels)
+        
+        
+        pdf = np.histogram(breast_pixels[np.isfinite(breast_pixels)], 4096, density=True)
+        cdf = np.cumsum(pdf[0])
+        
+        #find the 0.95 value in the cdf
+        #the axis is still in the pdf, and use this to find the pixel value
+        axis = pdf[1][0:-1]
+        upper_limit = axis[cdf >= 0.95]
+        upper_limit = upper_limit[0]
+        
+        #now will use this to create a binary mask of the fibroglandular disk/dense tissue
+        self.fibroglandular_mask = (self.data > self.threshold) & (self.data < upper_limit)
+        self.fibroglandular_mask[boundary_blur == True] = False
+        
+       
+        #fig = plt.figure()
+        #ax1 = fig.add_subplot(1,1,1)
+        #ax1.imshow(self.fibroglandular_mask)
+        #fig.savefig(os.getcwd() + '/figs/' + 'fibro_' + self.file_path[-10:-3] + 'png')
+        #fig.clf()
+        #plt.close()
+        
+        
+        
+        
         
         
         
@@ -945,6 +1073,10 @@ class breast(object):
     and won't contain any useful information, so wont use the breast skin region for thresholding
     
     
+    @param breast_pixels = preprocessed scan that has had skin removed, and the areas near the breast
+                  boundary masked out so we only look at the breast tissue
+    
+    
     Reference
     
     @article{Li_1993,
@@ -962,22 +1094,10 @@ class breast(object):
     }
     """
     
-    def cross_entropy_threshold(self):
-        
-        #deep copy of image data
-        temp = np.copy(self.data)
-        #creating a mask of the breast boundary
-        edge_mask = np.zeros(np.shape(self.data), dtype=np.uint8)
+    def cross_entropy_threshold(self, breast_pixels):
         
         
-        for ii in range(0, len(self.boundary)):
-            for jj in range(0, 20):
-                edge_mask[self.boundary_y[ii], self.boundary[ii] - 20 + jj] = 1
-                
-                
-        #now lets just use the points where it isnt the edge of the skin
-        temp = temp[edge_mask == 0]
-        temp = temp[np.isfinite(temp)]
+        temp = breast_pixels[np.isfinite(breast_pixels)].ravel()
         #lets get rid of zero value pixels
         temp = temp[temp > 0]        
         eta = 10e10        #large value of eta that will be overwritten
@@ -991,30 +1111,6 @@ class breast(object):
                 self.threshold = t
                 
                 
-                
-        #creating mask of breast boundary
-        
-        pdf = np.histogram(temp, 4096, density=True)
-        cdf = np.cumsum(pdf[0])
-        
-        #find the 0.95 value in the cdf
-        #the axis is still in the pdf, and use this to find the pixel value
-        axis = pdf[1][0:-1]
-        upper_limit = axis[cdf >= 0.95]
-        upper_limit = upper_limit[0]
-        
-        #now will use this to create a binary mask of the fibroglandular disk/dense tissue
-        self.fibroglandular_mask = (self.data > self.threshold) & (self.data < upper_limit)
-        self.fibroglandular_mask[edge_mask == 1] = False
-        
-        """
-        fig = plt.figure()
-        ax1 = fig.add_subplot(1,1,1)
-        ax1.imshow(self.fibroglandular_mask)
-        fig.savefig(os.getcwd() + '/figs/' + 'msk_' + self.file_path[-10:-3] + 'png')
-        fig.clf()
-        plt.close()
-        """
         
         
         
@@ -1123,3 +1219,31 @@ class breast(object):
         
         
         
+        
+        
+    def deriv(self, input):
+        
+        #create the gaussian pdf
+        x = np.linspace(-2,2,51)
+        normal = np.exp(- (x**2/2) )/np.sqrt(2.0*np.pi)
+        #take the derivative of it
+        dx = np.gradient(normal)
+        #convolve this with the input signal to approximate the derivative
+        return np.convolve(input, dx, mode='same')
+    
+    
+    
+    
+    def hamming_lpf(self, input):
+        N = 51
+        n = np.arange(N)
+        alpha = (N-1)/2
+        fc = 0.05
+        h = np.zeros(N)
+        h[(n-alpha) != 0] = 1.0/(np.pi * (n[(n-alpha) != 0] - alpha)) * np.sin(2.0 * np.pi * fc * (n[(n-alpha) != 0] - alpha))
+        h[(n -alpha) == 0] = alpha
+        w = signal.hamming(N)
+        h_r = h * w
+        return signal.convolve(input, h_r, mode='same')
+    
+    

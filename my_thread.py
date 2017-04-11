@@ -488,6 +488,7 @@ class my_thread(Process):
             start_time = timeit.default_timer()
             self.manager.t_lock_acquire()
             if(not (self.manager.q_empty()) ):
+                
                 file_path = self.data_path + self.manager.q_get()
                 #get the cancer status.
                 #if we are validating on the synapse servers, the cancer status is not
@@ -518,7 +519,7 @@ class my_thread(Process):
                 #if we are validating, the benign count will most likely be more,
                 #but we want to keep going to try and classify benign scans
                 #if it is a cancerous file though we should keep going
-                if(self.manager.get_benign_count() > 30000) & (not self.validation) & (not self.cancer_status[-1]):
+                if(self.manager.get_benign_count() > 60000) & (not self.validation) & (not self.cancer_status[-1]):
                     self.remove_most_recent_metadata_entries()
                     print('Skipping %s since we have enough benign scans :)' %(file_path))
                     #now we can just continue with this loop and go on about our business
@@ -547,7 +548,7 @@ class my_thread(Process):
                 if(valid):
                     try:
                         #now we have the right filename, lets do the processing of it
-                        #if we are doing the preprocessing, we will need to read the file in correctly
+                    #if we are doing the preprocessing, we will need to read the file in correctly
                         self.scan_data.initialise(file_path, self.preprocessing)
                         
                         #begin preprocessing steps
@@ -565,9 +566,11 @@ class my_thread(Process):
                         lock_time = timeit.default_timer()
                         #now increment the total scan count as well
                         self.inc_total_scan_count()
-                            
-                            
+                        
+                        
                     except Exception as e:
+                        raise
+                        #print the error message
                         print e 
                         print('Error with current file %s' %(file_path))
                         self.manager.add_error_file(file_path)

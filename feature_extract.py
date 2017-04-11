@@ -49,7 +49,7 @@ from breast import breast
 
 class feature(breast):
 
-    def __init__(self, file_path = None, wavelet_type = 'haar', levels = 3, benign_scans = True, no_images = 1):
+    def __init__(self, file_path = None, wavelet_type = 'haar', levels = 1, benign_scans = True, no_images = 1):
         breast.__init__(self, file_path)
         
         self.packets = []             #wavelet packets for each level of decomposition
@@ -152,8 +152,7 @@ class feature(breast):
     """
     
     
-    def find_indicies(self):
-        
+    def find_indicies(self):        
         
         for ii in range(1,self.levels + 1):
             
@@ -189,6 +188,13 @@ class feature(breast):
         if(self.fibroglandular_mask != []):
             a[self.fibroglandular_mask == False ] = np.nan        
             
+            
+        #if there has been a problem with the preprocessed data,
+        #extract features from the original scan
+        if(np.nansum(a) < 1000):
+            a = np.copy(self.data.original_scan)
+            
+        a[np.isnan(a)] = 0    
         self.packets = pywt.WaveletPacket2D(data=a, wavelet=self.wavelet_type, mode='sym')
         
         #check that the number of levels isnt to high
@@ -219,10 +225,10 @@ class feature(breast):
         self.density.append(np.divide(np.nansum(self.data), np.nansum(np.isfinite(self.data))))
         print self.density[-1]
         
-            
-            
-            
-            
+        
+        
+        
+        
     """
     _get_features_level()
     
@@ -298,8 +304,34 @@ class feature(breast):
         
         #this will be a float value, so lets scale it to be within uint8 range
         #will also do some error checking, as sometimes the values may be negative
-        
-        min_val = np.min(temp[temp_mask])
+        try:
+            min_val = np.min(temp[temp_mask])
+        except Exception:
+            print temp
+            print('level = %d, ii = %d, jj = %d' %(level,ii,jj))
+            min_val = 0
+            print(self.file_path)
+            print('sum temp = %d' %(np.sum(temp[temp_mask])))
+            print('sum temp_mask = %d' %(np.sum(temp_mask)))        
+            fig = plt.figure()
+            ax1 = fig.add_subplot(1,2,1)
+            ax1.imshow(self.data)
+            ax1 = fig.add_subplot(1,2,2)
+            ax1.imshow(self.packets[self.indicies[0][ii,jj]].data)
+            fig.savefig(os.getcwd() + '/figs/' + 'data_' + self.file_path[-10:-3] + 'png')
+            fig.clf()
+            plt.close()
+            
+        """    
+        fig = plt.figure()
+        ax1 = fig.add_subplot(1,1,1)
+        ax1.imshow(self.packets[self.indicies[level][ii,jj]].data)
+        fig.savefig((os.getcwd() + '/figs/' + 'l_%d_i_%d_j_%d_data_' + self.file_path[-10:-3] + 'png') %(level, ii, jj))
+        fig.clf()
+        plt.close()
+        """
+            
+            
         #probably be negative, but if it isn't, set it to zero
         if min_val > 0: min_val = 0
         #make all the values positive
@@ -315,7 +347,7 @@ class feature(breast):
         
         #print np.max(temp[np.isfinite(temp)])
         #now will set all the values equal to nan to 2**8
-        temp[temp == np.nan] = 256
+        temp[temp == np.nan] = 0
         
         #now find the co-occurance matrix
         glcm = greycomatrix(temp.astype('uint16'), [1],[0], levels=256, symmetric=True, normed=True)

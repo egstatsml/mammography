@@ -10,7 +10,7 @@ python main_thread.py -p -i /media/dperrin/pilot_images/ -s /media/dperrin/prepr
 
 
 #run training
-sudo python main_thread.py -t -i /media/dperrin/preprocessed/preprocessedTrain/ -s /media/dperrin/preprocessed/preprocessedTrain/ -l ./ -m ./  --model /media/dperrin/preprocessed/preprocessedTrain/model_data/ --sub 1 -w 0:1,1:20 -k 3
+sudo python main_thread.py -t -i /media/dperrin/preprocessed/preprocessedTrain/ -s /media/dperrin/preprocessed/preprocessedTrain/ -l ./ -m ./  --model /media/dperrin/preprocessed/preprocessedTrain/model_data/ --sub 1 -w 0:1,1:2 -k 3
 
 
 #run validation

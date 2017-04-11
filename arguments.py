@@ -247,7 +247,7 @@ class arguments(object):
                     
             print train_file_path
             
-            self.train_string ='./CUDA/svm-train-gpu  -t %s -d %s -m 5000 -e %s %s %s/model_data/data_file_libsvm %s/model_file' %(self.kernel, self.degree, self.epsilon, weight_string, train_file_path, self.model_path)
+            self.train_string ='./CUDA/svm-train-gpu -c 1000 -t %s -d %s -m 5000 -e %s %s %s/model_data/data_file_libsvm %s/model_file' %(self.kernel, self.degree, self.epsilon, weight_string, train_file_path, self.model_path)
             
             print self.train_string
             
