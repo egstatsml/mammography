@@ -163,7 +163,7 @@ class breast(object):
         self.remove_label()
         self.remove_artifacts()
         self.breast_boundary()
-        self.fibroglandular_segmentation()
+        #self.fibroglandular_segmentation()
         
         
         
@@ -390,8 +390,10 @@ class breast(object):
         #if there weren't any vali peaks found, then let
         else:
             remove_pectoral = False
-            pectoral_rho = 0
-            
+            #just setting this to a value to it will fail the check for valid limits
+            #not essential but paranoia is really kicking in :)
+            pectoral_rho = self.data.shape[0]
+            pectoral_theta = 1
             
         #creating a list of positional indicies where the pectoral muscle is
         x_pec = []

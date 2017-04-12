@@ -185,8 +185,8 @@ class feature(breast):
         #perform the wavelet decomposition
         a = np.copy(self.data)
         
-        if(self.fibroglandular_mask != []):
-            a[self.fibroglandular_mask == False ] = np.nan        
+        #if(self.fibroglandular_mask != []):
+        #    a[self.fibroglandular_mask == False ] = np.nan        
             
             
         #if there has been a problem with the preprocessed data,
@@ -194,7 +194,8 @@ class feature(breast):
         if(np.nansum(a) < 1000):
             a = np.copy(self.original_scan)
             
-        a[np.isnan(a)] = 0    
+        #turn everything thats nan to zero
+        a[np.isnan(a)] = 0.0
         self.packets = pywt.WaveletPacket2D(data=a, wavelet=self.wavelet_type, mode='sym')
         
         #check that the number of levels isnt to high
@@ -222,7 +223,7 @@ class feature(breast):
             
             
         #estimate the density of the breast
-        self.density.append(np.divide(np.nansum(self.data), np.nansum( np.logical_and(np.isfinite(self.data), self.data > 1))))
+        self.density.append(np.divide(np.nansum(self.data), np.nansum( self.data[np.isfinite(self.data)] > 1)))
         print self.density[-1]
         
         
@@ -313,7 +314,7 @@ class feature(breast):
             print(self.file_path)
             print('sum temp = %d' %(np.sum(temp[temp_mask])))
             print('sum temp_mask = %d' %(np.sum(temp_mask)))        
-            temp_mask[not temp_mask] = True
+            temp_mask[temp_mask == False] = True
             temp[temp_mask] = 1
             
             
