@@ -249,14 +249,23 @@ class arguments(object):
             print train_file_path
             
             
-            self.train_string ='./CUDA/svm-train-gpu -c 100 -t %s -d %s -m 8000 -e %s %s %s/model_data/data_file_libsvm %s/model_file' %(self.kernel, self.degree, self.epsilon, weight_string, train_file_path, self.model_path)
+            self.train_string ='./CUDA/svm-train-gpu -c 1 -t %s -d %s -m 8000 -e %s %s %s/model_data/data_file_libsvm %s/model_file' %(self.kernel, self.degree, self.epsilon, weight_string, train_file_path, self.model_path)
             
             
             print self.train_string
             
-            
+
+        #the model path is read only in the challenge submissions
+        #and for sub challenge 2 I want to add the metadata so I do write to
+        #this path
+        #this is why I am setting it slightly differently
         if(self.validation):
-            self.validation_string = './LIBSVM/svm-predict %s/model_data/data_file_libsvm %s/model_file %s/model_data/results.txt' %(self.save_path, self.model_path, self.save_path)            
+            if(self.sub_challenge == 2) & (self.challenge_submission):
+                data_file_string = '/scratch/'
+            else:
+                data_file_string = self.save_path
+
+            self.validation_string = './LIBSVM/svm-predict %s/data_file_libsvm %s/model_file %s/model_data/results.txt' %(data_file_string, self.model_path, self.save_path)            
             #if we want probability measures, just add the -b flag
             if(self.probability):
                 self.validation_string += ' -b'
@@ -336,11 +345,9 @@ class arguments(object):
                 #to do this, will just list the number of files in the preprocessed directory
                 #or the 'input_path'
                 if len([name for name in os.listdir(self.input_path) if os.path.isfile(os.path.join(self.input_path, name))]) < 50:
-                    print('ERROR')
-                    print('You have suggested training the model, but we haven\'t preprocessed the data yet')
-                    print('Before training can be done, the model must be run with the -p aregument to preprocess the data')
-                    print('For more usage information, run with -h argument')
-                    sys.exit(2)        
+                    print('WARNING')
+                    print('You have suggested training the model, but I can\'t find any of the preprocessed data saved')
+                    print('I will attempt to train using just the feature vectors, assuming they have been saved')
                     
                 
         #some more error checking

@@ -71,15 +71,15 @@ class shared(object):
     #whenever any of these reference variables are accessed, the thread lock should be applied,
     #to ensure multiple threads arent accessing the same memory at the same time
     
-    q = Queue(350000)             #queue that will contain the filenames of the scans
-    q_cancer = Queue(350000)      #queue that will contain the cancer status of the scans
-    q_laterality = Queue(350000)  #queue that will contain the laterality (view) of the scans
-    q_exam = Queue(350000)        #queue that will contain the exam index of the scans
-    q_subject_id = Queue(350000)  #queue that will contain the subject ID of the scans
-    q_bc_history = Queue(350000)
-    q_bc_first_degree_history = Queue(350000)
-    q_bc_first_degree_history_50 = Queue(350000)
-    q_anti_estrogen = Queue(350000)
+    q = Queue(750000)             #queue that will contain the filenames of the scans
+    q_cancer = Queue(750000)      #queue that will contain the cancer status of the scans
+    q_laterality = Queue(750000)  #queue that will contain the laterality (view) of the scans
+    q_exam = Queue(750000)        #queue that will contain the exam index of the scans
+    q_subject_id = Queue(750000)  #queue that will contain the subject ID of the scans
+    q_bc_history = Queue(750000)
+    q_bc_first_degree_history = Queue(750000)
+    q_bc_first_degree_history_50 = Queue(750000)
+    q_anti_estrogen = Queue(750000)
     
     t_lock = Lock()
     exit_flag = False
@@ -519,7 +519,7 @@ class my_thread(Process):
                 #if we are validating, the benign count will most likely be more,
                 #but we want to keep going to try and classify benign scans
                 #if it is a cancerous file though we should keep going
-                if(self.manager.get_benign_count() > 70000) & (not self.validation) & (not self.cancer_status[-1]):
+                if(self.manager.get_benign_count() > 60000) & (not self.validation) & (not self.cancer_status[-1]):
                     self.remove_most_recent_metadata_entries()
                     print('Skipping %s since we have enough benign scans :)' %(file_path))
                     #now we can just continue with this loop and go on about our business
@@ -535,8 +535,9 @@ class my_thread(Process):
                     
                     
                 #this is just here whilst debugging to shorten the script
-                #if(self.manager.get_benign_count() > 200):
-                #    print('benign Count is greater than 200 so lets exit')
+                #################
+                #if(self.manager.get_benign_count() > 10):
+                #    print('benign Count is greater than 10 so lets exit')
                 #    self.manager.set_exit_status(True)                
                     
                 #are done getting metadata and filenames from the queue, so unlock processes
@@ -580,13 +581,14 @@ class my_thread(Process):
                         #
                         #NOTE: we won't want to get rid of these features whilst validating
                         #on the synapse server. Just find features from what we have and run with it
-                        if(not self.validation) & (not self.challenge_submission):
+                        if(True):
+                            #(not self.validation) & ((not self.challenge_submission) | self.preprocessing):
                             print('removing this scan')
                             self.remove_most_recent_metadata_entries()
                         #if we are validating for the challenge, lets try our best on what we have
                         
                         else:
-                            self.data = np.copy(self.original_scan)
+                            self.scan_data.data = np.copy(self.scan_data.original_scan)
                             #should be safe to have this outside a try and catch, as it
                             #should never fail
                             self.scan_data.get_features()

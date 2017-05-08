@@ -314,7 +314,8 @@ def validate_model(command_line_args, descriptor):
         X,Y = add_metadata_features(X,Y,command_line_args)            
         
         #now lets make an libsvm compatable file         
-        dump_svmlight_file(X,Y,command_line_args.model_path + '/data_file_libsvm')
+        #so we can use libsvm
+        dump_svmlight_file(X,Y,'/scratch/data_file_libsvm')
         
         
         
@@ -385,10 +386,13 @@ def validate_model(command_line_args, descriptor):
     for row in range(0, len(actual_subject_ids)):
         out.write('%s\t' %actual_subject_ids[row])
         out.write('%s\t' %actual_laterality[row])
-        out.write('%s\t' %predicted_breast[row])
+        out.write('%s' %predicted_breast[row])
         out.write('\n')
         
     out.close()
+    
+    a = open('/output/predictions.tsv', 'r')
+    print a.read()
     
     
     

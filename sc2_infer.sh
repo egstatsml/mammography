@@ -8,6 +8,7 @@ LOG_DIR="/modelState/"
 INPUT_DIR="/inferenceData/"
 METADATA_DIR="/metadata/"
 MODEL_STATE_DIR="/modelState/"
+SCRATCH_DIR="/scratch/"
 
 echo "Inferece for Sub Challenge 1"
 

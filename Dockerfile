@@ -97,6 +97,3 @@ RUN make -C ./LIBSVM/
 
 COPY sc1_infer.sh .
 RUN chmod 755 sc1_infer.sh
-
-#IF WE are running an inference model, copy the model file over
-#COPY model_file_sub_1_a ./model_file

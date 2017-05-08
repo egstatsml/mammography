@@ -20,7 +20,7 @@ ls /
 
 
 echo "Running Training Script"
-python main_thread.py -t -i $PREPROCESSED_DIR -s $SAVE_IMAGE_DIR -l $LOG_DIR -m $METADATA_DIR --model $MODEL_STATE_DIR --sub 1 --pca 20 -w 0:1,1:20 -k 1
+python main_thread.py -t -i $PREPROCESSED_DIR -s $SAVE_IMAGE_DIR -l $LOG_DIR -m $METADATA_DIR --model $MODEL_STATE_DIR --sub 1 --pca 20 -w 0:1,1:2 -k 1 -c
 
 
 #save the model in the modelstate dir
