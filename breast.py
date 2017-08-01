@@ -244,7 +244,7 @@ class breast(object):
         threshold_val = 0.5
         threshold_val_high = 0.99
         #search from right to left, as that is where the label will be
-        
+        done = False
         #start at 200, the label is never going to be that far to the left
         x = 200
         while (x < (self.im_width - 200) ):
@@ -268,9 +268,21 @@ class breast(object):
                     med_left = np.median( np.cumsum( np.histogram(self.data[y:y+200, x-10:x+190], bins=np.arange(0,np.max(self.data)+1), density=True)[0]))
                     #now lets compare
                     if(med_current < med_left):
+                        """
+                        if((not done) & (np.sum(self.data[y:y+200,x:x+200]) > 500)):
+                            done = True
+                            #plot the CDF of this scan
+                            fig = plt.figure()
+                            ax2 = fig.add_subplot(1,1,1)
+                            ax2.plot(np.linspace(0,np.max(self.data), cdf.size), cdf)
+                            plt.title('CDF of Region With Label')
+                            plt.xlabel('Pixel Intensity')
+                            plt.ylabel('CDF')
+                            plt.ylim([0, 1.2])
+                            fig.savefig(os.getcwd() + '/figs/lab_' + self.file_path[-10:-4] + '.eps', bbox_inches='tight')
+                            
+                        """
                         self.data[y:y+200,x:x+200] = 0                    
-                    
-                    
                     
                 y = y+200
             x = x+200
@@ -427,6 +439,18 @@ class breast(object):
             #plotting figure for VRES report
             
             if(self.plot):
+                fig = plt.figure(figsize = (14,7))
+                ax2 = fig.add_subplot(1,2,1)
+                ax2.imshow(self.original_scan, cmap='gray')
+                plt.title('Original Scan')
+                plt.axis('off')
+                ax2 = fig.add_subplot(1,2,2)
+                ax2.imshow(self.data, cmap='gray')
+                plt.title('Pectoral Muscle Removed')
+                plt.axis('off')
+                fig.savefig(os.getcwd() + '/figs/edge_' + self.file_path[-10:-4] +'d.' + 'png',bbox_inches='tight')
+
+                """
                 fig = plt.figure()
                 ax2 = fig.add_subplot(1,1,1)
                 ax2.imshow(self.original_scan, cmap='gray')
@@ -458,6 +482,7 @@ class breast(object):
                 ax2 = fig.add_subplot(1,1,1)
                 ax2.imshow(edge)
                 
+                """
                 fig.clf()
                 plt.close()
                 
@@ -920,10 +945,33 @@ class breast(object):
                 
         
         #Code just for making pretty plots to check it is all working :)
-        if(self.plot):
+        if(1):#self.plot):
             fig = plt.figure()
             ax1 = fig.add_subplot(1,1,1)
-            #im1 = ax1.plot(dx, 'b')
+            plt.axis('off')
+            im1 = ax1.imshow(self.original_scan, cmap='gray')
+            fig.savefig(os.getcwd() + '/figs/' + 'pre_a' + self.file_path[-10:-3] + 'png', bbox_inches='tight')
+            plt.clf()
+            
+            ax1 = fig.add_subplot(1,1,1)
+            plt.axis('on')
+            im1 = ax1.plot(t,curvature)
+            plt.title('Curvature of Breast Boundary')
+            plt.xlabel('Boundary index')
+            plt.ylabel('Curvature')
+            fig.savefig(os.getcwd() + '/figs/' + 'pre_b' + self.file_path[-10:-3] + 'eps', bbox_inches='tight')
+            plt.clf()
+
+            
+            
+            ax1 = fig.add_subplot(1,1,1)
+            plt.axis('off')
+            im1 = ax1.imshow(self.data, cmap='gray')
+            fig.savefig(os.getcwd() + '/figs/' + 'pre_c' + self.file_path[-10:-3] + 'png', bbox_inches='tight')
+
+
+
+            """
             if(peaks.size > 0):
                 im1 = ax1.scatter(self.boundary_y[peaks], d2x[peaks], label='Peaks')
             im2 = ax1.plot(self.boundary_y, np.divide(x.astype(float), np.max(self.boundary.astype(float))) * np.max(d2x), 'r', label='Scaled Breast Boundary')
@@ -939,7 +987,10 @@ class breast(object):
             fig = plt.figure()
             ax1 = fig.add_subplot(1,1,1)
             im1 = ax1.plot(t,curvature)
-            im1 = ax1.scatter(curv_x, curv_y)
+            plt.title('Curvature of Breast Boundary')
+            plt.xlabel('Boundary index')
+            plt.ylabel('Curvature')
+            #im1 = ax1.scatter(curv_x, curv_y)
             fig.savefig(os.getcwd() + '/figs/' + 'curv_' + self.file_path[-10:-3] + 'png', bbox_inches='tight')
             fig.clf()
         
@@ -957,6 +1008,8 @@ class breast(object):
             ax1 = fig.add_subplot(1,1,1)
             im1 = ax1.imshow(self.breast_mask)
             fig.savefig(os.getcwd() + '/figs/' + 'msk_' + self.file_path[-10:-3] + 'png', bbox_inches='tight')
+            
+            """
             
             fig.clf()
             plt.close()

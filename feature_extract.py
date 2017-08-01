@@ -259,6 +259,20 @@ class feature(breast):
         for ii in range(0, np.shape(self.indicies[level])[0]):
             for jj in range(0, np.shape(self.indicies[level])[1]):
                 
+                print('ii =  %d, jj = %d, indicies = %s' %(ii,jj,self.indicies[level][ii,jj]))
+                
+                im = self.packets[self.indicies[level][ii,jj]].data
+                fig = plt.figure()
+                ax2 = fig.add_subplot(1,1,1)
+                fig.subplots_adjust(left=0,right=1,bottom=0,top=1)
+                cax = ax2.imshow(im, cmap='gray')
+                plt.axis('off')
+                plt.tight_layout()
+                ax2.set_adjustable('box-forced')
+                fig.savefig(os.getcwd() + '/figs/wav_' + self.file_path[-10:-4] + '_' + str(ii) + '_' + str(jj) + '_'  + 'png')
+                plt.close()
+                
+                
                 temp, glcm = self._comatrix(level, ii, jj)
                 mask = np.isfinite(temp)
                 
@@ -351,10 +365,10 @@ class feature(breast):
         glcm = glcm[0:255, 0:255,:,:]        
         
         return temp[temp_mask], glcm
-        
-        
-        
-        
+    
+    
+    
+    
     
     
     

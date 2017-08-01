@@ -263,7 +263,7 @@ class arguments(object):
             if(self.sub_challenge == 2) & (self.challenge_submission):
                 data_file_string = '/scratch/'
             else:
-                data_file_string = self.save_path
+                data_file_string = self.save_path + '/model_data/'
 
             self.validation_string = './LIBSVM/svm-predict %s/data_file_libsvm %s/model_file %s/model_data/results.txt' %(data_file_string, self.model_path, self.save_path)            
             #if we want probability measures, just add the -b flag

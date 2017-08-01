@@ -44,7 +44,7 @@ from feature_extract import feature
 from read_files import spreadsheet
 from log import logger
 from arguments import arguments
-
+from metric import *
 
 def flatten(x):
     "Flatten one level of nesting"
@@ -376,8 +376,10 @@ def validate_model(command_line_args, descriptor):
                     
     print predicted_breast
     #now will find the AUROC score
-    #print('Area Under the Curve Prediction Score = %f' %(roc_auc_score(actual_breast, predicted_breast))) 
-    
+    print('Area Under the Curve Prediction Score = %f' %(roc_auc_score(actual_breast, predicted_breast))) 
+    print('Accuracy = %f' %(metric_accuracy(actual, predicted))) 
+    print('Sensitivity = %f' %(metric_sensitivity(actual_breast, predicted_breast)))
+    print('Specificity = %f' %(metric_specificity(actual_breast, predicted_breast)))
     #now save this as a tsv file
     #inference.to_csv('/output/predictions.tsv', sep='\t')
     out = open('/output/predictions.tsv', 'w')
@@ -392,7 +394,7 @@ def validate_model(command_line_args, descriptor):
     out.close()
     
     a = open('/output/predictions.tsv', 'r')
-    print a.read()
+    #print a.read()
     
     
     

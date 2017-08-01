@@ -30,8 +30,9 @@ Accuracy = (TP + FP)/( TP + FP + FP + FN)
 """
 
 def metric_accuracy(true, predicted):
-    
-    return accuracy_score(true, predicted)
+
+    correct = np.sum(true.astype(int) == predicted.astype(int))
+    return np.divide(float(correct), true.size)
 
 
 
@@ -49,9 +50,8 @@ Sensitivity = TP/(TP + FN)
 """
 
 def metric_sensitivity(true, predicted):
-    
-    TP = np.sum(np.logical_and(true, predicted))
-    FN = np.sum(np.logical_and(true, np.logical_not(predicted)))
+    TP = float(np.sum(np.logical_and(true, predicted)))
+    FN = float(np.sum(np.logical_and(true, np.logical_not(predicted))))
     
     return np.divide(TP, TP + FN)
     
@@ -73,8 +73,8 @@ specificity = TN/(TN + FP)
 
 def metric_specificity(true, predicted):
     
-    TN = np.sum(np.logical_and(np.logical_not(true), np.logical_not(predicted)))
-    FP = np.sum(np.logical_and(np.logical_not(true), predicted))
+    TN = float(np.sum(np.logical_and(np.logical_not(true), np.logical_not(predicted))))
+    FP = float(np.sum(np.logical_and(np.logical_not(true), predicted)))
     
     return np.divide(TN, TN + FP)
 
