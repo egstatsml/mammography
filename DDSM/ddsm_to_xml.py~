@@ -1,0 +1,58 @@
+#!/usr/bin/python
+
+
+import os
+import sys
+import numpy as np
+import xml.etree.cElementTree as ET
+
+
+"""
+ddsm_to_xml.py
+
+Description:
+ Converts the annotated files from the DDSM database into an XML file that can be more easily handled by current RCNN examples 
+
+"""
+
+
+
+
+if __name__ == "__main__":
+    
+    #for now just have an example file
+    
+    #read in the overlay file
+    f = open('test.OVERLAY', 'r')
+    
+    #read all of the lines until get to the one describing the boundary
+    
+    line = []
+    found = False
+    for line in f:
+        if("BOUNDARY" in line):
+            found = True
+            break
+        
+    #if we didn't find the boundary, then we probably shouldn't make a file for this one 
+    if(not found):
+        print("No Boundary information found for this example")
+        
+    else:
+        #convert the line into a list, then get rid of the first and last element
+        boundary = line.split()
+        del boundary[0]
+        del boundary[-1]
+        #should now be a list of integers in string format
+        
+        #first to elements give the starting position of the boundary
+        start = [int(boundary[0]), int(boundary[1])]
+        
+        
+        
+        
+    
+    
+    
+
+
