@@ -163,7 +163,7 @@ class breast(object):
         self.remove_label()
         self.remove_artifacts()
         self.breast_boundary()
-        #self.fibroglandular_segmentation()
+        self.fibroglandular_segmentation()
         
         
         
@@ -945,7 +945,7 @@ class breast(object):
                 
         
         #Code just for making pretty plots to check it is all working :)
-        if(1):#self.plot):
+        if(self.plot):
             fig = plt.figure()
             ax1 = fig.add_subplot(1,1,1)
             plt.axis('off')
@@ -1112,7 +1112,26 @@ class breast(object):
         self.fibroglandular_mask = (self.data > self.threshold) & (self.data < upper_limit)
         self.fibroglandular_mask[boundary_blur == True] = False
         
-       
+        
+        
+        fig = plt.figure()
+        plt.axis('off')
+        ax1 = fig.add_subplot(1,1,1)
+        im1 = ax1.imshow(self.data, cmap='gray')
+        fig.savefig(os.getcwd() + '/figs/' + 'im_' + self.file_path[-10:-3] + 'png', bbox_inches='tight')
+        fig.clf()
+        
+        
+        fig = plt.figure()
+        plt.axis('off')
+        ax1 = fig.add_subplot(1,1,1)
+        im1 = ax1.imshow(self.fibroglandular_mask)
+        fig.savefig(os.getcwd() + '/figs/' + 'fibro_' + self.file_path[-10:-3] + 'png', bbox_inches='tight')
+        fig.clf()
+        
+        
+        
+        
         #fig = plt.figure()
         #ax1 = fig.add_subplot(1,1,1)
         #ax1.imshow(self.fibroglandular_mask)

@@ -402,7 +402,7 @@ class my_thread(Process):
         print('Initialising thread %d' %thread_id)
         self.manager = manager
         self.t_id = thread_id
-        self.scan_data = feature(levels = 1, wavelet_type = 'haar', no_images = no_images_total ) #the object that will contain all of the data
+        self.scan_data = feature(levels = 3, wavelet_type = 'haar', no_images = no_images_total ) #the object that will contain all of the data
         self.scan_data.current_image_no = 0    #initialise to the zeroth mammogram
         self.data_path = command_line_args.input_path
         self.time_process = []   #a list containing the time required to perform preprocessing
@@ -571,7 +571,7 @@ class my_thread(Process):
                         
                         
                     except Exception as e:
-                        
+                        #raise #if debugging
                         #print the error message
                         print e 
                         print('Error with current file %s' %(file_path))
@@ -764,7 +764,3 @@ class my_thread(Process):
         self.scan_data.current_image_no = 0
         #reset the timer
         self.add_timer = time.time()
-        
-        
-        
-        

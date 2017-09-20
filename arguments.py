@@ -61,6 +61,7 @@ class arguments(object):
         self.sub_challenge = 1
         self.principal_components = 0
         self.extract_features = False
+        self.kl_divergence = 0
         
         if(argv != False):
             print(argv)
@@ -110,7 +111,9 @@ class arguments(object):
        --pca = If we want to do PCA on the textural based features we find
                Should supply the number of principal components to be used
                Note will not do PCA on any metadata or density estimate features
-        --model = Path of directory where model should be saved
+       --model = Path of directory where model should be saved
+       --kl = Use Kl Divergence to specify which features to use for classification
+              should supply the number or arguments to use for classification
        -f = extract features from preprocessed data. NOTE that this is done by default
             when you specify you wan't to do preprocessing with the -p flag.
             If you have already done the preprocessing though and you want to extract 
@@ -123,7 +126,7 @@ class arguments(object):
         
         try:
             
-            opts,args = getopt.getopt(argv, "htpbvfcm:i:s:l:k:d:g:e:w:", ['sub=', 'pca=', 'model='])
+            opts,args = getopt.getopt(argv, "htpbvfcm:i:s:l:k:d:g:e:w:", ['sub=', 'pca=', 'kl=', 'model='])
             
         except getopt.GetoptError as err:
             print(str(err))
@@ -199,6 +202,9 @@ class arguments(object):
                 self.principal_components = int(arg)
                 print self.principal_components
                 
+            elif opt == '--kl':
+                self.kl_divergence = int(arg)
+                    
             elif opt == '--model':  #using -a because am running out of letters :)
                 self.model_path = str(arg)
                 print('found model path')
@@ -386,6 +392,24 @@ class arguments(object):
                 print('For more usage information, run with -h argument')
                 sys.exit(2)
                     
+                
+                
+                
+                
+        #if we have supplied both kl and pca arguments, throw an error, can only use 1 at a time
+        #should be 1 for sub challenge 1, or 2 for sub challenge 2
+        if(self.principal_components & self.kl_divergence):
+            print('ERROR')
+            print('You supplied the --pca flag and the --kl flag')
+            print('The features are used for dimensionality reduction of features before classifying')
+            print('Should be one or the other')
+            print('For more usage information, run with -h argument')
+            sys.exit(2)
+
+                
+                
+                
+                
                 
                 
                 

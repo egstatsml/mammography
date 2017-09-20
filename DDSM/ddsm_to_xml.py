@@ -98,16 +98,10 @@ def find_boundary(f, fpath):
         bottom_x = np.max(boundary_x)
         bottom_y = np.max(boundary_y)
         
-        
-        print top_x
-        print top_y
-        print bottom_x
-        print bottom_y
-
         #use this information to create the XML file needed
-
+        
         create_xml(fpath, lesion_type, top_x, top_y, bottom_x, bottom_y)
-
+        
         
         
         
@@ -118,17 +112,27 @@ def find_boundary(f, fpath):
         
 def create_xml(fpath, lesion_type, top_x, top_y, bottom_x, bottom_y):
     
+    annotation_dir = "/media/dperrin/Data/DDSM/data/Annotations"
+    im_dir = "/media/dperrin/Data/DDSM/data/Images"
     fname = os.path.basename(fpath)[0:-7] + "jpg"
     if('RIGHT' in fname):
         pose = "right"
     else:
         pose = "left"
-
+        
     #load in the file so we can get it's dimensions
-    im = Image.open(os.path.join(os.path.dirname(fpath), fname))
-    print im.size
-    height = im.size[0]
-    width = im.size[1]
+    im = Image.open(os.path.join(im_dir, fname))
+    
+    #reading the size using the indecies back the front because it is
+    #an Imgae object and not an arrow
+    #
+    #Why do they do this to me :(
+    height = im.size[1] 
+    width = im.size[0]
+
+    #make sure all the bounding boxes are within reasonable ranges
+    assert(bottom_y < height)
+    assert(bottom_x < width)
     
     
     root = ET.Element("annotation")
@@ -138,35 +142,43 @@ def create_xml(fpath, lesion_type, top_x, top_y, bottom_x, bottom_y):
     ET.SubElement(sz,"height").text = str(height) 
     ET.SubElement(sz,"width").text = str(width)
     ET.SubElement(sz,"depth").text = "1"
-
+    
     #object information (which is the lesion found)
-    obj = ET.SubElement(root, "lesion")
-    ET.SubElement(obj, "pose").text = "pose"
+    obj = ET.SubElement(root, "object")
+    ET.SubElement(obj, 'name').text = 'lesion'
     bndbox = ET.SubElement(obj, "bndbox")
     ET.SubElement(bndbox, "xmin").text = str(top_x)
-
-    #now write the XML file
-    tree = ET.ElementTree(root)
-    tree.write(fpath[0:-7] + 'xml')
+    ET.SubElement(bndbox, "ymin").text = str(top_y)
+    ET.SubElement(bndbox, "xmax").text = str(bottom_x)
+    ET.SubElement(bndbox, "ymax").text = str(bottom_y)
     
-        
-        
-
-
-
+    #now write the XML file
+    sv_path = os.path.join(annotation_dir, fname[0:-3] + 'txt')
+    tree = ET.ElementTree(root)
+    tree.write( sv_path )
+    print sv_path
+    
+    
+    
+    
+    
 if __name__ == "__main__":
     
     #for now just have an example file
-    
+    path_to_ddsm = "/media/dperrin/Data/DDSM/figment.csee.usf.edu/pub/DDSM/cases/" #../data/"
     #read in the overlay file
-
+    
     #for this test will just loop through all the files in the data folder
-    root_dir = './data/'
-    for subdirs in os.listdir(root_dir):
-        for files in os.listdir(os.path.join(root_dir, subdirs)):
-            #if overlay is in the file name, then it is an overlay file we
-            #are interested in for generating the metadata
-            if('OVERLAY' in files):
-                fpath = os.path.join(root_dir, subdirs, files)
-                f = open(fpath, 'r')
-                find_boundary(f, fpath)
+    for root, subFolders, file_names in os.walk(path_to_ddsm):
+        for file_name in file_names:
+            try:
+                #if overlay is in the file name, then it is an overlay file we
+                #are interested in for generating the metadata
+                if('OVERLAY' in file_name):
+                    fpath = os.path.join(root, file_name)
+                    f = open(fpath, 'r')
+                    find_boundary(f, fpath)
+                    
+            except:
+                #raise
+                pass

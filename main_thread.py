@@ -45,6 +45,8 @@ from read_files import spreadsheet
 from log import logger
 from arguments import arguments
 from metric import *
+from kl_divergence import *
+
 
 def flatten(x):
     "Flatten one level of nesting"
@@ -208,6 +210,28 @@ def begin_processes(command_line_args, descriptor):
         pca = PCA(n_components=command_line_args.principal_components)
         X = pca.fit_transform(X)
         
+    if(command_line_args.kl_divergence):
+        kld = kl_divergence(X[Y,:], X[Y==False,:], command_line_args.kl_divergence)
+        X = X[:,kld]
+        
+    #scaling the feature vector
+    if(command_line_args.preprocessing | command_line_args.training):
+        scale_factor = np.zeros((1,X.shape[1]))
+        for ii in range(0, X.shape[1]):
+            scale_factor[:,ii] = np.abs(np.max(X[:,ii]))
+            X[:,ii] = np.divide(X[:,ii], scale_factor[:,ii])        
+            
+        #now save the scaling factors so we can use the same ones for validation
+        np.save(command_line_args.model_path + 'scale_factor', scale_factor)
+    #if we are doing the validation, will want to use the same scaling factors we
+    #used during the initial stage
+    else:
+        scale_factor = np.load(command_line_args.model_path + 'scale_factor')
+        for ii in range(0, X.shape[1]):
+            scale_factor[:,ii] = np.abs(np.max(X[:,ii]))
+            X[:,ii] = np.divide(X[:,ii], scale_factor[:,ii])        
+            
+        
     #save this data in numpy format, and in the LIBSVM format
     print('Saving the final data')
     np.save(command_line_args.save_path + '/model_data/X', X)
@@ -218,8 +242,7 @@ def begin_processes(command_line_args, descriptor):
     np.save(command_line_args.save_path + '/model_data/bc_histories', bc_histories)
     np.save(command_line_args.save_path + '/model_data/bc_first_degree_histories', bc_first_degree_histories)
     np.save(command_line_args.save_path + '/model_data/bc_first_degree_histories_50', bc_first_degree_histories_50)
-    np.save(command_line_args.save_path + '/model_data/anti_estrogens', anti_estrogens)
-    
+    np.save(command_line_args.save_path + '/model_data/anti_estrogens', anti_estrogens)    
     dump_svmlight_file(X,Y,command_line_args.save_path + '/model_data/data_file_libsvm')
     
     
@@ -315,7 +338,7 @@ def validate_model(command_line_args, descriptor):
         
         #now lets make an libsvm compatable file         
         #so we can use libsvm
-        dump_svmlight_file(X,Y,'/scratch/data_file_libsvm')
+        dump_svmlight_file(X,Y,command_line_args.model_path + '/data_file_libsvm')
         
         
         
@@ -382,7 +405,7 @@ def validate_model(command_line_args, descriptor):
     print('Specificity = %f' %(metric_specificity(actual_breast, predicted_breast)))
     #now save this as a tsv file
     #inference.to_csv('/output/predictions.tsv', sep='\t')
-    out = open('/output/predictions.tsv', 'w')
+    out = open('./output/predictions.tsv', 'w')
     #write the headers for the predictions file
     out.write('subjectId\tlaterality\tconfidence\n')
     for row in range(0, len(actual_subject_ids)):
@@ -392,9 +415,6 @@ def validate_model(command_line_args, descriptor):
         out.write('\n')
         
     out.close()
-    
-    a = open('/output/predictions.tsv', 'r')
-    #print a.read()
     
     
     

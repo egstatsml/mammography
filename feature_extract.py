@@ -100,16 +100,16 @@ class feature(breast):
         self.benign_scans = benign_scans
         self.no_images = no_images
         self.current_image_no = -1     #this will increment as we load in every individual scan
-                
+        
         
         self._initialise_feature_lists()
         if(file_path != None):
             self.initialise(file_path)
             
-        
-        
-        
-        
+            
+            
+            
+            
     """
     initialise()
     
@@ -223,7 +223,7 @@ class feature(breast):
             
             
         #estimate the density of the breast
-        self.density.append(np.divide(np.nansum(self.data), np.nansum( self.data[np.isfinite(self.data)] > 1)))
+        self.density.append(np.divide(np.nansum(self.data[self.fibroglandular_mask]), np.nansum( self.data[np.isfinite(self.data)] > 1)))
         print self.density[-1]
         
         
@@ -259,7 +259,7 @@ class feature(breast):
         for ii in range(0, np.shape(self.indicies[level])[0]):
             for jj in range(0, np.shape(self.indicies[level])[1]):
                 
-                print('ii =  %d, jj = %d, indicies = %s' %(ii,jj,self.indicies[level][ii,jj]))
+                #print('ii =  %d, jj = %d, indicies = %s' %(ii,jj,self.indicies[level][ii,jj]))
                 
                 im = self.packets[self.indicies[level][ii,jj]].data
                 fig = plt.figure()
