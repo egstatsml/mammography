@@ -43,36 +43,54 @@ will generate something like
 
 
 
+def get_lesion_type(f):
+
+    lesion_type = None
+    for line in f:
+        #find the type of lesion here
+        if("LESION_TYPE" in line):
+            #if microcalcifications in the split, lets set the class to microcalcifications
+            if('CALCIFICATION' in line.split()[1]):
+                lesion_type = 'microcalcification'
+                print lesion_type
+            else:
+                lesion_type = 'mass'
+            break
+        
+    return lesion_type
+
+
+
+
+
+
 
 def find_boundary(f, fpath):
     
-#dictionary for the chain code
+    #dictionary for the chain code
     chain_x = {0:0,1:1,2:1,3:1,4:0,5:-1,6:-1,7:-1}
     chain_y = {0:-1,1:-1,2:0,3:1,4:1,5:1,6:0,7:-1}
     
     #read all of the lines until get to the one describing the boundary
     lesion_type = []
     line = []
-    found = False
-
+    found = 0
+    
+    lesion_type = get_lesion_type(f)
     for line in f:
-        #find the type of lesion here
-        if("LESION_TYPE" in line):
-            lesion_type = line.split()[1]
-        
         if("BOUNDARY" in line):
-            found = True
+            found += 1
             #the boundary data is on the line after where it says BOUNDARY
             #in the file, this next bit of code with the continue just
             #goes to the next line for getting the data
             continue
-        if(found):
+        if(found > 1):
             break
         
         
     #if we didn't find the boundary, then we probably shouldn't make a file for this one 
     if(not found):
-        print("No Boundary information found for this example")
+        print("No Boundary or lesion information found for this example")
         
     else:
         #convert the line into a list, then get rid of the first and last element
@@ -123,14 +141,28 @@ def create_xml(fpath, lesion_type, top_x, top_y, bottom_x, bottom_y):
     #load in the file so we can get it's dimensions
     im = Image.open(os.path.join(im_dir, fname))
     
+    
+    
+    
+    
     #reading the size using the indecies back the front because it is
     #an Imgae object and not an arrow
     #
     #Why do they do this to me :(
     height = im.size[1] 
     width = im.size[0]
-
+    
     #make sure all the bounding boxes are within reasonable ranges
+    #make sure these values are ok and not outside the dimensions of the image
+    if(top_x < 0):
+        top_x = 0
+    if(top_y < 0):
+        top_y = 0
+    if(bottom_x >= width):
+        bottom_x = width - 2
+    if(bottom_y >= height):
+        bottom_y = height - 2
+
     assert(bottom_y < height)
     assert(bottom_x < width)
     
@@ -145,7 +177,7 @@ def create_xml(fpath, lesion_type, top_x, top_y, bottom_x, bottom_y):
     
     #object information (which is the lesion found)
     obj = ET.SubElement(root, "object")
-    ET.SubElement(obj, 'name').text = 'lesion'
+    ET.SubElement(obj, 'name').text = lesion_type
     bndbox = ET.SubElement(obj, "bndbox")
     ET.SubElement(bndbox, "xmin").text = str(top_x)
     ET.SubElement(bndbox, "ymin").text = str(top_y)

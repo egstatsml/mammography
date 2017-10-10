@@ -1,0 +1,45 @@
+#!/usr/bin/python
+
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+import os
+import sys
+import numpy as np
+from scipy.ndimage.measurements import label
+import xml.etree.cElementTree as ET
+from PIL import Image
+
+
+
+
+
+
+
+
+
+
+
+
+
+    
+if __name__ == "__main__":
+    
+    root = "/media/dperrin/Data/INBreast/AllDICOMs/" #../data/"
+    
+    
+    #for this test will just loop through all the files in the data folder
+    for file_name in os.listdir(root):
+        print file_name
+        try:
+            file_path = os.path.join(root, file_name)
+            file = dicom.read_file(file_path)
+            self.data = np.fromstring(file.PixelData,dtype=np.int16).reshape((file.Rows,file.Columns))
+
+            
+            
+            
+            
+        except:
+            raise
+            pass
