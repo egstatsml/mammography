@@ -58,11 +58,17 @@ class spreadsheet(object):
         self.bc_first_degree_history_list = []
         self.bc_first_degree_history_50 = []
         self.bc_first_degree_history_50_list = []
-        
-        
+        self.rcnn_list = []
+        self.use_rcnn = 0
         self.filenames = []        #list that contains all of the filenames
         self.file_pos = 0          #the location of the current file we are looking for
         self.sub_challenge = command_line_args.sub_challenge  #save which sub challenge we are doing
+        self.region_ids = []
+        self.region_bbs = []            
+        self.region_conf = []
+        self.bbs_list = [] #the sorted bounding boxes that will be used for the queue
+        self.conf_list = []
+        
         #this is so we know whether to store metadata or not
         self.challenge_submission = command_line_args.challenge_submission
         self.validation = command_line_args.validation
@@ -70,20 +76,27 @@ class spreadsheet(object):
         #given out early in the challenge
         self.patient_subject = 'subjectId'
         
+        #if we specified that we want to use the regions found with the rcnn
+        self.use_rcnn = True if (type(command_line_args.rcnn) is str) else False
+        if(self.use_rcnn):
+            #if we are using rcnn, lets load in the regions
+            self.load_rcnn_file(command_line_args.rcnn)
+            
+            
         #load in data from the spreadsheets
         self.crosswalk = pd.read_csv(command_line_args.metadata_path + '/images_crosswalk.tsv', sep='\t')    
         self.training_path = command_line_args.input_path
         #will have access to the metadata if we are validating on the synapse servers
         #though if we are validating for ourselves we will use the validation data
-        print command_line_args.validation
-        print command_line_args.challenge_submission
+        #print command_line_args.validation
+        #print command_line_args.challenge_submission
         if( not(command_line_args.validation & command_line_args.challenge_submission & (command_line_args.sub_challenge == 1)) ):
             print('am getting the metadata')
             self.metadata = pd.read_csv(command_line_args.metadata_path + '/exams_metadata.tsv', sep='\t')
             print(self.metadata.columns.values)
             
         #just printing the database headers to make sure they are correct
-        print(self.crosswalk.columns.values)        
+        #print(self.crosswalk.columns.values)        
         
         #lets load in the files
         #
@@ -97,7 +110,7 @@ class spreadsheet(object):
         #performance metrics) we will load the cancer status.
         
         self.get_all_scans(command_line_args.input_path)
-            
+        
         #now lets set the number of scans we have available
         self.no_scans = len(self.filenames)
         
@@ -119,20 +132,32 @@ class spreadsheet(object):
     def get_all_scans(self,directory):
         
         #now lets load in all of the filenames
-        for (data_dir, dirnames, filenames) in os.walk(directory):
-            self.filenames.extend(filenames)
-            break   
+        #for (data_dir, dirnames, filenames) in os.walk(directory):
+        #    self.filenames.extend(filenames)
+        #    break   
         
+        for scan in os.listdir(directory):
+            if(scan.endswith('.npy') | scan.endswith('.dcm')):
+               self.filenames.append(scan)
+               
         #if we are getting all of the features, such as when preprocessing, training and
         #sub challenge 2 
         #if we aren't all of the values added to these metadata features will just be zero
         #now will add the cancer status of these files
         for ii in range(0, len(self.filenames)):
-            self.next_scan()
+            cur_file = self.next_scan()
+            #self.mass_regions.append(self.get_mass_region(filename))
             self.cancer_list.append(self.cancer)
             self.laterality_list.append(self.laterality)
             self.exam_list.append(self.exam)
             self.subject_id_list.append(self.subject_id)
+            #add the regions
+            #if we arent actually going to use the regions during testing, (ie. use_rcnn == False)
+            #will just set all entries to -1
+            bb, conf = self.get_region_scan(os.path.basename(cur_file))
+            self.bbs_list.append(bb)
+            self.conf_list.append(conf)
+            #print self.regions[-1]
             
             #add the medata features, though these will only be used
             #if we have specified we are doing sub challenge 2
@@ -194,6 +219,7 @@ class spreadsheet(object):
         
         #will get rid of any file extentsion suffixies
         #will be either .npy or .dcm, wither way both are 4 chars long
+        #print filename
         filename = filename[0:-4]
         list_all_files = list(self.crosswalk['filename'])
         file_loc = []
@@ -203,6 +229,8 @@ class spreadsheet(object):
             
         crosswalk_data = self.crosswalk.loc[file_loc,:]
         #get the view and exam index of this scan
+        #print crosswalk_data
+        #print crosswalk_data.columns.get_loc('laterality')
         self.laterality = crosswalk_data.iloc[0, crosswalk_data.columns.get_loc('laterality')]
         self.subject_id = crosswalk_data.iloc[0, crosswalk_data.columns.get_loc(str(self.patient_subject))]
         #if we are validating on synapse servers, the exam index is not available, so just set
@@ -260,7 +288,7 @@ class spreadsheet(object):
             
         elif(str(crosswalk_data.iloc[0,crosswalk_data.columns.get_loc('laterality')]) == 'R') & (str(scan_metadata.iloc[0,scan_metadata.columns.get_loc('cancerR')]) == '1'):
             self.cancer = True
-            print('cancer right')
+            #print('cancer right')
         else:
             self.cancer = False
             
@@ -376,6 +404,133 @@ class spreadsheet(object):
     
     
     
+    def load_rcnn_file(self, rcnn_dir):
+        #check if the rcnn files are there
+        microcalcifications = os.path.join(rcnn_dir, 'microcalcifications.out')
+        masses = os.path.join(rcnn_dir, 'masses.out')
+        if(not os.path.isfile(microcalcifications)) | (not os.path.isfile(masses)):
+            print('ERROR: You specified that you wanted to use RCNN generated regions, \
+            but the file dont exist :( ')
+            print('Files should be stored like %s' %masses)
+            sys.exit()
+            
+        #if the files are there, lets get busy reading them
+        else:
+            mass_lines = []
+            micro_lines = []
+            with open(masses, 'r') as mf:
+                mass_lines = mf.readlines()
+            mf.close()
+            with open(microcalcifications, 'r') as mf:
+                micro_lines = mf.readlines()        
+            mf.close()
+            
+            #concatenate the two lists 
+            lines = mass_lines + micro_lines
+            #only want to have one region for each mass
+            ids, bb, conf = self.rcnn_separate(lines)
+            self.region_ids = ids
+            self.region_bbs = bb            
+            self.region_conf = conf
+            
+            
+            
+    """
+    rcnn_separate()
+    
+    Description:
+    Will seperate the lines from an RCNN detection file
+    
+    @param lines = list of strings, where each element is a line from the RCNN detection file
+    @retval lists containing the separated ids, bounding boxes and confidence values
+    
+    """
+            
+            
+    def rcnn_separate(self, lines):
+        splitlines = [x.strip().split(' ') for x in lines]
+        image_ids = [x[0] for x in splitlines]
+        confidence = np.array([float(x[1]) for x in splitlines])
+        BB = np.array([[float(z) for z in x[2:]] for x in splitlines]).astype(np.int)
+        ids_sorted = []
+        bbs_sorted = []
+        conf_sorted = []
+        
+        for im in set(image_ids):
+            #find locations of this image in our  list
+            cur_im = self.list_compare(image_ids, im)
+            ids_sorted.append(im)
+            bbs_sorted.append(BB[cur_im])
+            conf_sorted.append(confidence[cur_im])
+            
+            #print len(BB[cur_im])
+            #print BB[cur_im]
+            #print len(confidence[cur_im])
+            #print confidence[cur_im]
+            
+        return ids_sorted, bbs_sorted, conf_sorted
+    
+    
+    
+    
+    
+    
+    """
+    get_region_scan():
+    
+    Description:
+    gets all of the regions found for this SPECIFIC scan (both microcalcifications and masses)
+    It is likely that there is a few regions found in each scan, and all of these 
+    regions will be added to the list. We will also save the psuedo confidence value for each 
+    region. We will use this psuedo confidence value and the location of the region to determine
+    if the region is suitable (ie. using location to see if wer found the breast or not)
+    
+    Regions will be returned as a list of lists.
+    
+    @param subject_id = the filename of this scan
+    @retval the regions for this specific scan
+    
+    """    
+    
+    def get_region_scan(self, subject_id):
+        if(not self.use_rcnn):
+            return [np.array(-1)]
+        
+        bbs = []
+        conf = []
+        if(subject_id.endswith('.dcm')) | (subject_id.endswith('.npy')):
+            subject_id = subject_id[0:-4]
+            
+        ind = self.list_compare(self.region_ids, subject_id)
+        if(np.sum(ind) > 0):
+            bbs.append(self.region_bbs[np.where(ind)[0][0]].astype(np.int))
+            conf.append(self.region_conf[np.where(ind)[0][0]])
+        #if we didnt find anything, lets set it to zero
+        if(len(bbs) == 0):
+            #return a list of zero
+            bbs.append(np.array([-1] * 4))
+            conf.append([-1])
+        #return the regions for this scan
+        return bbs, (conf)
+    
+    
+    
+    """
+    list_compare()
+        
+    Description:
+    Helper function to do element wise comparison on lists
+    
+    """
+    
+    def list_compare(self, lst, value):
+        boolean = []
+        for ii in range(len(lst)):
+            boolean.append(lst[ii] == value)
+            
+        return np.array(boolean)
+    
+    
     
     #####################################################################
     # Functions that were used by the gui for ENB345
@@ -414,7 +569,7 @@ class spreadsheet(object):
         
         
         
-              
+        
         
     
     """

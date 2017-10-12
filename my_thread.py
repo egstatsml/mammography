@@ -80,6 +80,8 @@ class shared(object):
     q_bc_first_degree_history = Queue(750000)
     q_bc_first_degree_history_50 = Queue(750000)
     q_anti_estrogen = Queue(750000)
+    q_bbs = Queue(750000)
+    q_conf = Queue(750000)
     
     t_lock = Lock()
     exit_flag = False
@@ -96,6 +98,8 @@ class shared(object):
     bc_first_degree_array = []
     bc_first_degree_50_array = []
     anti_estrogen_array = []
+    skipped_ids = []
+    skipped_cancer_status = []
     save_timer = time.time()
     save_time = 3600      #save once an hour or every 3600 seconds
     
@@ -134,7 +138,13 @@ class shared(object):
         
     def q_anti_estrogen_get(self):
         return self.q_anti_estrogen.get()
-        
+    
+    def q_bbs_get(self):
+        return self.q_bbs.get()
+    
+    def q_conf_get(self):
+        return self.q_conf.get()
+    
     def q_put(self, arg):
         self.q.put(arg)
         
@@ -161,6 +171,12 @@ class shared(object):
         
     def q_anti_estrogen_put(self, arg):
         self.q_anti_estrogen.put(arg)
+        
+    def q_bbs_put(self, arg):
+        self.q_bbs.put(arg)
+        
+    def q_conf_put(self, arg):
+        self.q_conf.put(arg)
         
     def q_empty(self):
         return self.q.empty()
@@ -255,8 +271,11 @@ class shared(object):
     def get_anti_estrogen_array(self):
         return self.anti_estrogen_array
     
+    def get_skipped_ids(self):
+        return self.skipped_ids
     
-    
+    def get_skipped_cancer_status(self):
+        return self.skipped_cancer_status   
     
     
     
@@ -373,6 +392,24 @@ class shared(object):
         self.t_lock_release()
         
         
+        
+    #these are files we either had an error with, or we are using
+    #regions found from the RCNN and none of them were good
+    def add_skipped_files(self, skipped_ids, skipped_cancer_status):
+        self.t_lock_acquire()
+        if(len(self.skipped_ids) < 0):
+            self.skipped_ids = skipped_ids
+            self.skipped_cancer_status = skipped_cancer_status
+        else:
+            self.skipped_ids.extend(skipped_ids)
+            self.skipped_cancer_status.extend(skipped_cancer_status)
+            
+        self.t_lock_release()
+        
+        
+        
+        
+        
 class my_manager(BaseManager):
     pass
 
@@ -421,6 +458,11 @@ class my_thread(Process):
         self.validation = command_line_args.validation
         self.save_path = command_line_args.save_path
         self.challenge_submission = command_line_args.challenge_submission
+        
+        self.skipped_ids = []
+        self.skipped_cancer_status = []
+        
+        
         #some variables that are used to time the system for adding files to the shared manager
         self.add_timer = time.time()
         #add features every 13 minutes
@@ -502,7 +544,8 @@ class my_thread(Process):
                 self.bc_first_degree_histories.append(self.manager.q_bc_first_degree_history_get())
                 self.bc_first_degree_histories_50.append(self.manager.q_bc_first_degree_history_50_get())
                 self.anti_estrogens.append(self.manager.q_anti_estrogen_get())
-                
+                bbs = (self.manager.q_bbs_get())
+                conf = (self.manager.q_conf_get())                
                 #if this scan is cancerous
                 if(self.cancer_status[-1]):
                     self.manager.inc_cancer_count()
@@ -530,13 +573,13 @@ class my_thread(Process):
                 #if the queue is now empty, we should wrap up and
                 #get ready to exit
                 if(self.manager.q_empty()):
-                    print(' Queue is Empty')
+                    print('Queue is Empty')
                     self.manager.set_exit_status(True)                
                     
                     
                 #this is just here whilst debugging to shorten the script
                 #################
-                #if(self.manager.get_benign_count() > 10):
+                #if(self.manager.get_benign_count() > 80):
                 #    print('benign Count is greater than 10 so lets exit')
                 #    self.manager.set_exit_status(True)                
                     
@@ -555,12 +598,26 @@ class my_thread(Process):
                         #begin preprocessing steps
                         if(self.preprocessing):
                             self.scan_data.preprocessing()
-                            if(not self.challenge_submission) & (not self.validation):
+                            if(not self.challenge_submission):# & (not self.validation):
                                 self.save_preprocessed()
+                           
+                        #if confidence is equal to zero, we are using the regions
+                        #found with the rcnn, we just didnt find any for this image   
+                        print bbs
+                        print conf
+                        if(conf[0][0] != -1):
+                            print 'Found Region'
+                            valid = self.scan_data.get_features(bbs, conf)
                             
-                        self.scan_data.get_features()
-                        
-                        #now that we have the features, we want to append them to the list of features
+                        if(conf[0][0] == -1) | (not valid):
+                            print('no good region for this image')
+                            self.skipped_ids.append(self.subject_ids[-1])
+                            self.skipped_cancer_status.append(self.cancer_status[-1])
+                            self.remove_most_recent_metadata_entries()
+                            continue
+                           
+                        #now that we have the features, we want to append them to
+                        #the list of features
                         #The list of features is shared amongst all of the class instances, so
                         #before we add anything to there, we should lock other threads from adding
                         #to it
@@ -571,7 +628,7 @@ class my_thread(Process):
                         
                         
                     except Exception as e:
-                        #raise #if debugging
+                        raise #if debugging
                         #print the error message
                         print e 
                         print('Error with current file %s' %(file_path))
@@ -669,15 +726,21 @@ class my_thread(Process):
     def save_preprocessed(self):
         
         file_path = self.save_path +  self.scan_data.file_path[-10:-4]
+        boundary_path = os.path.join(self.save_path, 'boundaries',  self.scan_data.file_path[-10:-4])
+        boundary = np.zeros((2,len(self.scan_data.boundary)))
+        boundary[0,:] = np.array(self.scan_data.boundary)
+        boundary[1,:] = np.array(self.scan_data.boundary_y)
         print(file_path)
         #copy the scan data
         temp = np.copy(self.scan_data.data)
         #set all Nan's to -1
         temp[np.isnan(temp)] = -1
         temp = temp.astype(np.int16)
-        
         #now save the data
         np.save(file_path, temp)
+        np.save(boundary_path, boundary)        
+        
+        
         
         
     """
@@ -750,6 +813,7 @@ class my_thread(Process):
             #X[t_ii].append(self.scan_data.density[t_ii])
             #set the cancer statues for this scan            
             Y.append(self.cancer_status[t_ii])    
+        self.manager.add_skipped_files(self.skipped_ids, self.skipped_cancer_status)
         #now add the features from this list to to conplete list in the manager
         self.manager.add_features(X, Y, self.lateralities, self.exam_nos, self.subject_ids, self.bc_histories, self.bc_first_degree_histories, self.bc_first_degree_histories_50, self.anti_estrogens)
         #reinitialise the feature list in the scan_data member
@@ -761,6 +825,6 @@ class my_thread(Process):
         self.exam_nos = []
         
         #set the number of scans processed back to zero
-        self.scan_data.current_image_no = 0
+        self.scan_data.current_image_no = 0                
         #reset the timer
         self.add_timer = time.time()

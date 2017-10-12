@@ -101,7 +101,6 @@ class feature(breast):
         self.no_images = no_images
         self.current_image_no = -1     #this will increment as we load in every individual scan
         
-        
         self._initialise_feature_lists()
         if(file_path != None):
             self.initialise(file_path)
@@ -180,54 +179,144 @@ class feature(breast):
     
     """
     
-    def get_features(self, level = 'all'):
-        
-        #perform the wavelet decomposition
-        a = np.copy(self.data)
-        
+    
+    
+    def get_features(self, bbs = [-1], conf = [0],  level = 'all'):
+        #Initially assume the data is valid
+        #will only be set to false if we are using regions and there arent any good ones
+        valid = True
+        #copy the data across now
+        scan = np.copy(self.data)        
         #if(self.fibroglandular_mask != []):
-        #    a[self.fibroglandular_mask == False ] = np.nan        
+        #    scan[self.fibroglandular_mask == False ] = np.nan        
             
             
         #if there has been a problem with the preprocessed data,
         #extract features from the original scan
-        if(np.nansum(a) < 1000):
-            a = np.copy(self.original_scan)
+        if(np.nansum(scan) < 1000):
+            scan = np.copy(self.original_scan)
             
         #turn everything thats nan to zero
-        a[np.isnan(a)] = 0.0
-        self.packets = pywt.WaveletPacket2D(data=a, wavelet=self.wavelet_type, mode='sym')
+        scan[np.isnan(scan)] = 0.0
+        #see if we are using the regions found
         
-        #check that the number of levels isnt to high
-        #if it is, lets print something to let them know
-        if(self.levels > self.packets.maxlevel):
-            print('number of levels given is too large')
-            print('Maximum level of %d, level decomp given is %d' %(self.packets.maxlevel, self.levels))
-            print('Set to max level and will continue')
-            self.levels = self.packets.maxlevel
-            #will have to reinitialise the feature lists
-            self._initialise_feature_lists()
+        #sorting out the bounding boxes
+        #they come to us as a single element numpy array of 2-D lists
+        #this is confusing, but it allows us to get all of the bounding boxes for this
+        #scan in one pop statement from the queue
+        #so the format is like
+        #   bbs = np.array([[xmin, ymin, xmax, ymax], ... , [xmin, ymin, xmax, ymax]])
+        #to make the code neater now, am going to get rid of the numpy array layer
+        #so it is bbs = 2d list
+        bbs = bbs[0]
+        #similar deal for the confidence values, is np array of 1d lists though
+        conf = conf[0]
+        
+        #if the first element of bbs is set to -1, it means we aren't 
+        if(bbs[0][0] != -1):
             
-        #now lets put the indicies for each level in a nice format that is pleseant to index
-        #indicies will be a list of numpy arrays for each level
-        self.find_indicies()
-        
-        if(level == 'all'):
-            for ii in range(0, self.levels):
-                self._get_features_level(ii)
+            #if the confidence values are equal to minus one, then we are using region extraction,
+            #we just didnt find any suspicious regions for this image
+            if(conf[0] == -1):
+                print('Didnt find any regions for %s' %self.file_path)                
+                #dont extract features from any region as none was found
+                pass
+            else:
                 
-        #else will just get the features of a single level
-        #not sure why would want to do this, but might be handy?
+                #lets crop the image so we only find features from this region
+                best_bb = self.find_best_bb(bbs, conf)
+                #if we did actually find a suitable bounding box
+                if(best_bb[0] != -1):
+                    scan = scan[best_bb[1]:best_bb[3], best_bb[0]:best_bb[2]]
+                else:
+                    #set the valid flag to false
+                    valid = False
+                
+        if(bbs[0][0] != -1) & (valid):
+            self.packets = pywt.WaveletPacket2D(data=scan, wavelet=self.wavelet_type, mode='sym')
+            
+            #check that the number of levels isnt to high
+            #if it is, lets print something to let them know
+            if(self.levels > self.packets.maxlevel):
+                print('number of levels given is too large')
+                print('Maximum level of %d, level decomp given is %d' %(self.packets.maxlevel, self.levels))
+                print('Set to max level and will continue')
+                self.levels = self.packets.maxlevel
+                #will have to reinitialise the feature lists
+                self._initialise_feature_lists()
+                
+            #now lets put the indicies for each level in a nice format that is pleseant to index
+            #indicies will be a list of numpy arrays for each level
+            self.find_indicies()
+            
+            if(level == 'all'):
+                for ii in range(0, self.levels):
+                    self._get_features_level(ii)
+                    
+            #else will just get the features of a single level
+            #not sure why would want to do this, but might be handy?
+            else:
+                self._get_features_level(level)
+                
+                
+            #estimate the density of the breast
+            self.density.append(np.divide(np.nansum(self.data[self.fibroglandular_mask]), np.nansum( self.data[np.isfinite(self.data)] > 1)))
+            print self.density[-1]
+            
+        #return the boolean that said whether the scan was valid or not
+        return valid
+    
+    
+    """
+    find_best_bb():
+    
+    Description:
+    In finding the best region, will just make sure that we arent including any unnesecary artifacts
+    such as the nipple. To exclude the nipple and other artifacts near the edge of the breast,
+    will compare the found regions with that of the breast boundary
+    
+    If preprocessing wasnt done in this step, will load the boundary data from file
+    """
+        
+            
+        
+    def find_best_bb(self, bbs, conf):
+        
+        good_bbs = []
+        good_conf = []
+        
+        if(len(self.boundary) < 1):
+            boundary_path = os.path.join(os.path.dirname(self.file_path), 'boundaries',
+                                         os.path.basename(self.file_path))
+            boundary_full = np.load(boundary_path)
+            boundary = boundary_full[0,:]
+            boundary_y = boundary_full[1,:]            
+        #otherwise need to convert the list to an array
         else:
-            self._get_features_level(level)
+            boundary = np.array(self.boundary)
+            boundary_y = np.array(self.boundary_y)
             
+        #now lets loop over all of the bounding boxes
+        #will check if the bounding box covers the boundary by seeing if the x value
+        #of the boundary and the y value of the boundary appear in the same location
+        
+        for ii in range(0, len(bbs)):
+            x = (boundary > bbs[ii][0]) &  (boundary < bbs[ii][2])
+            y = (boundary_y > bbs[ii][1]) &  (boundary_y < bbs[ii][3])
             
-        #estimate the density of the breast
-        self.density.append(np.divide(np.nansum(self.data[self.fibroglandular_mask]), np.nansum( self.data[np.isfinite(self.data)] > 1)))
-        print self.density[-1]
+            on_boundary = np.sum(x & y)
+            if not on_boundary:
+                good_bbs.append(bbs[ii])
+                good_conf.append(conf[ii])
+                
+                
+        if(len(good_conf) == 0):
+            return [np.array(-1)]
         
-        
-        
+        else:
+            #now lets find the bounding box with the highest confidence
+            best = np.where(np.array(good_conf) == np.max(good_conf))[0][0]
+            return good_bbs[best]
         
         
     """
@@ -479,4 +568,22 @@ class feature(breast):
         self.wave_dissimilarity = [[0 for j in xrange(self.levels)] for i in xrange(self.no_images)]
         self.wave_correlation = [[0 for j in xrange(self.levels)] for i in xrange(self.no_images)]
         self.wave_entropy = [[0 for j in xrange(self.levels)] for i in xrange(self.no_images)]
-
+        
+        
+        
+        
+        
+        
+    def plot_rcnn(self, bboxx):
+        bbox = dets[i, :4]
+        score = dets[i, -1]
+        plt.cla()
+        plt.imshow(im)
+        plt.gca().add_patch(
+            plt.Rectangle((bbox[0], bbox[1]),
+                          bbox[2] - bbox[0],
+                          bbox[3] - bbox[1], fill=False,
+                          edgecolor='r', linewidth=2))
+        plt.title('{}{:.3f}'.format(class_name, score))
+        plt.savefig('./vis/%s.png' %os.path.basename(self.file_path))
+        

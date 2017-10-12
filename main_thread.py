@@ -32,6 +32,7 @@ from skimage.util import img_as_ubyte
 from skimage.feature import corner_harris, corner_subpix, corner_peaks
 from scipy import ndimage as ndi
 import subprocess
+import pickle
 
 from itertools import chain
 import timeit
@@ -54,7 +55,7 @@ def flatten(x):
 
 
 def create_classifier_arrays(shared):
-        
+    
     #convert the list of features and class discriptors into arrays
     print shared.get_laterality_array()
     X = np.array(shared.get_feature_array())
@@ -70,6 +71,13 @@ def create_classifier_arrays(shared):
     return X, Y, lateralities, exams, subject_ids, bc_histories, bc_first_degree_histories, bc_first_degree_histories_50, anti_estrogens
 
 
+
+def my_pickle_save(data, filename):
+    with open(filename, 'wb') as f:
+        pickle.dump(data,f)
+    f.close()
+    
+    
 
 
 
@@ -136,7 +144,7 @@ def begin_processes(command_line_args, descriptor):
     #initialise list of threads
     threads = []
     id = 0
-    num_threads = cpu_count() - 2
+    num_threads = cpu_count() - 3
     print("Number of processes to be initiated = %d" %num_threads )
     
     man = my_manager()
@@ -159,6 +167,8 @@ def begin_processes(command_line_args, descriptor):
         shared.q_bc_first_degree_history_put(descriptor.bc_first_degree_history_list[ii])
         shared.q_bc_first_degree_history_50_put(descriptor.bc_first_degree_history_50_list[ii])        
         shared.q_anti_estrogen_put(descriptor.anti_estrogen_list[ii])
+        shared.q_bbs_put(descriptor.bbs_list[ii])
+        shared.q_conf_put(descriptor.conf_list[ii])
         
     print('Set up Queues')
     
@@ -211,9 +221,17 @@ def begin_processes(command_line_args, descriptor):
         X = pca.fit_transform(X)
         
     if(command_line_args.kl_divergence):
-        kld = kl_divergence(X[Y,:], X[Y==False,:], command_line_args.kl_divergence)
-        X = X[:,kld]
-        
+        #if we are training, lets find the indicies with that we are using
+        if(not command_line_args.validation):
+            kld = kl_divergence(X[Y,:], X[Y==False,:], command_line_args.kl_divergence)
+            X = X[:,kld]
+            #save the kld features
+            np.save(command_line_args.model_path + 'kld', kld)
+        #if we are validating, select the same feature indecies we used whilst training
+        else:
+            kld = np.load(command_line_args.model_path + 'kld.npy')
+            X = X[:,kld]
+            
     #scaling the feature vector
     if(command_line_args.preprocessing | command_line_args.training):
         scale_factor = np.zeros((1,X.shape[1]))
@@ -226,13 +244,15 @@ def begin_processes(command_line_args, descriptor):
     #if we are doing the validation, will want to use the same scaling factors we
     #used during the initial stage
     else:
-        scale_factor = np.load(command_line_args.model_path + 'scale_factor')
+        scale_factor = np.load(command_line_args.model_path + 'scale_factor.npy')
         for ii in range(0, X.shape[1]):
             scale_factor[:,ii] = np.abs(np.max(X[:,ii]))
             X[:,ii] = np.divide(X[:,ii], scale_factor[:,ii])        
             
         
     #save this data in numpy format, and in the LIBSVM format
+    print kld
+    print X.shape
     print('Saving the final data')
     np.save(command_line_args.save_path + '/model_data/X', X)
     np.save(command_line_args.save_path + '/model_data/Y', Y)
@@ -245,6 +265,10 @@ def begin_processes(command_line_args, descriptor):
     np.save(command_line_args.save_path + '/model_data/anti_estrogens', anti_estrogens)    
     dump_svmlight_file(X,Y,command_line_args.save_path + '/model_data/data_file_libsvm')
     
+    
+    #save the files that we skipped
+    my_pickle_save(shared.get_skipped_ids(), command_line_args.save_path + '/model_data/skipped_ids')
+    my_pickle_save(shared.get_skipped_cancer_status(), command_line_args.save_path + '/model_data/skipped_cancer_status')    
     
     
     
@@ -311,7 +335,7 @@ def train_model(command_line_args, descriptor):
         #now lets make an libsvm compatable file         
         dump_svmlight_file(X,Y,command_line_args.model_path + '/data_file_libsvm')
         
-    #now features are extracted, lets classify using this bad boy
+    #now features are extracted, lets train using this bad boy
     terminal_cmd(command_line_args.train_string)
     
     
@@ -342,7 +366,7 @@ def validate_model(command_line_args, descriptor):
         
         
         
-       
+        
         
     #run validation
     terminal_cmd(command_line_args.validation_string)
@@ -403,6 +427,7 @@ def validate_model(command_line_args, descriptor):
     print('Accuracy = %f' %(metric_accuracy(actual, predicted))) 
     print('Sensitivity = %f' %(metric_sensitivity(actual_breast, predicted_breast)))
     print('Specificity = %f' %(metric_specificity(actual_breast, predicted_breast)))
+    metric_plot_roc(actual, predicted)
     #now save this as a tsv file
     #inference.to_csv('/output/predictions.tsv', sep='\t')
     out = open('./output/predictions.tsv', 'w')

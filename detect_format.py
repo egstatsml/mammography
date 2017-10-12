@@ -15,7 +15,7 @@ import xml.etree.cElementTree as ET
 def create_xml(fname, im, train_test):
     
     #train test will be a string saying pilot or val
-    annotation_dir = "/media/dperrin/Data/DDSM/data/" + train_test + "_annotations"
+    annotation_dir = "/media/dperrin/Data/DDSM/data/" + train_test + "/Annotations"
     im_dir = "/media/dperrin/pilot_images"
     fname = os.path.basename(fname)[0:-3] + "jpg"
     if('RIGHT' in fname):
@@ -47,6 +47,13 @@ def create_xml(fname, im, train_test):
     ET.SubElement(sz,"width").text = str(width)
     ET.SubElement(sz,"depth").text = "1"
     
+    #dont actually know the type of lesions we have in our dataset
+    #lets just randomly assign it why not :)
+    if(np.random.randint(0,1)):
+        lesion_type = 'mass'
+    else:
+        lesion_type = 'microcalcification'
+        
     #object information (which is the lesion found)
     obj = ET.SubElement(root, "object")
     ET.SubElement(obj, 'name').text = 'lesion'
@@ -81,7 +88,7 @@ if __name__ == "__main__":
     train_test = "val"
     
     in_path = "/media/dperrin/" + train_test + "_images"
-    out_path = "/media/dperrin/Data/DDSM/data/val_images"
+    out_path = "/media/dperrin/Data/DDSM/data/" + train_test + "_images"
     
     for filenames in os.listdir(in_path):
         print filenames
@@ -98,5 +105,5 @@ if __name__ == "__main__":
         
         print filenames[0:-4]
         #now want to save it
-        im_jpg.save(os.path.join(out_path, filenames[0:-3]+'jpg'))
+        #im_jpg.save(os.path.join(out_path, filenames[0:-3]+'jpg'))
         

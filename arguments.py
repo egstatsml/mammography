@@ -51,7 +51,8 @@ class arguments(object):
         self.kernel = 1
         self.degree = 3
         self.gamma = 0
-        self.weight = 40
+        self.cost = 1.0
+        self.weight = 1
         self.epsilon = 0.1
         self.probability = False
         self.weight = {'0':1,'1':1}
@@ -62,6 +63,9 @@ class arguments(object):
         self.principal_components = 0
         self.extract_features = False
         self.kl_divergence = 0
+        self.rcnn = 0
+        
+        
         
         if(argv != False):
             print(argv)
@@ -98,13 +102,14 @@ class arguments(object):
           
            NOTE: Default used here is polynomial, whilst default in LIBSVM is RBF. Have had
            troubles with RBF, so should avoid using it at the moment.
-         
        -d = Degree of kernel. Only valid for polynomial and Sigmoid kernels (Default of 3)
        -g = Gamma. (Default of 1/n_features)
        -e = Epsilon. Tolerance for termination. (Default of 0.001)
        -b = Probability estimates (Default of False)
        -w = Weight for each class. usage here should be a dictionary like reference for each class
        -c = Challenge Submission
+       --cost = cost value for training svm
+       --rcnn = whether we are using detections the rcnn implementation
        --sub = Sub challenge we are running for
              1 = Sub Challenge 1 - Don't use any metadata as features for classification
              2 = Sub challenge 2 - Use metadata for classification
@@ -119,14 +124,13 @@ class arguments(object):
             If you have already done the preprocessing though and you want to extract 
             features again, you should use this flag, but you shouldn't use this flag in
             conjunction with the preprocessing flag
-    
     """
     
     def parse_command_line(self, argv):
         
         try:
             
-            opts,args = getopt.getopt(argv, "htpbvfcm:i:s:l:k:d:g:e:w:", ['sub=', 'pca=', 'kl=', 'model='])
+            opts,args = getopt.getopt(argv, "htpbvfcm:i:s:l:k:d:g:e:w:", ['rcnn=', 'sub=', 'pca=', 'kl=', 'model=', 'cost='])
             
         except getopt.GetoptError as err:
             print(str(err))
@@ -195,6 +199,9 @@ class arguments(object):
             elif opt == '-c':
                 self.challenge_submission = True            
                 
+            elif opt == '--rcnn':
+                self.rcnn = str(arg)
+                
             elif opt == '--sub':
                 self.sub_challenge = int(arg)
                 
@@ -205,7 +212,10 @@ class arguments(object):
             elif opt == '--kl':
                 self.kl_divergence = int(arg)
                     
-            elif opt == '--model':  #using -a because am running out of letters :)
+            elif opt == '--cost':
+                self.cost = float(arg)
+                
+            elif opt == '--model': 
                 self.model_path = str(arg)
                 print('found model path')
                 print(self.model_path)
@@ -225,7 +235,7 @@ class arguments(object):
                     print self.weight.keys()
                     print init_dict.keys()
                     for jj in self.weight.keys():
-                        self.weight[jj] = init_dict[int(jj)]
+                        self.weight[jj] = init_dict[float(jj)]
                                                 
                 except Exception as e:
                     print('There was an error with your weight inputs.')
@@ -255,7 +265,7 @@ class arguments(object):
             print train_file_path
             
             
-            self.train_string ='./CUDA/svm-train-gpu -c 1 -t %s -d %s -m 8000 -e %s %s %s/model_data/data_file_libsvm %s/model_file' %(self.kernel, self.degree, self.epsilon, weight_string, train_file_path, self.model_path)
+            self.train_string ='./CUDA/svm-train-gpu -c %f -t %s -d %s -m 8000 -e %s %s %s/model_data/data_file_libsvm %s/model_file' %(self.cost, self.kernel, self.degree, self.epsilon, weight_string, train_file_path, self.model_path)
             
             
             print self.train_string

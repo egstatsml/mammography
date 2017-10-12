@@ -88,6 +88,7 @@ class breast(object):
         self.threshold = 0                #threshold for segmenting fibroglandular disk
         self.file_path = []
         self.plot = False                  #boolean for plotting figures when debugging
+        self.file_path = file_path
         if(file_path != None):
             self.initialise(file_path)
             
@@ -871,7 +872,6 @@ class breast(object):
         curvature = self.hamming_lpf(curvature)
         
         t = np.arange(np.size(curvature))
-        print('curve')
         curv_x, curv_y = self.stationary_points(curvature)
         
         #use this to find the location of excess skin
@@ -1094,8 +1094,7 @@ class breast(object):
         breast_pixels[boundary_blur == True] = np.nan
         #pass this to the cross entropy threshold function to find the optimal
         #threshold that minimises cross entropy
-        #threshold value is saved in the self.threshold member variableB
-        print('found threshold')
+        #threshold value is saved in the self.threshold member variable
         self.cross_entropy_threshold(breast_pixels)
         
         
