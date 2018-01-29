@@ -50,7 +50,11 @@ class arguments(object):
         self.validation = False
         self.kernel = 1
         self.degree = 3
+<<<<<<< HEAD
         self.gamma = 0.1
+=======
+        self.gamma = 0
+>>>>>>> ecd0c1c7f7b7cc6473508b1fb8ada170a7a9eb63
         self.cost = 1.0
         self.weight = 1
         self.epsilon = 0.1
@@ -64,8 +68,12 @@ class arguments(object):
         self.extract_features = False
         self.kl_divergence = 0
         self.rcnn = 0
+<<<<<<< HEAD
         self.train_scale_string = []
         self.validation_scale_string = []
+=======
+        
+>>>>>>> ecd0c1c7f7b7cc6473508b1fb8ada170a7a9eb63
         
         
         if(argv != False):
@@ -266,8 +274,12 @@ class arguments(object):
             print train_file_path
             
             
+<<<<<<< HEAD
             self.train_string ='./CUDA/svm-train-gpu -c %f -g %2.16f -t %s -d %s -m 8000 -e %s %s '%(self.cost, self.gamma, self.kernel, self.degree, self.epsilon, weight_string) + os.path.join(train_file_path, 'model_data/data_file_libsvm') + ' ' + os.path.join(self.model_path, 'model_file')
             print self.train_string
+=======
+            self.train_string ='./CUDA/svm-train-gpu -c %f -t %s -d %s -m 8000 -e %s %s %s/model_data/data_file_libsvm %s/model_file' %(self.cost, self.kernel, self.degree, self.epsilon, weight_string, train_file_path, self.model_path)
+>>>>>>> ecd0c1c7f7b7cc6473508b1fb8ada170a7a9eb63
             
             self.train_scale_string = ('./LIBSVM/svm-scale -l -1 -u 1 -s range1 %s > %s' %(os.path.join(train_file_path, 'model_data/data_file_libsvm'), os.path.join(train_file_path, 'model_data/data_file_libsvm.scale')))  
             
