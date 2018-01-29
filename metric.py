@@ -120,17 +120,30 @@ http://scikit-learn.org/stable/auto_examples/model_selection/plot_roc.html
 
 """
 def metric_plot_roc(true, predicted_score):
-    
+    true = true.astype(np.float)
     fpr = dict()
     tpr = dict()
     roc_auc = dict()
-    
-    fpr, fnr = roc_curve(true, predicted_score)
-    roc_auc = auc(fpr,tpr)
+    for ii in range(0,1):
+        print 'here'
+        #print ind
+        #print true[ind]
+        #print predicted_score[ind]
+        
+        #fpr[ii], tpr[ii], t = roc_curve((true[ind].astype(np.int)), predicted_score[ind])
+        #print fpr[0]
+        #print tpr[0]
+        #roc_auc[ii] = auc(fpr[ii],tpr[ii])
+        
+    fpr[0], tpr[0], t = roc_curve((true.astype(np.int)), predicted_score, pos_label=1.0, drop_intermediate=False)
+    print t
+    roc_auc[0] = auc(fpr[0],tpr[0])
+    print fpr[0]
+    print tpr
     plt.figure()
     lw = 2
-    plt.plot(fpr, tpr, color='darkorange',
-                      lw=lw, label='ROC curve (area = %0.2f)' % roc_auc)
+    plt.plot(fpr[0], tpr[0], color='darkorange',
+                      lw=lw, label='ROC curve (area = %0.2f)' % roc_auc[0])
     plt.plot([0, 1], [0, 1], color='navy', lw=lw, linestyle='--')
     plt.xlim([0.0, 1.0])
     plt.ylim([0.0, 1.05])

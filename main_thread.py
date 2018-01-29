@@ -32,6 +32,7 @@ from skimage.util import img_as_ubyte
 from skimage.feature import corner_harris, corner_subpix, corner_peaks
 from scipy import ndimage as ndi
 import subprocess
+import pickle
 
 from itertools import chain
 import timeit
@@ -54,7 +55,7 @@ def flatten(x):
 
 
 def create_classifier_arrays(shared):
-        
+    
     #convert the list of features and class discriptors into arrays
     print shared.get_laterality_array()
     X = np.array(shared.get_feature_array())
@@ -71,11 +72,26 @@ def create_classifier_arrays(shared):
 
 
 
+def my_pickle_save(data, filename):
+    with open(filename, 'wb') as f:
+        pickle.dump(data,f)
+    f.close()
+    
+    
+    
+def my_pickle_load(filename):
+    with open(filename, 'rb') as f:
+        data = pickle.load(f)
+    f.close()
+    return data
+    
+    
+
 
 
 
 def load_results(command_line_args):
-    with open(command_line_args.save_path + '/model_data/results.txt') as f:
+    with open(os.path.join(command_line_args.save_path, 'model_data/results.txt')) as f:
         lines = f.read().splitlines()
         
         
@@ -108,10 +124,10 @@ def add_metadata_features(X,Y,command_line_args):
     
     
     #load in metadata
-    bc_histories = np.load(command_line_args.save_path + '/model_data/bc_histories.npy')
-    bc_first_degree_histories = np.load(command_line_args.save_path + '/model_data/bc_first_degree_histories.npy')
-    bc_first_degree_histories_50 = np.load(command_line_args.save_path + '/model_data/bc_first_degree_histories_50.npy')
-    anti_estrogens = np.load(command_line_args.save_path + '/model_data/anti_estrogens.npy')
+    bc_histories = np.load(os.path.join(command_line_args.save_path, 'model_data/bc_histories.npy'))
+    bc_first_degree_histories = np.load(os.path.join(command_line_args.save_path, 'model_data/bc_first_degree_histories.npy'))
+    bc_first_degree_histories_50 = np.load(os.path.join(command_line_args.save_path, 'model_data/bc_first_degree_histories_50.npy'))
+    anti_estrogens = np.load(os.path.join(command_line_args.save_path, 'model_data/anti_estrogens.npy'))
     
     print('X shape')
     print X.shape
@@ -136,7 +152,7 @@ def begin_processes(command_line_args, descriptor):
     #initialise list of threads
     threads = []
     id = 0
-    num_threads = cpu_count() - 2
+    num_threads = cpu_count() - 3
     print("Number of processes to be initiated = %d" %num_threads )
     
     man = my_manager()
@@ -159,6 +175,8 @@ def begin_processes(command_line_args, descriptor):
         shared.q_bc_first_degree_history_put(descriptor.bc_first_degree_history_list[ii])
         shared.q_bc_first_degree_history_50_put(descriptor.bc_first_degree_history_50_list[ii])        
         shared.q_anti_estrogen_put(descriptor.anti_estrogen_list[ii])
+        shared.q_bbs_put(descriptor.bbs_list[ii])
+        shared.q_conf_put(descriptor.conf_list[ii])
         
     print('Set up Queues')
     
@@ -211,40 +229,34 @@ def begin_processes(command_line_args, descriptor):
         X = pca.fit_transform(X)
         
     if(command_line_args.kl_divergence):
-        kld = kl_divergence(X[Y,:], X[Y==False,:], command_line_args.kl_divergence)
-        X = X[:,kld]
-        
-    #scaling the feature vector
-    if(command_line_args.preprocessing | command_line_args.training):
-        scale_factor = np.zeros((1,X.shape[1]))
-        for ii in range(0, X.shape[1]):
-            scale_factor[:,ii] = np.abs(np.max(X[:,ii]))
-            X[:,ii] = np.divide(X[:,ii], scale_factor[:,ii])        
+        #if we are training, lets find the indicies with that we are using
+        if(not command_line_args.validation):
+            kld = kl_divergence(X[Y,:], X[Y==False,:], command_line_args.kl_divergence)
+            X = X[:,kld]
+            #save the kld features
+            np.save(os.path.join(command_line_args.model_path, 'kld'), kld)
+        #if we are validating, select the same feature indecies we used whilst training
+        else:
+            kld = np.load(os.path.join(command_line_args.model_path, 'kld.npy'))
+            X = X[:,kld]
             
-        #now save the scaling factors so we can use the same ones for validation
-        np.save(command_line_args.model_path + 'scale_factor', scale_factor)
-    #if we are doing the validation, will want to use the same scaling factors we
-    #used during the initial stage
-    else:
-        scale_factor = np.load(command_line_args.model_path + 'scale_factor')
-        for ii in range(0, X.shape[1]):
-            scale_factor[:,ii] = np.abs(np.max(X[:,ii]))
-            X[:,ii] = np.divide(X[:,ii], scale_factor[:,ii])        
-            
-        
     #save this data in numpy format, and in the LIBSVM format
+    print X.shape
     print('Saving the final data')
-    np.save(command_line_args.save_path + '/model_data/X', X)
-    np.save(command_line_args.save_path + '/model_data/Y', Y)
-    np.save(command_line_args.save_path + '/model_data/lateralities', lateralities)
-    np.save(command_line_args.save_path + '/model_data/exams', exams)
-    np.save(command_line_args.save_path + '/model_data/subject_ids', subject_ids)
-    np.save(command_line_args.save_path + '/model_data/bc_histories', bc_histories)
-    np.save(command_line_args.save_path + '/model_data/bc_first_degree_histories', bc_first_degree_histories)
-    np.save(command_line_args.save_path + '/model_data/bc_first_degree_histories_50', bc_first_degree_histories_50)
-    np.save(command_line_args.save_path + '/model_data/anti_estrogens', anti_estrogens)    
-    dump_svmlight_file(X,Y,command_line_args.save_path + '/model_data/data_file_libsvm')
-    
+    np.save(os.path.join(command_line_args.save_path , 'model_data/X'), X)
+    np.save(os.path.join(command_line_args.save_path , 'model_data/Y'), Y)
+    np.save(os.path.join(command_line_args.save_path , 'model_data/lateralities'), lateralities)
+    np.save(os.path.join(command_line_args.save_path , 'model_data/exams'), exams)
+    np.save(os.path.join(command_line_args.save_path , 'model_data/subject_ids'), subject_ids)
+    np.save(os.path.join(command_line_args.save_path , 'model_data/bc_histories'), bc_histories)
+    np.save(os.path.join(command_line_args.save_path , 'model_data/bc_first_degree_histories'), bc_first_degree_histories)
+    np.save(os.path.join(command_line_args.save_path , 'model_data/bc_first_degree_histories_50'), bc_first_degree_histories_50)
+    np.save(os.path.join(command_line_args.save_path , 'model_data/anti_estrogens'), anti_estrogens)        
+    #save the files that we skipped
+    my_pickle_save(shared.get_skipped_ids(), os.path.join(command_line_args.save_path , 'model_data/skipped_ids'))
+    my_pickle_save(shared.get_skipped_lateralities(), os.path.join(command_line_args.save_path , 'model_data/skipped_lateralities'))
+    my_pickle_save(shared.get_skipped_cancer_status(), os.path.join(command_line_args.save_path , 'model_data/skipped_cancer_status'))
+    my_pickle_save(shared.get_skipped_exam(), os.path.join(command_line_args.save_path , 'model_data/skipped_exam'))
     
     
     
@@ -292,26 +304,30 @@ def train_model(command_line_args, descriptor):
     #if we aren't extracting files, lets check that there is already
     #a file in libsvm format. If there isn't we will make one
     
-    elif(not os.path.isfile(command_line_args.input_path + '/model_data/data_file_libsvm')):
-        #if this file doesn't exist, we have two options
-        #use the near incomplete features if the preprocessing run finished completely
-        #otherwise use the nearly complete feature set
-        if( os.path.isfile(command_line_args.input_path + '/model_data/X.npy')):
-            X = np.load(command_line_args.input_path + '/model_data/X.npy')
-            Y = np.load(command_line_args.input_path + '/model_data/Y.npy')
+    #if this file doesn't exist, we have two options
+    #use the near incomplete features if the preprocessing run finished completely
+    #otherwise use the nearly complete feature set
+    
+    if(os.path.isfile(os.path.join(command_line_args.model_path , 'X.npy'))):
+        X = np.load(os.path.join(command_line_args.model_path , 'X.npy'))
+        Y = np.load(os.path.join(command_line_args.model_path , 'Y.npy'))
             
-        else:
-            X = np.load(command_line_args.model_path + '/X_temp.npy')
-            Y = np.load(command_line_args.model_path + '/Y_temp.npy')
+    else:
+        X = np.load(os.path.join(command_line_args.model_path, 'X_temp.npy'))
+        Y = np.load(os.path.join(command_line_args.model_path, 'Y_temp.npy'))
             
-        #if we are doing sub challenge 2, add the metadata features
-        if(command_line_args.sub_challenge == 2):
-            X,Y = add_metadata_features(X,Y,command_line_args)            
-            
-        #now lets make an libsvm compatable file         
-        dump_svmlight_file(X,Y,command_line_args.model_path + '/data_file_libsvm')
+    #if we are doing sub challenge 2, add the metadata features
+    if(command_line_args.sub_challenge == 2):
+        print('adding metadata')
+        X,Y = add_metadata_features(X,Y,command_line_args)            
         
-    #now features are extracted, lets classify using this bad boy
+    #now lets make an libsvm compatable file         
+    dump_svmlight_file(X,Y,os.path.join(command_line_args.model_path, 'data_file_libsvm'))
+        
+    #lets scale the features first
+    terminal_cmd(command_line_args.train_scale_string)
+    
+    #now features are extracted, lets train using this bad boy
     terminal_cmd(command_line_args.train_string)
     
     
@@ -330,35 +346,56 @@ def validate_model(command_line_args, descriptor):
     #Otherwise will assume that preprocessing has already been done prior
     
     #if we are doing sub challege 2, we will need to add the metadata features to the feature array
-    
+    X = np.load(os.path.join(command_line_args.save_path, 'model_data/X.npy'))
+    Y = np.load(os.path.join(command_line_args.save_path, 'model_data/Y.npy'))
     if(command_line_args.sub_challenge == 2):
-        X = np.load(command_line_args.save_path + '/model_data/X.npy')
-        Y = np.load(command_line_args.save_path + '/model_data/Y.npy')
         X,Y = add_metadata_features(X,Y,command_line_args)            
         
-        #now lets make an libsvm compatable file         
-        #so we can use libsvm
-        dump_svmlight_file(X,Y,command_line_args.model_path + '/data_file_libsvm')
+    #now lets make an libsvm compatable file         
+    #so we can use libsvm
+    dump_svmlight_file(X,Y,os.path.join(command_line_args.save_path, 'model_data/data_file_libsvm'))
         
-        
-        
-       
-        
+    #scale the features
+    terminal_cmd(command_line_args.validation_scale_string)
+    
+    
     #run validation
     terminal_cmd(command_line_args.validation_string)
     #now load in the validation data
     #so we can group the prediction value from each of the scans
     #to get an overall prediction value for individual breasts
-    lateralities = np.load(command_line_args.save_path + '/model_data/lateralities.npy')
-    exams = np.load(command_line_args.save_path + '/model_data/exams.npy')
-    subject_ids = np.load(command_line_args.save_path + '/model_data/subject_ids.npy')
+    lateralities = np.load(os.path.join(command_line_args.save_path, 'model_data/lateralities.npy'))
+    exams = np.load(os.path.join(command_line_args.save_path, 'model_data/exams.npy'))
+    subject_ids = np.load(os.path.join(command_line_args.save_path, 'model_data/subject_ids.npy'))
+    print exams
+    print exams.shape
+    #load in any scans that were skipped
+    skipped_ids = my_pickle_load(os.path.join(command_line_args.save_path , 'model_data/skipped_ids'))
+    skipped_lateralities = my_pickle_load(os.path.join(command_line_args.save_path , 'model_data/skipped_lateralities'))  
+    skipped_cancer_status = my_pickle_load(os.path.join(command_line_args.save_path , 'model_data/skipped_cancer_status'))
+    skipped_exam = my_pickle_load(os.path.join(command_line_args.save_path , 'model_data/skipped_exam'))
+    print skipped_exam
+    print len(skipped_exam)
     #load in the predicted values
     predicted = load_results(command_line_args)
+    #add in the scans that were skipped, and assume they were negative (benign)
+    predicted = np.append(predicted, ([0] * len(skipped_ids)))
     print np.shape(predicted)
+    #append the actual data that was skipped to the real data
+    lateralities = np.append(lateralities,skipped_lateralities)
+    exams = np.append(exams,[item for sublist in skipped_exam for item in sublist])
+    subject_ids = np.append(subject_ids,skipped_ids)
+    
+    print lateralities.shape
+    print exams.shape
+    print subject_ids.shape
+    
     #load in the actual class values
     #WILL ONLY BE USEFUL IF VALIDATING ON OUR DATA
     #OTHERWISE I HAVE JUST SET THEM ALL TO ZERO :)
-    actual = np.load(command_line_args.save_path + '/model_data/Y.npy')
+    actual = np.load(os.path.join(command_line_args.save_path, 'model_data/Y.npy'))
+    #append skipped cancer status
+    actual = np.append(actual, skipped_cancer_status)
     
     #creating a set of all the subjects used
     #set is used so we don't have repeated values
@@ -374,6 +411,7 @@ def validate_model(command_line_args, descriptor):
                             #WILL ONLY BE USEFUL IF VALIDATING ON OUR DATA 
     actual_laterality = []  #save the laterality of this breast as well
     actual_subject_ids = [] #list that has the actual subject id's 
+    
     
     for subject in subject_ids_set:
     #am going to initialise a mask of all the positions of scans for the current patient
@@ -403,6 +441,7 @@ def validate_model(command_line_args, descriptor):
     print('Accuracy = %f' %(metric_accuracy(actual, predicted))) 
     print('Sensitivity = %f' %(metric_sensitivity(actual_breast, predicted_breast)))
     print('Specificity = %f' %(metric_specificity(actual_breast, predicted_breast)))
+    #metric_plot_roc(actual, predicted)
     #now save this as a tsv file
     #inference.to_csv('/output/predictions.tsv', sep='\t')
     out = open('./output/predictions.tsv', 'w')
