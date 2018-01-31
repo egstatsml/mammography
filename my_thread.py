@@ -35,11 +35,11 @@ from skimage.util import img_as_ubyte
 from skimage.feature import corner_harris, corner_subpix, corner_peaks
 from scipy import ndimage as ndi
 from itertools import chain
-#import my classes
-from breast import breast
-from feature_extract import feature
-from read_files import spreadsheet
 
+#import my classes
+from mammogram.breast import breast
+from mammogram.feature_extract import feature
+from db import spreadsheet
 
 #for tracking memory
 #from pympler.tracker import SummaryTracker

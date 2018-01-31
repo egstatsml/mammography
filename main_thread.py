@@ -39,14 +39,18 @@ import timeit
 from multiprocessing import Process, Lock, Queue, cpu_count
 from my_thread import my_thread, shared, my_manager
 from multiprocessing.managers import BaseManager
-#import my classes
-from breast import breast
-from feature_extract import feature
-from read_files import spreadsheet
-from log import logger
-from arguments import arguments
+
+#import my modules
 from metric import *
 from kl_divergence import *
+#import my classes
+from mammogram.breast import breast
+from mammogram.feature_extract import feature
+from db import spreadsheet
+from log import logger
+from cmd_arguments import arguments
+
+
 
 
 def flatten(x):

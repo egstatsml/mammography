@@ -1,0 +1,640 @@
+#!/bin/env python
+"""
+read_files.py
+
+Author: Ethan Goan
+Queensland University of Technology
+DREAM Mammography Challenge
+2016
+
+Description:
+
+spreadsheet object is defined to handle the reading of image file names
+and the associated metadata
+spreadsheet object is capable of reading malignant or benign scans individually
+for training purposes
+
+"""
+import sys
+import dicom
+import os
+import numpy as np
+import pandas as pd
+
+
+
+
+
+class spreadsheet(object):
+    
+    """
+    __init__()
+    
+    Description:
+    
+    
+    @param command_line_args = arguments object that holds the path and boolean values determined
+    from the command line 
+    
+    
+    """
+    
+    def __init__(self, command_line_args):
+        
+        #now setting the member variables
+        self.cancer = False        #cancer status of the current scan
+        self.cancer_list = []      #list of cancer status for all of the scans DONE IN THIS PROCESS!!!!!
+        self.laterality = []       #laterality of current scan
+        self.laterality_list = []  #list of laterality of all scans
+        self.exam = []             #exam index of current scan 
+        self.exam_list = []        #list of exam indicies for all scans
+        self.subject_id = []       #ID of current scan
+        self.subject_id_list = []  #list of subject ID's for all scans
+        self.bc_history = []
+        self.bc_history_list = []
+        self.anti_estrogen = []
+        self.anti_estrogen_list = []
+        self.bc_first_degree_history = []
+        self.bc_first_degree_history_list = []
+        self.bc_first_degree_history_50 = []
+        self.bc_first_degree_history_50_list = []
+        self.rcnn_list = []
+        self.use_rcnn = 0
+        self.filenames = []        #list that contains all of the filenames
+        self.file_pos = 0          #the location of the current file we are looking for
+        self.sub_challenge = command_line_args.sub_challenge  #save which sub challenge we are doing
+        self.region_ids = []
+        self.region_bbs = []            
+        self.region_conf = []
+        self.bbs_list = [] #the sorted bounding boxes that will be used for the queue
+        self.conf_list = []
+        
+        #this is so we know whether to store metadata or not
+        self.challenge_submission = command_line_args.challenge_submission
+        self.validation = command_line_args.validation
+        #this variable is here just because there was a minor discrepancy between the pilot metadata
+        #given out early in the challenge
+        self.patient_subject = 'subjectId'
+        
+        #if we specified that we want to use the regions found with the rcnn
+        self.use_rcnn = True if (type(command_line_args.rcnn) is str) else False
+        if(self.use_rcnn):
+            #if we are using rcnn, lets load in the regions
+            self.load_rcnn_file(command_line_args.rcnn)
+            
+            
+        #load in data from the spreadsheets
+        self.crosswalk = pd.read_csv(os.path.join(command_line_args.metadata_path, 'images_crosswalk.tsv'), sep='\t')    
+        self.training_path = command_line_args.input_path
+        #will have access to the metadata if we are validating on the synapse servers
+        #though if we are validating for ourselves we will use the validation data
+        #print command_line_args.validation
+        #print command_line_args.challenge_submission
+        if( not(command_line_args.validation & command_line_args.challenge_submission & (command_line_args.sub_challenge == 1)) ):
+            print('am getting the metadata')
+            self.metadata = pd.read_csv(os.path.join(command_line_args.metadata_path, 'exams_metadata.tsv'), sep='\t')
+            print(self.metadata.columns.values)
+            
+        #just printing the database headers to make sure they are correct
+        #print(self.crosswalk.columns.values)        
+        
+        #lets load in the files
+        #
+        #If we are running the validation model on the server, we wont have access to any
+        #metadata about the cancer status of this file. 
+        #If we are running validation (-v) and running on synapse server for the challenge (-c)
+        #we wont try and load in the cancer status, we will just set them all to 0
+        #
+        #
+        #For every other instance (including validation on pilot data, as I wan't to get
+        #performance metrics) we will load the cancer status.
+        
+        self.get_all_scans(command_line_args.input_path)
+        
+        #now lets set the number of scans we have available
+        self.no_scans = len(self.filenames)
+        
+        
+        
+        
+        
+        
+        
+    """
+    get_all_scans()
+    
+    Description:
+    Function will load in all of the filenames available for the scans and store them in a list.
+    
+    
+    """
+    
+    def get_all_scans(self,directory):
+        
+        #now lets load in all of the filenames
+        #for (data_dir, dirnames, filenames) in os.walk(directory):
+        #    self.filenames.extend(filenames)
+        #    break   
+        
+        for scan in os.listdir(directory):
+            if(scan.endswith('.npy') | scan.endswith('.dcm')):
+               self.filenames.append(scan)
+               print scan
+        #if we are getting all of the features, such as when preprocessing, training and
+        #sub challenge 2 
+        #if we aren't all of the values added to these metadata features will just be zero
+        #now will add the cancer status of these files
+        for ii in range(0, len(self.filenames)):
+            cur_file = self.next_scan()
+            #self.mass_regions.append(self.get_mass_region(filename))
+            self.cancer_list.append(self.cancer)
+            self.laterality_list.append(self.laterality)
+            self.exam_list.append(self.exam)
+            self.subject_id_list.append(self.subject_id)
+            #add the regions
+            #if we arent actually going to use the regions during testing, (ie. use_rcnn == False)
+            #will just set all entries to -1
+            print cur_file
+            print(os.path.basename(cur_file))
+            bb, conf = self.get_region_scan(os.path.basename(cur_file))
+            self.bbs_list.append(bb)
+            self.conf_list.append(conf)
+            #print self.regions[-1]
+            
+            #add the medata features, though these will only be used
+            #if we have specified we are doing sub challenge 2
+            #otherwise everything is just set to zero
+            self.bc_history_list.append(self.bc_history)
+            self.bc_first_degree_history_list.append(self.bc_first_degree_history)
+            self.bc_first_degree_history_50_list.append(self.bc_first_degree_history_50)
+            self.anti_estrogen_list.append(self.anti_estrogen)
+            
+            
+        #after done adding the cancer status, will set reset the file position back to the start (0)
+        self.file_pos = 0
+        
+        
+        
+    """
+    next_scan()
+    
+    Description:
+    Function will just get the next available scan, doesn't matter what type it is
+    will just get the next scan
+    
+    Will use the filename of the scan and backtrack to the metadata spredsheet to see if it is
+    a cancerous scan or not
+    
+    """
+    
+    def next_scan(self):
+        
+        #find the patient number of the current scan, the exam number ant the breast we are
+        #looking at
+        
+        current_file = self.filenames[self.file_pos]
+        #now lets get info from this scan, such as the cancer status,
+        #view and exam number
+        self.get_info(current_file)
+        
+        #increment the scan position
+        self.file_pos = self.file_pos + 1
+        
+        #now return the filename with the path
+        #am including a minus one for the file position because we just incremented it
+        return os.path.join(self.training_path, self.filenames[self.file_pos -1])
+    
+    
+    """
+    get_info()
+    
+    Description:
+    Will get all of the relevant data from the current scan
+    
+    @param filename = string containing just the code of the current image                      
+    """
+    
+    
+    
+    
+    def get_info(self, filename):
+        
+        #will get rid of any file extentsion suffixies
+        #will be either .npy or .dcm, wither way both are 4 chars long
+        #print filename
+        filename = filename[0:-4]
+        list_all_files = list(self.crosswalk['filename'])
+        file_loc = []
+        for ii in range(0,len(list_all_files)): 
+            file_loc.append(filename in list_all_files[ii])
+            
+            
+        crosswalk_data = self.crosswalk.loc[file_loc,:]
+        #get the view and exam index of this scan
+        #print crosswalk_data
+        #print crosswalk_data.columns.get_loc('laterality')
+        self.laterality = crosswalk_data.iloc[0, crosswalk_data.columns.get_loc('laterality')]
+        self.subject_id = crosswalk_data.iloc[0, crosswalk_data.columns.get_loc(str(self.patient_subject))]
+        #if we are validating on synapse servers, the exam index is not available, so just set
+        #them all to 1. This is because the scans from the validation set are only one exam
+        #per subject
+        if(self.challenge_submission & self.validation):
+            #just set the exam index to one
+            self.exam = 1
+        else:
+            #set it to what it really is
+            self.exam = crosswalk_data.iloc[0, crosswalk_data.columns.get_loc('examIndex')]
+        #if we are doing sub challenge 2, lets add some metadata as features
+        #if we aren't it will just set all the metadata to zero
+        self.metadata_sub_challenge_2(crosswalk_data)
+            
+        #now use the helper function to actually check for cancer
+        #but only do this if we aren't validating on the synapse servers
+        if(not (self.challenge_submission & self.validation)):
+            self._check_cancer(crosswalk_data)
+        #otherwise it doesn't really matter what the cancer status is,
+        #but just set it to false
+        else:
+            print('here')
+            self.cancer = False
+            
+            
+            
+            
+            
+            
+    """
+    _check_cancer()
+    
+    Description:
+    Will just read the spreadsheet to see if this current scan is a malignant case
+    
+    """
+    
+    def _check_cancer(self, crosswalk_data):
+        
+        #get just the metadata of this current exam
+        #by finding the row with this patient id and exam number
+        #finding these individually, it's not the most elegant way to do it,
+        #but it is the clearest
+        
+        patient_mask = (self.metadata.iloc[:, self.metadata.columns.get_loc(self.patient_subject)] == crosswalk_data.iloc[0,crosswalk_data.columns.get_loc(self.patient_subject)])
+        exam_mask = (self.metadata.iloc[:,self.metadata.columns.get_loc('examIndex')] == crosswalk_data.iloc[0,crosswalk_data.columns.get_loc('examIndex')])
+        mask = (patient_mask & exam_mask)
+        scan_metadata = self.metadata.loc[mask,:]
+            
+        #now check this scan using the laterality information
+        if(str(crosswalk_data.iloc[0,crosswalk_data.columns.get_loc('laterality')]) == 'L') & (str(scan_metadata.iloc[0,scan_metadata.columns.get_loc('cancerL')]) == '1'):
+            self.cancer = True
+            print('cancer left')
+            
+        elif(str(crosswalk_data.iloc[0,crosswalk_data.columns.get_loc('laterality')]) == 'R') & (str(scan_metadata.iloc[0,scan_metadata.columns.get_loc('cancerR')]) == '1'):
+            self.cancer = True
+            #print('cancer right')
+        else:
+            self.cancer = False
+            
+            
+            
+            
+            
+            
+    """
+    metatdata_sub_challenge_2()
+    
+    Description:
+    If we are taking part in sub challene 2, will get the metadata as well
+    
+    I copied most of the code from the _check_cancer function above ;)
+    which is sloppy but I will let it slide this time
+    
+    """
+    
+    def metadata_sub_challenge_2(self, crosswalk_data):
+        
+        if(self.sub_challenge == 2):
+            patient_mask = (self.metadata.iloc[:, self.metadata.columns.get_loc(self.patient_subject)] == crosswalk_data.iloc[0,crosswalk_data.columns.get_loc(self.patient_subject)])
+            exam_mask = (self.metadata.iloc[:,self.metadata.columns.get_loc('examIndex')] == crosswalk_data.iloc[0,crosswalk_data.columns.get_loc('examIndex')])
+            mask = (patient_mask & exam_mask)
+            scan_metadata = self.metadata.loc[mask,:]
+            self.bc_history = int(scan_metadata.iloc[0,scan_metadata.columns.get_loc('bcHistory')])
+            self.anti_estrogen = int(scan_metadata.iloc[0,scan_metadata.columns.get_loc('antiestrogen')])
+            self.bc_first_degree_history = int(scan_metadata.iloc[0,scan_metadata.columns.get_loc('firstDegreeWithBc')])
+            self.bc_first_degree_history_50 = int(scan_metadata.iloc[0,scan_metadata.columns.get_loc('firstDegreeWithBc50')])
+            
+            
+        else:
+            self.bc_history = 0
+            self.anti_estrogen = 0
+            self.bc_first_degree_history = 0
+            self.bc_first_degree_history_50 = 0
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+    #just creating a mask that will tell me which rows to look at in the crosswalk spreadsheet
+    #to get the filenames of the scans    
+    
+    
+    def get_filenames(self):
+        
+        left = (self.crosswalk[self.patient_subject] == self.patient_id) & (self.crosswalk['examIndex'] == self.exam_index) & (self.crosswalk["imageView"].str.contains('L')) 
+        
+        left_filenames = (self.crosswalk.loc[left, 'filename'])
+        
+        
+        self.no_scans_left = np.sum(left)
+        for ii in range(0, np.sum(left)):
+            left_name = left_filenames.iloc[ii]
+            self.filename_l.append(left_name)
+            
+            
+        right = (self.crosswalk[self.patient_subject] == self.patient_id) & (self.crosswalk['examIndex'] == self.exam_index) & (self.crosswalk["imageView"].str.contains('R')) 
+        
+        
+        right_filenames = (self.crosswalk.loc[right, 'filename'])
+        self.no_scans_right = np.sum(right)
+        for ii in range(0, np.sum(right)):
+            right_name = right_filenames.iloc[ii]
+            self.filename_r.append(right_name)
+            
+            
+            
+            
+            
+    """
+    return_filename()
+    
+    Description:
+    Function will return the filename of the current scan we are looking at
+   
+    @param breast = string containg left or right
+    @param file_index = index to say which fielename in the list we are looking at
+    
+    @retval string containing current path to scan we want to look at
+    
+    """
+    def _return_filename(self, breast):
+        
+        if(self.run_synapse == True):
+            base_dir = '/trainingData'
+        else:
+            base_dir = './pilot_images/'
+            
+        if(breast == 'left'):
+            return base_dir + str(self.filename_l[self.left_index][0:-3])
+        else:
+            return base_dir + str(self.filename_r[self.right_index][0:-3])
+        
+        
+        
+        
+    def filenames(self):
+        base_dir = './pilot_images/'
+        return  base_dir + str(self.filename_l[self.left_index][0:-3]), base_dir + str(self.filename_r[self.left_index][0:-3])
+    
+    
+    
+    
+    
+    
+    
+    def load_rcnn_file(self, rcnn_dir):
+        #check if the rcnn files are there
+        microcalcifications = os.path.join(rcnn_dir, 'microcalcifications.out')
+        masses = os.path.join(rcnn_dir, 'masses.out')
+        if(not os.path.isfile(microcalcifications)) | (not os.path.isfile(masses)):
+            print('ERROR: You specified that you wanted to use RCNN generated regions, \
+            but the file dont exist :( ')
+            print('Files should be stored like %s' %masses)
+            sys.exit()
+            
+        #if the files are there, lets get busy reading them
+        else:
+            mass_lines = []
+            micro_lines = []
+            with open(masses, 'r') as mf:
+                mass_lines = mf.readlines()
+            mf.close()
+            with open(microcalcifications, 'r') as mf:
+                micro_lines = mf.readlines()        
+            mf.close()
+            
+            #concatenate the two lists 
+            lines = mass_lines + micro_lines
+            #only want to have one region for each mass
+            ids, bb, conf = self.rcnn_separate(lines)
+            self.region_ids = ids
+            self.region_bbs = bb            
+            self.region_conf = conf
+            
+            
+            
+    """
+    rcnn_separate()
+    
+    Description:
+    Will seperate the lines from an RCNN detection file
+    
+    @param lines = list of strings, where each element is a line from the RCNN detection file
+    @retval lists containing the separated ids, bounding boxes and confidence values
+    
+    """
+            
+            
+    def rcnn_separate(self, lines):
+        splitlines = [x.strip().split(' ') for x in lines]
+        image_ids = [x[0] for x in splitlines]
+        confidence = np.array([float(x[1]) for x in splitlines])
+        BB = np.array([[float(z) for z in x[2:]] for x in splitlines]).astype(np.int)
+        ids_sorted = []
+        bbs_sorted = []
+        conf_sorted = []
+        
+        for im in set(image_ids):
+            #find locations of this image in our  list
+            cur_im = self.list_compare(image_ids, im)
+            ids_sorted.append(im)
+            bbs_sorted.append(BB[cur_im])
+            conf_sorted.append(confidence[cur_im])
+            
+            #print len(BB[cur_im])
+            #print BB[cur_im]
+            #print len(confidence[cur_im])
+            #print confidence[cur_im]
+            
+        return ids_sorted, bbs_sorted, conf_sorted
+    
+    
+    
+    
+    
+    
+    """
+    get_region_scan():
+    
+    Description:
+    gets all of the regions found for this SPECIFIC scan (both microcalcifications and masses)
+    It is likely that there is a few regions found in each scan, and all of these 
+    regions will be added to the list. We will also save the psuedo confidence value for each 
+    region. We will use this psuedo confidence value and the location of the region to determine
+    if the region is suitable (ie. using location to see if wer found the breast or not)
+    
+    Regions will be returned as a list of lists.
+    
+    @param subject_id = the filename of this scan
+    @retval the regions for this specific scan
+    
+    """    
+    
+    def get_region_scan(self, subject_id):
+        
+        if(not self.use_rcnn):
+            return [np.array([-1, -1])]
+        
+        bbs = []
+        conf = []
+        if(subject_id.endswith('.dcm')) | (subject_id.endswith('.npy')):
+            subject_id = subject_id[0:-4]
+            
+        ind = self.list_compare(self.region_ids, subject_id)
+        #print self.region_ids
+        if(np.sum(ind) > 0):
+            bbs.append(self.region_bbs[np.where(ind)[0][0]].astype(np.int))
+            conf.append(self.region_conf[np.where(ind)[0][0]])
+        #if we didnt find anything, lets set it to zero
+        if(len(bbs) == 0):
+            #return a list of zero
+            bbs.append(np.array([-1] * 4))
+            conf.append([-1])
+        #return the regions for this scan
+        return bbs, (conf)
+    
+    
+    
+    """
+    list_compare()
+        
+    Description:
+    Helper function to do element wise comparison on lists
+    
+    """
+    
+    def list_compare(self, lst, value):
+        boolean = []
+        for ii in range(len(lst)):
+            boolean.append(lst[ii] == value)
+            
+        return np.array(boolean)
+    
+    
+    
+    #####################################################################
+    # Functions that were used by the gui for ENB345
+    #
+    #####################################################################    
+    
+    """
+    get_most_recent()
+    
+    Description:
+    Function will load in the most recent scan from a patient
+    
+    @param patientId = patient number
+    
+    """
+    
+    def get_most_recent(self, patientId):
+        #create a truncated database that just includes the information for the
+        #current patient
+        
+        #just clearing the filename variables in case they have something already in them
+        self.filename_l = []
+        self.filename_r = []
+        self.patient_id = patientId
+        mask = (self.metadata[self.patient_subject] == patientId)
+        patient_data = self.metadata.loc[mask,:]
+        #now lets find the most recent exam and get those files
+        self.exam_index = np.max(patient_data['examIndex'])
+        
+        #setting the number of exams
+        self.no_exams_patient = self.exam_index
+        
+        #now get the filenames for this exam
+        self.get_filenames()
+        
+        
+        
+        
+        
+        
+    
+    """
+    get_exam()
+    
+    Description:
+    Function will load in the specific scans from a signle examination
+    
+    @param patientId = patient number
+    @param exam = exam index
+    
+    """
+    
+    def get_exam(self, patientId, exam):
+        #create a truncated database that just includes the information for the
+        #current patient
+        
+        #just clearing the filename variables in case they have something already in them
+        self.filename_l = []
+        self.filename_r = []
+        self.patient_id = patientId
+        mask = (self.metadata[self.patient_subject] == patientId)
+        patient_data = self.metadata.loc[mask,:]
+        #now lets find the most recent exam and get those files
+        self.exam_index = exam
+        
+        #now get the filenames for this exam
+        self.get_filenames()
+        
+        
+        
+    """
+    get_patient_data()
+    
+    Description:
+    Function that will return a Pandas database of the current patients
+    information listed in the metadata spreadsheet
+    Will return all of the information form all examinations
+    
+    The current patient ID is read from the current_patient_id member variable
+    
+    Can be used then for viewing in the GUI
+    
+    @retval Pandas Database of the current patient we are interested in
+    
+    """
+    
+    def get_patient_info(self):
+        #creating a mask for crop the data to information for just our patient of interest
+        mask = (self.metadata[self.patient_subject] == self.current_patient_id)
+        #get the header
+        header = self.metadata.columns.values
+        patient_info = pd.DataFrame(header) 
+        patient_info = patient_info.T #transpose so it is row not a column
+        data = self.metadata.loc[mask,:]
+        data_values = pd.DataFrame(data.values)
+        #patient_info.append(data_values, ignore_index=True)
+        patient_info = pd.concat([patient_info,data_values], ignore_index=True)
+        #now return the cropped database
+        return patient_info
+    
+    
+    
+    
