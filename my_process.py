@@ -47,29 +47,17 @@ from db import spreadsheet
 
 
 
-"""
-my_process:
-
-Description: 
-class that holds all of the data and methods to be used within each process for 
-processing and training the model. This class uses processing.Process as the base class,
-and extends on it's functionality to make it suitable for our use.
-
-Memeber variables are included such as the feature object defined in feature_extract.py
-Each process will have a feature object as a member variable, and will use this member
-to do the bulk of the processing. This class is defined purely to parellelize the workload
-over multiple cores.
-
-
-Some reference variables such as a queue, lock and exit flag are shared statically amongst all of 
-the instances. Doing this just wraps everything a lot nicer.
-"""
 
 
 class shared(object):
-    #some reference variables that will be shared by all of the individual process objects
-    #whenever any of these reference variables are accessed, the process lock should be applied,
-    #to ensure multiple processs arent accessing the same memory at the same time
+    """
+    shared()
+    
+    Description:
+    some reference variables that will be shared by all of the individual process objects
+    whenever any of these reference variables are accessed, the process lock should be applied,
+    to ensure multiple processs arent accessing the same memory at the same time
+    """
     
     q = Queue(750000)             #queue that will contain the filenames of the scans
     q_cancer = Queue(750000)      #queue that will contain the cancer status of the scans
@@ -104,15 +92,14 @@ class shared(object):
     skipped_exam = []
     save_timer = time.time()
     save_time = 3600      #save once an hour or every 3600 seconds
-    
-    
+
+    
     ##########################################
     #
     #List of helper functions that are used to
     #access the data in the manager
     #
     ##########################################
-    
     
     def q_get(self):
         return self.q.get()
@@ -285,44 +272,39 @@ class shared(object):
     def get_skipped_exam(self):
         return self.skipped_exam
     
-    
-    
+        
     ###################################
     #
     # Functions to handle timing of saving data
     #
     ###################################
     
-    """
-    init_timer()
-    
-    Description:
-    Initialise timer
-    
-    
-    """
     def init_timer(self):
+        """
+        init_timer()
+
+        Description:
+        Initialise timer
+        """
         self.save_timer = time.time()
         
-        
-    """
-    reset_timer()
-    
-    Description: 
-    Will just reinitialise both timers
-    This function is just here as a convenience
-    
-    """
+    
     
     def reset_timer(self):
+        """
+        reset_timer()
+
+        Description: 
+        Will just reinitialise both timers
+        This function is just here as a convenience
+        """
         self.init_timer()
         
-        
+        
     def save_time_elapsed(self):
         return ( (time.time() - self.save_timer) >= self.save_time)
     
-    
-    
+    
     def periodic_save_features(self, save_path):
         self.t_lock_acquire()
         X = np.array(self.get_feature_array())
@@ -342,30 +324,30 @@ class shared(object):
         #reset the timer
         self.reset_timer()
         self.t_lock_release()
-        
-        
-        
-        
-    """    
-    add_features()
-    
-    Description: 
-    This function will add all of the features from scans processed
-    in a single process/process and add them to the list in the manager
-    
-    @params
-    X = N x M array containing the features from the scans processed in the process
-        N = number of scans processed
-        M = Number of features per scan
-    
-    Y = 1D array containing status of each of training scans
-    laterality = list containing the laterality of each scan (either 'L' or 'R')
-    exam = list containing the examination number of each scan
-    subject_id = list containing the subject ID of all the scans
-    
-    """
+
+
+
     
     def add_features(self,X, Y, laterality, exam, subject_id, bc_histories, bc_first_degree_histories, bc_first_degree_histories_50, anti_estrogens):
+        """    
+        add_features()
+
+        Description: 
+        This function will add all of the features from scans processed
+        in a single process/process and add them to the list in the manager
+
+        @params
+        X = N x M array containing the features from the scans processed in the process
+            N = number of scans processed
+            M = Number of features per scan
+
+        Y = 1D array containing status of each of training scans
+        laterality = list containing the laterality of each scan (either 'L' or 'R')
+        exam = list containing the examination number of each scan
+        subject_id = list containing the subject ID of all the scans
+
+        """
+
         #request lock for this process
         self.t_lock_acquire()
         #if this is the first set of features to be added, we should just initially
@@ -417,13 +399,12 @@ class shared(object):
             print(skipped_exam)
         self.t_lock_release()
         
-        
-        
-        
-        
+                
 class my_manager(BaseManager):
     pass
 
+#Defining the manager that is used for the main program and that it is a shared
+#manager
 my_manager.register('shared', shared)
 
 
@@ -431,21 +412,40 @@ my_manager.register('shared', shared)
 
 
 class my_process(Process):    
-    
     """
-    __init__()
-    
-    Description:
-    Will initialise the process and the feature member variable.
-    
-    @param process_id = integer to identify individual process s
-    @param num_images_total = the number of images about to be processed in TOTAL
-    @param command_line_args = arguments object that holds the arguments parsed from 
-           the command line. These areguments decide whether we are training, preprocessing etc.
-    
+    my_process:
+
+    Description: 
+    class that holds all of the data and methods to be used within each process for 
+    processing and training the model. This class uses processing.Process as the base class,
+    and extends on it's functionality to make it suitable for our use.
+
+    Memeber variables are included such as the feature object defined in feature_extract.py
+    Each process will have a feature object as a member variable, and will use this member
+    to do the bulk of the processing. This class is defined purely to parellelize the workload
+    over multiple cores.
+
+
+    Some reference variables such as a queue, lock and exit flag are shared statically 
+    amongst all of the instances. Doing this just wraps everything a lot nicer.
     """
+
+    
     
     def __init__(self, process_id, no_images_total, manager, command_line_args):
+        """
+        __init__()
+
+        Description:
+        Will initialise the process and the feature member variable.
+
+        @param process_id = integer to identify individual process s
+        @param num_images_total = the number of images about to be processed in TOTAL
+        @param command_line_args = arguments object that holds the arguments parsed from 
+               the command line. These areguments decide whether we are training,
+                preprocessing etc.
+
+        """
         Process.__init__(self)
         print('Initialising process %d' %process_id)
         self.manager = manager
@@ -481,55 +481,49 @@ class my_process(Process):
         #made it not a factor of 60 minutes
         self.add_time = 780
         
-        
-        
-        
-        
-        
-    """
-    run()
-    
-    Description:
-    Overloaded version of the Process modules run function, which is called whenever the process
-    is started. This will essentially just call the processing member function , which handles
-    the sequence for the running of the process
-    """
+                
     
     def run(self):
+        """
+        run()
+
+        Description:
+        Overloaded version of the Process modules run function, which is called whenever 
+        the process is started. This will essentially just call the processing member function,
+        which handles the sequence for the running of the process
+        """
         #just run the process function
         print('Begin process in process %d' %self.t_id)
-        self.process()
+        self._process()
         
-        
-        
-    """
-    process()
+            
     
-    Description:
-    The bulk of the running of the process is handeled in this function. This function handles
-    the sequence of processing required, ie. loaading scans, preprocessing etc.
-    
-    Also handles synchronization of the processs, by locking the processs when accessing the 
-    class reference variables, such as the queues
-    
-    The process function will continue to loop until the queues are empty. When the queues
-    are empty, the reference variable (exit_flag) will be set to True to tell us that the processing
-    is about ready to finish.
-    
-    If there is an error with any file, the function will add the name of the file where the error
-    occurred so it can be looked at later on, to see what exactly caused the error. 
-    This will raise a generic exception, and will just mean we skip to the next file if we 
-    encounter an error.
-    
-    Will also time each of the preprocessing steps to see how long the preprocessing of each
-    scan actually takes, just to give us an idea
-    
-    Finally, will make sure we will look at parts of the feature array that are actually valid
-    
-    """
-    
-    
-    def process(self):
+    def _process(self):
+        """
+        _process()
+
+        Description:
+        The bulk of the running of the process is handeled in this function. This function handles
+        the sequence of processing required, ie. loaading scans, preprocessing etc.
+
+        Also handles synchronization of the processs, by locking the processs when accessing the 
+        class reference variables, such as the queues
+
+        The process function will continue to loop until the queues are empty. When the queues
+        are empty, the reference variable (exit_flag) will be set to True to tell us that the 
+        processing is about ready to finish.
+
+        If there is an error with any file, the function will add the name of the file where the 
+        error occurred so it can be looked at later on, to see what exactly caused the error. 
+        This will raise a generic exception, and will just mean we skip to the next file if we 
+        encounter an error.
+
+        Will also time each of the preprocessing steps to see how long the preprocessing of each
+        scan actually takes, just to give us an idea
+
+        Finally, will make sure we will look at parts of the feature array that are actually valid
+        """
+
         print('Running process %d' %self.t_id)
         #while there is still names on the list, continue to loop through
         #while the queue is not empty
@@ -575,7 +569,7 @@ class my_process(Process):
                 #but we want to keep going to try and classify benign scans
                 #if it is a cancerous file though we should keep going
                 if(self.manager.get_benign_count() > 60000) & (not self.validation) & (not self.cancer_status[-1]):
-                    self.remove_most_recent_metadata_entries()
+                    self._remove_most_recent_metadata_entries()
                     print('Skipping %s since we have enough benign scans :)' %(file_path))
                     #now we can just continue with this loop and go on about our business
                     #this will go to next iteration of the while loop
@@ -611,7 +605,7 @@ class my_process(Process):
                         if(self.preprocessing):
                             self.scan_data.preprocessing()
                             if(not self.challenge_submission):# & (not self.validation):
-                                self.save_preprocessed()
+                                self._save_preprocessed()
                                 
                         #if confidence is equal to zero, we are using the regions
                         #found with the rcnn, we just didnt find any for this image   
@@ -624,7 +618,7 @@ class my_process(Process):
                             self.skipped_lateralities.append(self.lateralities[-1])
                             self.skipped_cancer_status.append(self.cancer_status[-1])
                             self.skipped_exam.append(self.exam_nos[-1])
-                            self.remove_most_recent_metadata_entries()
+                            self._remove_most_recent_metadata_entries()
                             continue
                            
                         #now that we have the features, we want to append them to
@@ -635,7 +629,7 @@ class my_process(Process):
                         self.scan_data.current_image_no += 1   #increment the image index
                         lock_time = timeit.default_timer()
                         #now increment the total scan count as well
-                        self.inc_total_scan_count()
+                        self._inc_total_scan_count()
                         
                         
                     except Exception as e:
@@ -652,7 +646,7 @@ class my_process(Process):
                         if(True):
                             #(not self.validation) & ((not self.challenge_submission) | self.preprocessing):
                             print('removing this scan')
-                            self.remove_most_recent_metadata_entries()
+                            self._remove_most_recent_metadata_entries()
                         #if we are validating for the challenge, lets try our best on what we have
                         
                         else:
@@ -661,9 +655,7 @@ class my_process(Process):
                             #should never fail
                             self.scan_data.get_features()
                             self.scan_data.current_image_no += 1   #increment the image index
-                            self.inc_total_scan_count()
-                            
-                            
+                            self._inc_total_scan_count()
                             
                 sys.stdout.flush()
                 self.scan_data.cleanup()
@@ -677,23 +669,21 @@ class my_process(Process):
         #there is nothing left on the queue, so we are ready to exit
         #before we exit though, we just need to crop the feature arrays to include
         #only the number of images we looked at in this individual process
-        self.add_features()
+        self._add_features()
         
         #now just print a message to say that we are done
         print('Process %d is out' %self.t_id)
         sys.stdout.flush()
         
+                
+    def _remove_most_recent_metadata_entries(self):
+        """
+        _remove_most_recent_metadata_entries():
         
-        
-    """
-    remove_most_recent_metadata_entries():
-    
-    Description:
-    Function will remove the data entries from the last scan if there was
-    and error, or if there was too many scans collected etc.
-    """ 
-        
-    def remove_most_recent_metadata_entries(self):
+        Description:
+        Function will remove the data entries from the last scan if there was
+        and error, or if there was too many scans collected etc.
+        """
         
         del self.cancer_status[-1]
         del self.lateralities[-1]
@@ -704,37 +694,38 @@ class my_process(Process):
         del self.bc_first_degree_histories_50[-1]
         del self.anti_estrogens[-1]
         
+        
         
-        
-        
-    def add_time_elapsed(self):
+    def _add_time_elapsed(self):
         return (time.time() - self.add_timer) > self.add_time
     
+    
     
-    
-    
-    def flatten(self, x):
-        "Flatten one level of nesting"
+    def _flatten(self, x):
+        """
+        _flatten()
+
+        Description:
+        Flatten one level of nesting
+        """
         return chain.from_iterable(x)
     
+    
     
     
-    """
-    save_preprocessed()
-    
-    Description:
-    After a file has been preprocessed, will write it to file so we don't have to do 
-    it again. 
-    Before saving to file, we will convert all of the Nans to -1. This allows us to save the data
-    as a 16-bit integer instead of 32-64 bit float.
-    
-    Using half the amount of disk space == Awesomeness
-    
-    Will just have to convert it when loading before performing feature extraction
-    
-    """
-    
-    def save_preprocessed(self):
+    def _save_preprocessed(self):
+        """
+        _save_preprocessed()
+        
+        Description:
+        After a file has been preprocessed, will write it to file so we don't have to do 
+        it again. 
+        Before saving to file, we will convert all of the Nans to -1. This allows us to save 
+        the data as a 16-bit integer instead of 32-64 bit float.
+        
+        Using half the amount of disk space == Awesomeness
+        Will just have to convert it when loading before performing feature extraction
+        """
         
         file_path = self.save_path +  self.scan_data.file_path[-10:-4]
         boundary_path = os.path.join(self.save_path, 'boundaries',  self.scan_data.file_path[-10:-4])
@@ -751,38 +742,31 @@ class my_process(Process):
         np.save(file_path, temp)
         np.save(boundary_path, boundary)        
         
+        
         
+    def _inc_total_scan_count(self):
+        """
+        _inc_scan_count()
         
+        Description:
+        Will just increment the scans processed
         
-    """
-    inc_scan_count()
-    
-    Description:
-    Will just increment the scans processed
-    
-    """
-    def inc_total_scan_count(self):
+        """
         self.manager.t_lock_acquire()
         self.manager.inc_scan_count()
         self.manager.t_lock_release()                    
         
+        
+            
+    def _add_features(self):
+        """
+        add_features()
         
+        Description:
+        Am done with selection and aquisition of features. 
+        Will add the features from this process to the manager
         
-        
-        
-        
-    """
-    add_features()
-    
-    Description:
-    Am done with selection and aquisition of features. 
-    Will add the features from this process to the manager
-    
-    """
-    
-    
-    
-    def add_features(self):
+        """
         
         self.scan_data._crop_features(self.scan_data.current_image_no)
         
@@ -802,26 +786,15 @@ class my_process(Process):
                 #wave_entropy = self.scan_data.wave_entropy[t_ii][lvl]
                 #wave_kurtosis = self.scan_data.wave_kurtosis[t_ii][lvl]
                 
-                X[t_ii].extend(self.flatten(homogeneity))
-                X[t_ii].extend(self.flatten(entropy))
-                X[t_ii].extend(self.flatten(energy))
-                X[t_ii].extend(self.flatten(contrast))
-                X[t_ii].extend(self.flatten(dissimilarity))
-                X[t_ii].extend(self.flatten(correlation))
-                #X[t_ii].extend(flatten(wave_energy))
-                #X[t_ii].extend(flatten(wave_entropy))
-                #X[t_ii].extend(flatten(wave_kurtosis))
+                X[t_ii].extend(self._flatten(homogeneity))
+                X[t_ii].extend(self._flatten(entropy))
+                X[t_ii].extend(self._flatten(energy))
+                X[t_ii].extend(self._flatten(contrast))
+                X[t_ii].extend(self._flatten(dissimilarity))
+                X[t_ii].extend(self._flatten(correlation))
                 
-                #X[ii, lvl + lvl*jj*no_features] = homogeneity[0,jj]
-                #X[ii, jj*no_features + 1 + kk] = entropy[0,jj]
-                #X[ii, jj*no_features + 2*feat_len] = energy[0,jj]
-                #X[ii, jj*no_features + 3*feat_len] = contrast[0,jj]
-                #X[ii, jj*no_features + 4*feat_len] = dissimilarity[0,jj]
-                #X[ii, jj*no_features + 5*feat_len] = correlation[0,jj]
-                
-            
             #add the density measure for this scan
-            #X[t_ii].append(self.scan_data.density[t_ii])
+            X[t_ii].append(self.scan_data.density[t_ii])
             #set the cancer statues for this scan            
             Y.append(self.cancer_status[t_ii])    
         self.manager.add_skipped_files(self.skipped_ids, self.skipped_lateralities, self.skipped_cancer_status, self.skipped_exam)
