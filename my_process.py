@@ -48,15 +48,15 @@ from db import spreadsheet
 
 
 """
-my_thread:
+my_process:
 
 Description: 
-class that holds all of the data and methods to be used within each thread for 
-processing and training the model. This class uses threading.Thread as the base class,
+class that holds all of the data and methods to be used within each process for 
+processing and training the model. This class uses processing.Process as the base class,
 and extends on it's functionality to make it suitable for our use.
 
 Memeber variables are included such as the feature object defined in feature_extract.py
-Each thread will have a feature object as a member variable, and will use this member
+Each process will have a feature object as a member variable, and will use this member
 to do the bulk of the processing. This class is defined purely to parellelize the workload
 over multiple cores.
 
@@ -67,9 +67,9 @@ the instances. Doing this just wraps everything a lot nicer.
 
 
 class shared(object):
-    #some reference variables that will be shared by all of the individual thread objects
-    #whenever any of these reference variables are accessed, the thread lock should be applied,
-    #to ensure multiple threads arent accessing the same memory at the same time
+    #some reference variables that will be shared by all of the individual process objects
+    #whenever any of these reference variables are accessed, the process lock should be applied,
+    #to ensure multiple processs arent accessing the same memory at the same time
     
     q = Queue(750000)             #queue that will contain the filenames of the scans
     q_cancer = Queue(750000)      #queue that will contain the cancer status of the scans
@@ -351,10 +351,10 @@ class shared(object):
     
     Description: 
     This function will add all of the features from scans processed
-    in a single thread/process and add them to the list in the manager
+    in a single process/process and add them to the list in the manager
     
     @params
-    X = N x M array containing the features from the scans processed in the thread
+    X = N x M array containing the features from the scans processed in the process
         N = number of scans processed
         M = Number of features per scan
     
@@ -430,26 +430,26 @@ my_manager.register('shared', shared)
 
 
 
-class my_thread(Process):    
+class my_process(Process):    
     
     """
     __init__()
     
     Description:
-    Will initialise the thread and the feature member variable.
+    Will initialise the process and the feature member variable.
     
-    @param thread_id = integer to identify individual thread s
+    @param process_id = integer to identify individual process s
     @param num_images_total = the number of images about to be processed in TOTAL
     @param command_line_args = arguments object that holds the arguments parsed from 
            the command line. These areguments decide whether we are training, preprocessing etc.
     
     """
     
-    def __init__(self, thread_id, no_images_total, manager, command_line_args):
+    def __init__(self, process_id, no_images_total, manager, command_line_args):
         Process.__init__(self)
-        print('Initialising thread %d' %thread_id)
+        print('Initialising process %d' %process_id)
         self.manager = manager
-        self.t_id = thread_id
+        self.t_id = process_id
         self.scan_data = feature(levels = 2, wavelet_type = 'db4', no_images = no_images_total ) #the object that will contain all of the data
         self.scan_data.current_image_no = 0    #initialise to the zeroth mammogram
         self.data_path = command_line_args.input_path
@@ -490,14 +490,14 @@ class my_thread(Process):
     run()
     
     Description:
-    Overloaded version of the Thread modules run function, which is called whenever the thread
+    Overloaded version of the Process modules run function, which is called whenever the process
     is started. This will essentially just call the processing member function , which handles
-    the sequence for the running of the thread
+    the sequence for the running of the process
     """
     
     def run(self):
         #just run the process function
-        print('Begin process in thread %d' %self.t_id)
+        print('Begin process in process %d' %self.t_id)
         self.process()
         
         
@@ -506,10 +506,10 @@ class my_thread(Process):
     process()
     
     Description:
-    The bulk of the running of the thread is handeled in this function. This function handles
+    The bulk of the running of the process is handeled in this function. This function handles
     the sequence of processing required, ie. loaading scans, preprocessing etc.
     
-    Also handles synchronization of the threads, by locking the threads when accessing the 
+    Also handles synchronization of the processs, by locking the processs when accessing the 
     class reference variables, such as the queues
     
     The process function will continue to loop until the queues are empty. When the queues
@@ -530,14 +530,14 @@ class my_thread(Process):
     
     
     def process(self):
-        print('Running thread %d' %self.t_id)
+        print('Running process %d' %self.t_id)
         #while there is still names on the list, continue to loop through
         #while the queue is not empty
         while( not self.manager.get_exit_status()):
             #variable that is used to see if we want to process this scan
             #or skip it
             valid = True
-            #lock the threads so only one is accessing the queue at a time
+            #lock the processs so only one is accessing the queue at a time
             #start the preprocessing timer
             start_time = timeit.default_timer()
             self.manager.t_lock_acquire()
@@ -630,7 +630,7 @@ class my_thread(Process):
                         #now that we have the features, we want to append them to
                         #the list of features
                         #The list of features is shared amongst all of the class instances, so
-                        #before we add anything to there, we should lock other threads from adding
+                        #before we add anything to there, we should lock other processs from adding
                         #to it
                         self.scan_data.current_image_no += 1   #increment the image index
                         lock_time = timeit.default_timer()
@@ -676,11 +676,11 @@ class my_thread(Process):
                 
         #there is nothing left on the queue, so we are ready to exit
         #before we exit though, we just need to crop the feature arrays to include
-        #only the number of images we looked at in this individual thread
+        #only the number of images we looked at in this individual process
         self.add_features()
         
         #now just print a message to say that we are done
-        print('Thread %d is out' %self.t_id)
+        print('Process %d is out' %self.t_id)
         sys.stdout.flush()
         
         
@@ -776,7 +776,7 @@ class my_thread(Process):
     
     Description:
     Am done with selection and aquisition of features. 
-    Will add the features from this thread to the manager
+    Will add the features from this process to the manager
     
     """
     
