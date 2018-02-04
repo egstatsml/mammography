@@ -7,7 +7,7 @@ import pandas as pd
 import sys
 import getopt
 
-#this allows us to create figures over ssh and save to file
+#this allows us to create figures when no display environment variable is available
 import matplotlib as mpl
 mpl.use('Agg')
 from matplotlib import pyplot as plt
@@ -51,12 +51,18 @@ from log import logger
 from cmd_arguments import arguments
 
 
-
+##################################
+#
+# Helper functions for the main parts of the program
+# called from this script
+#
+##################################
 
 def flatten(x):
     "Flatten one level of nesting"
     return chain.from_iterable(x)
 
+
 
 def create_classifier_arrays(shared):
     
@@ -74,14 +80,14 @@ def create_classifier_arrays(shared):
     
     return X, Y, lateralities, exams, subject_ids, bc_histories, bc_first_degree_histories, bc_first_degree_histories_50, anti_estrogens
 
-
+
 
 def my_pickle_save(data, filename):
     with open(filename, 'wb') as f:
         pickle.dump(data,f)
     f.close()
     
-    
+    
     
 def my_pickle_load(filename):
     with open(filename, 'rb') as f:
@@ -90,54 +96,42 @@ def my_pickle_load(filename):
     return data
     
     
-
-
-
+
 
 def load_results(command_line_args):
     with open(os.path.join(command_line_args.save_path, 'model_data/results.txt')) as f:
         lines = f.read().splitlines()
-        
         
     #now map the results to an array of ints
     results = np.array( map(float, lines) )
     print results
     return results
 
-
+
 def terminal_cmd(command):
     print(command)
     os.system(command)
     
+    
     
-    
-    
-"""
-add_metadata_features()
-
-Description:
-If we are running model for sub challenge 2, we should add the metadata features
-
-@param X = original textural based features
-@param Y = array with class identiers
-@param command_line_args = arguments object with all of our arguments we parsed in
-
-"""
-
 def add_metadata_features(X,Y,command_line_args):
+    """
+    add_metadata_features()
     
+    Description:
+    If we are running model for sub challenge 2, we should add the metadata features
+    
+    @param X = original textural based features
+    @param Y = array with class identiers
+    @param command_line_args = arguments object with all of our arguments we parsed in
+    
+    """
     
     #load in metadata
     bc_histories = np.load(os.path.join(command_line_args.save_path, 'model_data/bc_histories.npy'))
     bc_first_degree_histories = np.load(os.path.join(command_line_args.save_path, 'model_data/bc_first_degree_histories.npy'))
     bc_first_degree_histories_50 = np.load(os.path.join(command_line_args.save_path, 'model_data/bc_first_degree_histories_50.npy'))
     anti_estrogens = np.load(os.path.join(command_line_args.save_path, 'model_data/anti_estrogens.npy'))
-    
-    print('X shape')
-    print X.shape
-    print('bc shape')
-    print bc_histories.shape
-    
     
     X = np.append(X,bc_histories.reshape([bc_histories.size, 1]), axis=1)
     X = np.append(X,bc_first_degree_histories.reshape([bc_first_degree_histories.size, 1]), axis=1)
@@ -146,28 +140,25 @@ def add_metadata_features(X,Y,command_line_args):
     
     return X,Y
     
-    
-    
-    
-    
-    
-    
-def begin_processes(command_line_args, descriptor):
-    #initialise list of processes
-    processes = []
-    id = 0
-    num_processes = cpu_count() - 3
-    print("Number of processes to be initiated = %d" %num_processes )
-    
-    man = my_manager()
-    man.start()
-    shared = man.shared()
-    
+    
+
+def setup_queue(shared, descriptor):
+    """
+    setup_queue()
+
+    Description:
+    Information from all the scans are input to this function, and is added to 
+    the queue that is shared amoungst all individual processes
+
+    @param shared = my_manager object (defined in my_process) that holds the queue for 
+                    each process to access
+    @param descriptor = the database (db) object that has the information on each scan that was
+                         read from the spreadsheet
+    """
     print("Number of Scans = %d" %(descriptor.no_scans))
     #setting up the queue for all of the processes, which contains the filenames
     #also add everything for the metadata queues
     print("Setting up Queues")
-    
     for ii in range(0, descriptor.no_scans):
         
         shared.q_put(descriptor.filenames[ii])
@@ -177,14 +168,47 @@ def begin_processes(command_line_args, descriptor):
         shared.q_subject_id_put(descriptor.subject_id_list[ii])
         shared.q_bc_history_put(descriptor.bc_history_list[ii])
         shared.q_bc_first_degree_history_put(descriptor.bc_first_degree_history_list[ii])
-        shared.q_bc_first_degree_history_50_put(descriptor.bc_first_degree_history_50_list[ii])        
+        shared.q_bc_first_degree_history_50_put(descriptor.bc_first_degree_history_50_list[ii])
         shared.q_anti_estrogen_put(descriptor.anti_estrogen_list[ii])
         shared.q_bbs_put(descriptor.bbs_list[ii])
         shared.q_conf_put(descriptor.conf_list[ii])
-        
     print('Set up Queues')
     
-    
+    
+
+##################################
+#
+# Programs that are specified to run via command line arguments
+#
+##################################
+
+
+def begin_processes(command_line_args, descriptor):
+    """
+    begin_processes()
+
+    Description:
+
+    Is the main method in this program.
+    This will initiate the specified number of processes to handle the mammograms.
+    Command line arguments are supplied to indicate whether the individual processes
+    should be preprocessing the raw mammography data, extracting features or performing both
+    tasks.
+
+    @param command_line_args = arguments object that will have all of the relevant information
+                               parsed from the command line
+    @param descriptor = the database (db) object that has the information on the scans
+    """
+    #initialise list of processes
+    processes = []
+    id = 0
+    num_processes = cpu_count() - 3
+    print("Number of processes to be initiated = %d" %num_processes )
+    #initialise manager that will handle sharing of information between the processes
+    man = my_manager()
+    man.start()
+    shared = man.shared()
+    setup_queue(shared, descriptor)
     #Create new processes
     print('Creating processes')
     for ii in range(0,num_processes):
@@ -204,28 +228,26 @@ def begin_processes(command_line_args, descriptor):
     
     #queue is empty so we are just about ready to finish up
     #set the exit flag to true
-    
     #wait until all processes are done
     for t in processes:
         t.join()
         
         
     #all of the processes are done, so we can now we can use the features found to train
-    #the classifier
-    
+    #the classifier    
     #will be here after have run through everything
     #lets save the features we found, and the file ID's of any that
     #created any errors so I can have a look later
     #will just convert the list of error files to a pandas database to look at later
     error_database = pd.DataFrame(shared.get_error_files())
     #will save the erroneous files as csv
-    #error_database.to_csv('error_files.csv')
+    error_database.to_csv('error_files.csv')
     
-    
-    #now lets save the features found
-    #will just use the features from the approximation wavelet decomps
-    
-    X, Y, lateralities, exams, subject_ids, bc_histories, bc_first_degree_histories, bc_first_degree_histories_50, anti_estrogens = create_classifier_arrays(shared)
+    X, Y, lateralities,
+    exams, subject_ids, bc_histories,
+    bc_first_degree_histories, bc_first_degree_histories_50,
+    anti_estrogens = create_classifier_arrays(shared)
+ 
     #if we specified we want to do PCA
     if(command_line_args.principal_components):
         print('Performing PCA on texture features with %d principal components' %(command_line_args.principal_components))
@@ -257,46 +279,45 @@ def begin_processes(command_line_args, descriptor):
     np.save(os.path.join(command_line_args.save_path , 'model_data/bc_first_degree_histories_50'), bc_first_degree_histories_50)
     np.save(os.path.join(command_line_args.save_path , 'model_data/anti_estrogens'), anti_estrogens)        
     #save the files that we skipped
-    my_pickle_save(shared.get_skipped_ids(), os.path.join(command_line_args.save_path , 'model_data/skipped_ids'))
-    my_pickle_save(shared.get_skipped_lateralities(), os.path.join(command_line_args.save_path , 'model_data/skipped_lateralities'))
-    my_pickle_save(shared.get_skipped_cancer_status(), os.path.join(command_line_args.save_path , 'model_data/skipped_cancer_status'))
-    my_pickle_save(shared.get_skipped_exam(), os.path.join(command_line_args.save_path , 'model_data/skipped_exam'))
+    my_pickle_save(shared.get_skipped_ids(),
+                   os.path.join(command_line_args.save_path,
+                                'model_data/skipped_ids'))
+    my_pickle_save(shared.get_skipped_lateralities(),
+                   os.path.join(command_line_args.save_path,
+                                'model_data/skipped_lateralities'))
+    my_pickle_save(shared.get_skipped_cancer_status(),
+                   os.path.join(command_line_args.save_path,
+                                'model_data/skipped_cancer_status'))
+    my_pickle_save(shared.get_skipped_exam(),
+                   os.path.join(command_line_args.save_path,
+                                'model_data/skipped_exam'))
     
-    
-    
-"""
-preprocessing()
-
-Description:
-
-Will call the function to begin all processes and start preprocessing all of the data
-
-"""    
+    
 
 def preprocessing(command_line_args, descriptor):
+    """
+    preprocessing()
     
+    Description:
+    
+    Will call the function to begin all processes and start preprocessing all of the data
+    """    
     #basically can just run all the processes
     begin_processes(command_line_args, descriptor)
     
-    
-    
-    
-    
-    
-    
-"""
-train_model()
-
-Description:
-If the command line arguments specified that we should train the model,
-this function will be called. Uses the GPU enhanced version of LIBSVM to train the model.
-
-In the command_line_args object, a path to a file containing the variables to train the models is found.
-
-"""
-
+    
 
 def train_model(command_line_args, descriptor):
+    """
+    train_model()
+    
+    Description:
+    If the command line arguments specified that we should train the model,
+    this function will be called. Uses the GPU enhanced version of LIBSVM to train the model.
+    
+    In the command_line_args object, a path to a file containing the variables to train the models is found.
+    
+    """
     
     #if we are forcing to capture the features, we will do so now.
     #otherwise we will use the ones found during initial preprocessing
@@ -314,8 +335,7 @@ def train_model(command_line_args, descriptor):
     
     if(os.path.isfile(os.path.join(command_line_args.model_path , 'X.npy'))):
         X = np.load(os.path.join(command_line_args.model_path , 'X.npy'))
-        Y = np.load(os.path.join(command_line_args.model_path , 'Y.npy'))
-            
+        Y = np.load(os.path.join(command_line_args.model_path , 'Y.npy'))        
     else:
         X = np.load(os.path.join(command_line_args.model_path, 'X_temp.npy'))
         Y = np.load(os.path.join(command_line_args.model_path, 'Y_temp.npy'))
@@ -334,10 +354,7 @@ def train_model(command_line_args, descriptor):
     #now features are extracted, lets train using this bad boy
     terminal_cmd(command_line_args.train_string)
     
-    
-    
-    
-    
+    
     
 def validate_model(command_line_args, descriptor):
     
@@ -458,16 +475,8 @@ def validate_model(command_line_args, descriptor):
         out.write('\n')
         
     out.close()
-    
-    
-    
-    
-#####################################################
-#
-#                Main of Program
-#
-#####################################################
 
+
 
 if __name__ == '__main__':
     #start the program timer
@@ -481,28 +490,21 @@ if __name__ == '__main__':
     #
     #The only time we would want to redo this when training is if we are
     #going to extract features again.
-    #Normally loading in this data again even if we weren't going to use it wouldn't be a big deal,
-    #but when doing it as part of the challenge, since there are so many scans it can take a while,
+    #Normally loading in this data again even if we weren't going to use it
+    #wouldn't be a big deal, but when doing it as part of the challenge,
+    #since there are so many scans it can take a while,
     #so don't want to do it if I don't have to
     
     descriptor = []
-    
-    if(command_line_args.preprocessing | command_line_args.validation | command_line_args.extract_features):
+    if(command_line_args.preprocessing | command_line_args.validation |
+       command_line_args.extract_features):
         descriptor = spreadsheet(command_line_args)
-        
-        
     if(command_line_args.preprocessing):
         preprocessing(command_line_args, descriptor)
-        
-        
     #if we want to train the model, lets start training
     if(command_line_args.training):
         train_model(command_line_args, descriptor)
-        
-        
     #if we want to do some validation, lets dooo it :)
     if(command_line_args.validation):
         validate_model(command_line_args, descriptor)
-        
-        
     print("Exiting Main Process")
